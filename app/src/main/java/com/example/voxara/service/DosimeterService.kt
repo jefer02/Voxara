@@ -21,6 +21,7 @@ import com.example.voxara.audio.AudioBurstSampler
 import com.example.voxara.audio.HeuristicSceneClassifier
 import com.example.voxara.complication.DoseComplicationService
 import com.example.voxara.core.advice.AdviceGrammar
+import com.example.voxara.data.LocaleStore
 import com.example.voxara.core.dose.PEAK_CEILING_DBC
 import com.example.voxara.core.dose.SampleState
 import com.example.voxara.core.dose.energyAverage
@@ -360,13 +361,16 @@ class DosimeterService : LifecycleService() {
         startForeground(NOTIFICATION_ID, notification, type)
     }
 
+    /** The wearer's chosen language, re-read per use: the setting can change under us. */
+    private fun strings() = LocaleStore.localized(this)
+
     private fun createChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    getString(R.string.channel_dosimeter),
+                    strings().getString(R.string.channel_dosimeter),
                     NotificationManager.IMPORTANCE_LOW,
                 ).apply { setShowBadge(false) }
             )
@@ -375,14 +379,17 @@ class DosimeterService : LifecycleService() {
 
     private fun buildNotification(risk: RiskState): Notification {
         val s = ExposureRepository.state.value
-        val content = "${s.dba.roundToInt()} dBA · ${s.dosePercent.roundToInt()}% dose"
+        val res = strings()
+        val content = res.getString(
+            R.string.notification_content, s.dba.roundToInt(), s.dosePercent.roundToInt(),
+        )
         val pending = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_voxara_status)
-            .setContentTitle(getString(R.string.app_name))
+            .setContentTitle(res.getString(R.string.app_name))
             .setContentText(content)
             .setOngoing(true)
             .setSilent(true)
