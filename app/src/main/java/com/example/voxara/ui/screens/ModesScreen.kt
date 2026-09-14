@@ -19,12 +19,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
+import com.example.voxara.R
+import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.AppMode
 import com.example.voxara.data.ExposureState
 import com.example.voxara.data.Scenario
+import com.example.voxara.text.blurbRes
+import com.example.voxara.text.indexRes
+import com.example.voxara.text.labelRes
+import com.example.voxara.text.titleRes
 import com.example.voxara.ui.theme.LocalVoxTypography
 import com.example.voxara.ui.theme.Vox
 
@@ -40,6 +47,8 @@ fun ModesScreen(
     onCalibration: (Double) -> Unit,
     onScenario: (Scenario) -> Unit,
     onResetDose: () -> Unit,
+    language: AppLanguage,
+    onLanguage: (AppLanguage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val type = LocalVoxTypography.current
@@ -54,7 +63,7 @@ fun ModesScreen(
             start = 18.dp, end = 18.dp, top = 34.dp, bottom = 40.dp,
         ),
     ) {
-        item { Meta("MODES", color = Vox.Ink3) }
+        item { Meta(stringResource(R.string.modes_title), color = Vox.Ink3) }
 
         items(AppMode.entries.toList()) { mode ->
             ModeCard(
@@ -66,13 +75,15 @@ fun ModesScreen(
 
         item { Panel {
             StatRow(
-                "MONITORING",
-                if (state.monitoring) "ON" else "OFF",
+                stringResource(R.string.monitoring),
+                stringResource(if (state.monitoring) R.string.on else R.string.off),
                 if (state.monitoring) Vox.Safe else Vox.Ink3,
             )
             Box(Modifier.padding(top = 8.dp)) {
                 Capsule(
-                    text = if (state.monitoring) "STOP" else "START",
+                    text = stringResource(
+                        if (state.monitoring) R.string.action_stop else R.string.action_start,
+                    ),
                     tint = if (state.monitoring) Vox.Ink3 else Vox.Safe,
                     onClick = { onMonitoring(!state.monitoring) },
                 )
@@ -80,22 +91,32 @@ fun ModesScreen(
         } }
 
         item { Panel {
-            Meta("CALIBRATION OFFSET", color = Vox.Ink3, small = true)
+            Meta(stringResource(R.string.calibration_offset), color = Vox.Ink3, small = true)
             Row(
                 Modifier.fillMaxWidth().padding(top = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Capsule("−", Vox.Ink3, onClick = { onCalibration(state.calibrationOffsetDb - 0.5) })
+                Capsule(
+                    stringResource(R.string.decrease),
+                    Vox.Ink3,
+                    onClick = { onCalibration(state.calibrationOffsetDb - 0.5) },
+                )
                 Text(
-                    text = "%+.1f dB".format(state.calibrationOffsetDb),
+                    text = stringResource(
+                        R.string.calibration_value, state.calibrationOffsetDb,
+                    ),
                     color = Vox.Ink1,
                     style = type.numeral,
                 )
-                Capsule("+", Vox.Ink3, onClick = { onCalibration(state.calibrationOffsetDb + 0.5) })
+                Capsule(
+                    stringResource(R.string.increase),
+                    Vox.Ink3,
+                    onClick = { onCalibration(state.calibrationOffsetDb + 0.5) },
+                )
             }
             Text(
-                text = "Reference: pink noise at 94 dB, 1 kHz. Indicative, not medical: expect ±3 dB.",
+                text = stringResource(R.string.calibration_note),
                 color = Vox.Ink3,
                 style = type.body,
                 textAlign = TextAlign.Center,
@@ -105,10 +126,9 @@ fun ModesScreen(
 
         if (state.simulated) {
             item { Panel {
-                Meta("BENCH SOURCE", color = Vox.Signal, small = true)
+                Meta(stringResource(R.string.bench_source), color = Vox.Signal, small = true)
                 Text(
-                    text = "The microphone is unavailable, so the ring is being driven by a " +
-                        "scripted level. Nothing here is a measurement.",
+                    text = stringResource(R.string.bench_note),
                     color = Vox.Ink2,
                     style = type.body,
                     textAlign = TextAlign.Center,
@@ -117,7 +137,11 @@ fun ModesScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Scenario.entries.forEach { s ->
                         Capsule(
-                            text = "${s.label} ${s.dba.toInt()}",
+                            text = stringResource(
+                                R.string.scenario_chip,
+                                stringResource(s.labelRes()),
+                                s.dba.toInt(),
+                            ),
                             tint = Vox.Ink3,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { onScenario(s) },
@@ -128,17 +152,54 @@ fun ModesScreen(
         }
 
         item { Panel {
-            StatRow("DAILY DOSE", "${state.dosePercent.toInt()}%", Vox.Ink1)
-            StatRow("WHO WEEK", "${(state.weeklyFraction * 100).toInt()}%", Vox.Ink1)
-            StatRow("PEAK", "${state.peakDbc.toInt()} dBC", Vox.Ink1)
+            StatRow(
+                stringResource(R.string.daily_dose),
+                stringResource(R.string.tile_dose_value, state.dosePercent.toInt()),
+                Vox.Ink1,
+            )
+            StatRow(
+                stringResource(R.string.who_week),
+                stringResource(R.string.tile_dose_value, (state.weeklyFraction * 100).toInt()),
+                Vox.Ink1,
+            )
+            StatRow(
+                stringResource(R.string.peak),
+                stringResource(R.string.unit_dbc_value, state.peakDbc.toInt()),
+                Vox.Ink1,
+            )
             Box(Modifier.padding(top = 8.dp)) {
-                Capsule("RESET DOSE", Vox.Critical, onClick = onResetDose)
+                Capsule(stringResource(R.string.reset_dose), Vox.Critical, onClick = onResetDose)
             }
+        } }
+
+        // LANGUAGE - the one setting that changes every other word on every surface.
+        item { Panel {
+            Meta(stringResource(R.string.language), color = Vox.Ink3, small = true)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                AppLanguage.entries.forEach { option ->
+                    Capsule(
+                        text = stringResource(option.labelRes()),
+                        tint = if (option == language) Vox.Safe else Vox.Ink3,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onLanguage(option) },
+                    )
+                }
+            }
+            Text(
+                text = stringResource(R.string.language_note),
+                color = Vox.Ink3,
+                style = type.body,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         } }
 
         item {
             Text(
-                text = "Indicative measurement, not a medical device. No audio leaves the watch.",
+                text = stringResource(R.string.disclaimer),
                 color = Vox.Ink3,
                 style = type.body,
                 textAlign = TextAlign.Center,
@@ -170,11 +231,6 @@ private fun ModeCard(mode: AppMode, selected: Boolean, onClick: () -> Unit) {
         AppMode.URBAN -> Vox.Safe
         AppMode.VOICE -> Vox.Signal
     }
-    val blurb = when (mode) {
-        AppMode.CONCERT -> "Continuous, 6 h cap. Countdown, not dose percent."
-        AppMode.URBAN -> "Adaptive 1.7–20% duty cycle. Silent until 80 dBA."
-        AppMode.VOICE -> "One sentence, spoken and shown. Watch mic only."
-    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -189,15 +245,15 @@ private fun ModeCard(mode: AppMode, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(mode.subtitle, color = Vox.Ink3, style = type.metaSmall)
+        Text(stringResource(mode.indexRes()), color = Vox.Ink3, style = type.metaSmall)
         Text(
-            mode.title,
+            stringResource(mode.titleRes()),
             color = if (selected) tint else Vox.Ink1,
             style = type.title,
             modifier = Modifier.padding(top = 2.dp),
         )
         Text(
-            blurb,
+            stringResource(mode.blurbRes()),
             color = Vox.Ink2,
             style = type.body,
             textAlign = TextAlign.Center,
