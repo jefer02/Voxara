@@ -28,7 +28,9 @@ import androidx.wear.tiles.TileService
 import androidx.wear.tiles.tooling.preview.Preview
 import androidx.wear.tiles.tooling.preview.TilePreviewData
 import androidx.wear.tooling.preview.devices.WearDevices
+import com.example.voxara.R
 import com.example.voxara.core.format.formatHeadroom
+import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.presentation.MainActivity
 import com.google.common.util.concurrent.Futures
@@ -98,6 +100,8 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
     val dba = p.lastDba
     val tint = tintFor(dba, dose)
     val headroom = headroomMinutes(dba, dose)
+    // Built by the tile host, which hands us its own context: resolve the language ourselves.
+    val res = LocaleStore.localized(context)
 
     val launch = ModifiersBuilders.Modifiers.Builder()
         .setClickable(
@@ -154,11 +158,11 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
         }
         .addContent(
             Column.Builder()
-                .addContent(meta("TODAY'S DOSE", INK3))
+                .addContent(meta(res.getString(R.string.tile_todays_dose), INK3))
                 .addContent(Spacer.Builder().setHeight(dp(2f)).build())
                 .addContent(
                     Text.Builder()
-                        .setText("${dose.roundToInt()}%")
+                        .setText(res.getString(R.string.tile_dose_value, dose.roundToInt()))
                         .setFontStyle(
                             FontStyle.Builder()
                                 .setSize(sp(34f))
@@ -171,8 +175,8 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
                 .addContent(Spacer.Builder().setHeight(dp(2f)).build())
                 .addContent(
                     meta(
-                        if (dba < 80.0) "NO DOSE ACCRUING"
-                        else "${formatHeadroom(headroom)} HEADROOM",
+                        if (dba < 80.0) res.getString(R.string.no_dose_accruing)
+                        else res.getString(R.string.headroom_suffix, formatHeadroom(headroom)),
                         INK1,
                     )
                 )
