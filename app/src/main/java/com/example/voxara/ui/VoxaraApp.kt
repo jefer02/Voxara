@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.AppMode
 import com.example.voxara.data.ExposureState
 import com.example.voxara.data.Scenario
@@ -57,6 +58,8 @@ fun VoxaraApp(
     onResetDose: () -> Unit,
     onConcertToggle: () -> Unit,
     onVoiceArm: () -> Unit,
+    language: AppLanguage,
+    onLanguage: (AppLanguage) -> Unit,
 ) {
     val pager = rememberPagerState(initialPage = PAGE_LIVE) { PAGE_COUNT }
     val scope = rememberCoroutineScope()
@@ -102,6 +105,8 @@ fun VoxaraApp(
                         onResetDose()
                         breachDismissedAt = 0.0
                     },
+                    language = language,
+                    onLanguage = onLanguage,
                 )
             }
         }
