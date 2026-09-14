@@ -12,14 +12,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
+import com.example.voxara.R
 import com.example.voxara.core.dose.DOSE_THRESHOLD_DBA
 import com.example.voxara.core.format.formatHeadroom
-import com.example.voxara.core.scene.Scene
-import com.example.voxara.core.scene.environmentLabel
 import com.example.voxara.data.ExposureState
+import com.example.voxara.text.labelRes
+import com.example.voxara.text.sceneOrBandLabelRes
 import com.example.voxara.ui.gauge.NeonReactiveGauge
 import com.example.voxara.ui.gauge.levelColor
 import com.example.voxara.ui.theme.LocalVoxTypography
@@ -39,10 +41,14 @@ fun LiveScreen(
     val type = LocalVoxTypography.current
     val dba = state.dba.toFloat()
     val tint = levelColor(dba)
-    val scene = if (state.scene == Scene.UNKNOWN) environmentLabel(state.dba) else state.scene.label
+    val scene = stringResource(sceneOrBandLabelRes(state.scene, state.dba))
 
-    val spoken = "${state.dba.roundToInt()} decibels, ${state.risk.label.lowercase()}, " +
-        "${state.dosePercent.roundToInt()} percent of today's dose used"
+    val spoken = stringResource(
+        R.string.cd_live,
+        state.dba.roundToInt(),
+        stringResource(state.risk.labelRes()).lowercase(),
+        state.dosePercent.roundToInt(),
+    )
 
     VoxScreen(
         modifier = modifier.semantics { contentDescription = spoken },
@@ -65,7 +71,7 @@ fun LiveScreen(
                     style = type.hero,
                 )
                 Box(Modifier.padding(start = 4.dp, bottom = 10.dp)) {
-                    Text("dBA", color = Vox.Ink3, style = type.metaSmall)
+                    Text(stringResource(R.string.unit_dba), color = Vox.Ink3, style = type.metaSmall)
                 }
             }
 
@@ -75,7 +81,7 @@ fun LiveScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text("DOSE", color = Vox.Ink2, style = type.metaSmall)
+                Text(stringResource(R.string.label_dose), color = Vox.Ink2, style = type.metaSmall)
                 Text(
                     text = "${state.dosePercent.roundToInt()}%",
                     color = if (ambient) Vox.Ink1 else tint,
@@ -84,8 +90,8 @@ fun LiveScreen(
             }
 
             Meta(
-                text = if (state.dba < DOSE_THRESHOLD_DBA) "NO DOSE ACCRUING"
-                else formatHeadroom(state.headroomMinutes) + " LEFT",
+                text = if (state.dba < DOSE_THRESHOLD_DBA) stringResource(R.string.no_dose_accruing)
+                else stringResource(R.string.headroom_left, formatHeadroom(state.headroomMinutes)),
                 color = Vox.Ink3,
                 small = true,
                 modifier = Modifier.padding(top = 2.dp),
@@ -96,7 +102,7 @@ fun LiveScreen(
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
-                Meta("BENCH SOURCE", color = Vox.Signal, small = true)
+                Meta(stringResource(R.string.bench_source), color = Vox.Signal, small = true)
             }
         }
     }
@@ -112,9 +118,10 @@ fun BreachScreen(
     modifier: Modifier = Modifier,
 ) {
     val type = LocalVoxTypography.current
+    val breachSpoken = stringResource(R.string.cd_breach)
     VoxScreen(
         modifier = modifier.semantics {
-            contentDescription = "Daily limit reached. Protect your ears or leave."
+            contentDescription = breachSpoken
         },
         behind = {
             NeonReactiveGauge(
@@ -125,20 +132,20 @@ fun BreachScreen(
         },
     ) {
         ColumnCenter {
-            Meta("DAILY LIMIT REACHED", color = Vox.Critical, small = true)
+            Meta(stringResource(R.string.daily_limit_reached), color = Vox.Critical, small = true)
             Text(
                 text = state.dba.roundToInt().toString(),
                 color = Vox.Critical,
                 style = type.hero,
             )
             Meta(
-                "dBA · ${state.dosePercent.roundToInt()}% DOSE",
+                stringResource(R.string.dba_and_dose, state.dosePercent.roundToInt()),
                 color = Vox.Ink1,
                 small = true,
             )
             Box(Modifier.padding(top = 10.dp)) {
                 Capsule(
-                    text = "PROTECT OR LEAVE",
+                    text = stringResource(R.string.protect_or_leave),
                     tint = Vox.Critical,
                     onClick = onDismiss,
                 )
