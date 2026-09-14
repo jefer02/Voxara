@@ -17,9 +17,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
+import com.example.voxara.R
 import com.example.voxara.core.dose.energyAverage
 import com.example.voxara.core.format.formatTwa
 import com.example.voxara.data.ExposureState
@@ -60,18 +62,20 @@ fun DayScreen(
         if (doseToday <= 0.0) null else 10.0 * log10(doseToday / 100.0) + 85.0
     }
     val dayLabel = when (index) {
-        0 -> "TODAY"
-        1 -> "YESTERDAY"
-        else -> "$index DAYS AGO"
+        0 -> stringResource(R.string.day_today)
+        1 -> stringResource(R.string.day_yesterday)
+        else -> stringResource(R.string.day_n_ago, index)
     }
+    val spoken = stringResource(
+        R.string.cd_day, dayLabel, twa?.roundToInt() ?: 0, doseToday.roundToInt(),
+    )
 
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
     VoxScreen(
         modifier = modifier
             .semantics {
-                contentDescription = "$dayLabel, time weighted average " +
-                    "${twa?.roundToInt() ?: 0} decibels, ${doseToday.roundToInt()} percent dose"
+                contentDescription = spoken
             }
             .onRotaryScrollEvent { event ->
                 accumulated += event.verticalScrollPixels
@@ -94,10 +98,10 @@ fun DayScreen(
     ) {
         ColumnCenter {
             Meta(dayLabel, color = Vox.Ink3, small = true)
-            Meta("TWA 8H", color = Vox.Ink3, small = true)
+            Meta(stringResource(R.string.twa_8h), color = Vox.Ink3, small = true)
             if (twa == null) {
                 // Nothing accrued: no number to show, and a placeholder glyph would read as one.
-                Meta("NO DOSE LOGGED", color = Vox.Ink2)
+                Meta(stringResource(R.string.no_dose_logged), color = Vox.Ink2)
             } else {
                 Text(
                     text = twa.roundToInt().toString(),
@@ -105,10 +109,21 @@ fun DayScreen(
                     style = type.display,
                 )
             }
-            Meta("${doseToday.roundToInt()}% DOSE", color = Vox.Ink2, small = true)
+            Meta(
+                stringResource(R.string.dose_percent, doseToday.roundToInt()),
+                color = Vox.Ink2,
+                small = true,
+            )
             if (index == 0) {
                 Box(Modifier.padding(top = 6.dp)) {
-                    Meta("NIOSH ${formatTwa(state.twaDba)}", color = Vox.Ink3, small = true)
+                    Meta(
+                        stringResource(
+                            R.string.niosh_twa,
+                            formatTwa(state.twaDba) ?: stringResource(R.string.value_none),
+                        ),
+                        color = Vox.Ink3,
+                        small = true,
+                    )
                 }
             }
         }
