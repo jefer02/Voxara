@@ -27,6 +27,13 @@ fun headroomOf(minutes: Double): Headroom = when {
     else -> Headroom.Left(formatClock(minutes))
 }
 
+/** "8h 00m", "30m", "28s", or "SAFE". */
+fun formatHeadroom(minutes: Double): String = when (val h = headroomOf(minutes)) {
+    is Headroom.NotAccruing -> "SAFE"
+    is Headroom.LimitReached -> "0m"
+    is Headroom.Left -> h.clock
+}
+
 /** "8h 00m" / "30m" / "28s" — locale-neutral. */
 fun formatClock(minutes: Double): String = when {
     minutes < 1.0 -> "${(minutes * 60).roundToInt()}s"

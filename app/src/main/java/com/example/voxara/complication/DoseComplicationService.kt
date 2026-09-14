@@ -15,6 +15,7 @@ import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.example.voxara.R
 import com.example.voxara.core.format.formatHeadroom
+import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.tile.headroomMinutes
 import com.example.voxara.tile.tintFor
@@ -37,8 +38,10 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
     private fun build(type: ComplicationType, dose: Double, dba: Double): ComplicationData? {
         val pct = dose.roundToInt()
         val tint = tintFor(dba, dose)
+        // Created by the watch face, not by the app: it has to resolve the language itself.
+        val res = LocaleStore.localized(this)
         val description = PlainComplicationText.Builder(
-            "$pct percent of today's noise dose used"
+            res.getString(R.string.complication_cd, pct)
         ).build()
 
         return when (type) {
@@ -48,8 +51,16 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
                 max = 100f,
                 contentDescription = description,
             )
-                .setText(PlainComplicationText.Builder("$pct%").build())
-                .setTitle(PlainComplicationText.Builder("DOSE").build())
+                .setText(
+                    PlainComplicationText.Builder(
+                        res.getString(R.string.tile_dose_value, pct)
+                    ).build()
+                )
+                .setTitle(
+                    PlainComplicationText.Builder(
+                        res.getString(R.string.label_dose)
+                    ).build()
+                )
                 .setMonochromaticImage(
                     MonochromaticImage.Builder(
                         Icon.createWithResource(this, R.drawable.ic_voxara_status)
@@ -59,12 +70,15 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
                 .build()
 
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(
-                text = PlainComplicationText.Builder("$pct%").build(),
+                text = PlainComplicationText.Builder(
+                    res.getString(R.string.tile_dose_value, pct)
+                ).build(),
                 contentDescription = description,
             )
                 .setTitle(
                     PlainComplicationText.Builder(
-                        if (dba < 80.0) "SAFE" else formatHeadroom(headroomMinutes(dba, dose))
+                        if (dba < 80.0) res.getString(R.string.risk_calm)
+                        else formatHeadroom(headroomMinutes(dba, dose))
                     ).build()
                 )
                 .build()
