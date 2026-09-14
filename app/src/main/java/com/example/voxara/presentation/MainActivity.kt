@@ -1,6 +1,7 @@
 package com.example.voxara.presentation
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -16,8 +17,10 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.ambient.AmbientLifecycleObserver
 import androidx.wear.compose.material3.AppScaffold
+import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.AppMode
 import com.example.voxara.data.ExposureRepository
+import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.Scenario
 import com.example.voxara.service.DosimeterService
 import com.example.voxara.service.MidnightRollupWorker
@@ -30,6 +33,18 @@ class MainActivity : ComponentActivity() {
 
     private val ambient = mutableStateOf(false)
     private lateinit var voice: VoiceTurn
+
+    /** The language the resources below were inflated with; a change to it re-creates us. */
+    private var language = AppLanguage.SYSTEM
+
+    /**
+     * Every resource this activity resolves - and so every word the wearer reads - comes from
+     * the locale chosen here, before the first view exists. Wear has no AppCompat delegate to
+     * do it for us and minSdk 30 predates the per-app locale API, so we wrap the base context.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleStore.localized(newBase))
+    }
 
     private val ambientCallback = object : AmbientLifecycleObserver.AmbientLifecycleCallback {
         override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) {
@@ -52,6 +67,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         ExposureRepository.init(this)
+        language = LocaleStore.read(this)
         lifecycle.addObserver(AmbientLifecycleObserver(this, ambientCallback))
         MidnightRollupWorker.schedule(this)
 
@@ -73,6 +89,19 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent { VoxaraRoot(voice) }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Changed from the settings panel - or, in principle, from another surface.
+        if (LocaleStore.read(this) != language) recreate()
+    }
+
+    private fun setLanguage(choice: AppLanguage) {
+        if (choice == language) return
+        LocaleStore.set(this, choice)
+        voice.release()
+        recreate()
     }
 
     override fun onDestroy() {
@@ -150,6 +179,8 @@ class MainActivity : ComponentActivity() {
                         if (turn.phase == VoiceTurn.Phase.LISTENING) voice.stop()
                         else voice.start(state)
                     },
+                    language = language,
+                    onLanguage = ::setLanguage,
                 )
             }
         }

@@ -1,6 +1,7 @@
 package com.example.voxara.data
 
 import android.content.Context
+import com.example.voxara.core.advice.Advice
 import com.example.voxara.core.dose.DOSE_THRESHOLD_DBA
 import com.example.voxara.core.dose.NoiseDoseEngine
 import com.example.voxara.core.dose.SampleState
@@ -11,20 +12,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/** THREE MODES, ONE ENGINE. */
-enum class AppMode(val title: String, val subtitle: String) {
-    CONCERT("CONCERT / CLUB", "MODE 01"),
-    URBAN("FOCUS / URBAN", "MODE 02 \u00b7 DEFAULT"),
-    VOICE("VOICE / AI", "MODE 03"),
+/** THREE MODES, ONE ENGINE. Titles and blurbs are resolved from resources by the UI layer. */
+enum class AppMode {
+    CONCERT,
+    URBAN,
+    VOICE,
 }
 
 /** The scenario chips of the dossier's live gauge, kept as a bench driver for mic-less devices. */
-enum class Scenario(val label: String, val dba: Double) {
-    OFFICE("OFFICE", 52.0),
-    CAFE("CAF\u00c9", 71.0),
-    TRAFFIC("TRAFFIC", 86.0),
-    CLUB("CLUB", 104.0),
-    JACKHAMMER("JACKHAMMER", 113.0),
+enum class Scenario(val dba: Double) {
+    OFFICE(52.0),
+    CAFE(71.0),
+    TRAFFIC(86.0),
+    CLUB(104.0),
+    JACKHAMMER(113.0),
 }
 
 data class ExposureState(
@@ -46,7 +47,7 @@ data class ExposureState(
     val calibrationOffsetDb: Double = 0.0,
     val todayProfile: List<Float> = List(24) { 0f },
     val weekProfiles: List<List<Float>> = emptyList(),
-    val lastAdvice: String = "",
+    val lastAdvice: Advice? = null,
 ) {
     val headroomMinutes: Double get() = headroomSeconds / 60.0
     val accruing: Boolean get() = dba >= DOSE_THRESHOLD_DBA
