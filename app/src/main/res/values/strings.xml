@@ -1,0 +1,160 @@
+<resources>
+    <string name="app_name">Voxara</string>
+    <string name="tile_label">Noise dose</string>
+    <string name="complication_label">Noise dose</string>
+    <string name="channel_dosimeter">Noise monitoring</string>
+
+    <!-- Units and shared metadata. All-caps metadata only. -->
+    <string name="unit_dba">dBA</string>
+    <string name="unit_dbc_value">%1$d dBC</string>
+    <string name="label_dose">DOSE</string>
+    <string name="no_dose_accruing">NO DOSE ACCRUING</string>
+    <string name="headroom_left">%1$s LEFT</string>
+    <string name="headroom_suffix">%1$s HEADROOM</string>
+    <string name="limit_reached">LIMIT REACHED</string>
+    <string name="dose_percent">%1$d%% DOSE</string>
+    <string name="bench_source">BENCH SOURCE</string>
+    <string name="value_none">—</string>
+
+    <!-- Live gauge -->
+    <string name="daily_limit_reached">DAILY LIMIT REACHED</string>
+    <string name="dba_and_dose">dBA · %1$d%% DOSE</string>
+    <string name="protect_or_leave">PROTECT OR LEAVE</string>
+    <string name="cd_live">%1$d decibels, %2$s, %3$d percent of today\'s dose used</string>
+    <string name="cd_breach">Daily limit reached. Protect your ears or leave.</string>
+
+    <!-- Day ledger -->
+    <string name="day_today">TODAY</string>
+    <string name="day_yesterday">YESTERDAY</string>
+    <string name="day_n_ago">%1$d DAYS AGO</string>
+    <string name="twa_8h">TWA 8H</string>
+    <string name="no_dose_logged">NO DOSE LOGGED</string>
+    <string name="niosh_twa">NIOSH %1$s</string>
+    <string name="cd_day">%1$s, time weighted average %2$d decibels, %3$d percent dose</string>
+
+    <!-- Concert mode -->
+    <string name="concert_title">CONCERT / CLUB</string>
+    <string name="concert_blurb">Continuous sampling, capped at 6 hours. Auto-drops to Urban after 20 quiet minutes.</string>
+    <string name="action_start">START</string>
+    <string name="action_stop">STOP</string>
+    <string name="cd_concert_on">Concert mode. %1$d decibels, %2$s left.</string>
+    <string name="cd_concert_off">Concert mode off</string>
+
+    <!-- Voice -->
+    <string name="voice_listening">LISTENING</string>
+    <string name="voice_thinking">THINKING</string>
+    <string name="voice_no_asr">NO ON-DEVICE ASR</string>
+    <string name="voice_ask_title">ASK VOXARA</string>
+    <string name="voice_example">“Is it safe in here?”</string>
+    <string name="voice_quoted">“%1$s”</string>
+    <string name="action_ask">ASK</string>
+    <string name="cd_voice_idle">Voice mode. Tap to ask.</string>
+
+    <!-- Modes and settings -->
+    <string name="modes_title">MODES</string>
+    <string name="mode_concert_index">MODE 01</string>
+    <string name="mode_urban_index">MODE 02 · DEFAULT</string>
+    <string name="mode_voice_index">MODE 03</string>
+    <string name="mode_concert_title">CONCERT / CLUB</string>
+    <string name="mode_urban_title">FOCUS / URBAN</string>
+    <string name="mode_voice_title">VOICE / AI</string>
+    <string name="mode_concert_blurb">Continuous, 6 h cap. Countdown, not dose percent.</string>
+    <string name="mode_urban_blurb">Adaptive 1.7–20%% duty cycle. Silent until 80 dBA.</string>
+    <string name="mode_voice_blurb">One sentence, spoken and shown. Watch mic only.</string>
+
+    <string name="monitoring">MONITORING</string>
+    <string name="on">ON</string>
+    <string name="off">OFF</string>
+    <string name="calibration_offset">CALIBRATION OFFSET</string>
+    <string name="calibration_value">%1$+.1f dB</string>
+    <string name="calibration_note">Reference: pink noise at 94 dB, 1 kHz. Indicative, not medical: expect ±3 dB.</string>
+    <string name="decrease">−</string>
+    <string name="increase">+</string>
+    <string name="bench_note">The microphone is unavailable, so the ring is being driven by a scripted level. Nothing here is a measurement.</string>
+    <string name="scenario_chip">%1$s %2$d</string>
+    <string name="daily_dose">DAILY DOSE</string>
+    <string name="who_week">WHO WEEK</string>
+    <string name="peak">PEAK</string>
+    <string name="reset_dose">RESET DOSE</string>
+    <string name="disclaimer">Indicative measurement, not a medical device. No audio leaves the watch.</string>
+
+    <!-- Language -->
+    <string name="language">LANGUAGE</string>
+    <string name="language_system">SYSTEM</string>
+    <string name="language_english">ENGLISH</string>
+    <string name="language_spanish">ESPAÑOL</string>
+    <string name="language_note">Interface, spoken answers and voice commands all follow this setting.</string>
+
+    <!-- Risk states. Colour never carries information alone: these words always appear with it. -->
+    <string name="risk_calm">SAFE</string>
+    <string name="risk_accruing">ELEVATED</string>
+    <string name="risk_hazard">HIGH</string>
+    <string name="risk_critical">CRITICAL</string>
+    <string name="risk_recover">RECOVERING</string>
+
+    <!-- Classified scenes -->
+    <string name="scene_traffic">TRAFFIC</string>
+    <string name="scene_transit">TRANSIT</string>
+    <string name="scene_live_music">LIVE MUSIC</string>
+    <string name="scene_machinery">MACHINERY</string>
+    <string name="scene_conversation">CONVERSATION</string>
+    <string name="scene_quiet_indoor">QUIET INDOOR</string>
+    <string name="scene_unknown">UNKNOWN</string>
+
+    <!-- Level-only environment bands, used when the classifier is not confident -->
+    <string name="env_quiet_room">QUIET ROOM</string>
+    <string name="env_office">OFFICE</string>
+    <string name="env_conversation">CONVERSATION</string>
+    <string name="env_city_traffic">CITY TRAFFIC</string>
+    <string name="env_live_music">LIVE MUSIC</string>
+    <string name="env_nightclub">NIGHTCLUB</string>
+    <string name="env_power_tool">POWER TOOL</string>
+
+    <!-- Bench scenarios -->
+    <string name="scenario_office">OFFICE</string>
+    <string name="scenario_cafe">CAFÉ</string>
+    <string name="scenario_traffic">TRAFFIC</string>
+    <string name="scenario_club">CLUB</string>
+    <string name="scenario_jackhammer">JACKHAMMER</string>
+
+    <!-- Ongoing notification -->
+    <string name="notification_content">%1$d dBA · %2$d%% dose</string>
+
+    <!-- Tile -->
+    <string name="tile_todays_dose">TODAY\'S DOSE</string>
+    <string name="tile_dose_value">%1$d%%</string>
+
+    <!-- Complication -->
+    <string name="complication_cd">%1$d percent of today\'s noise dose used</string>
+
+    <!--
+        ADVICE GRAMMAR - state the fact, then one action. Never more than one instruction,
+        no medical claims, no guilt. Every number is injected by the dose engine.
+    -->
+    <string name="advice_fine">You\'re fine. Nothing to do today.</string>
+    <string name="advice_comfortable">Comfortable level. Nothing to do.</string>
+    <string name="advice_critical_music">Daily limit reached. Put in plugs or step outside.</string>
+    <string name="advice_critical_machinery">Daily limit reached. Put on protection now.</string>
+    <string name="advice_critical_generic">Daily limit reached. Leave or protect your ears.</string>
+    <string name="advice_hazard_music">%1$s left. Step back from the speakers.</string>
+    <string name="advice_hazard_machinery">%1$s left. Move away or wear protection.</string>
+    <string name="advice_hazard_transit">%1$s left. Move down the platform.</string>
+    <string name="advice_hazard_traffic">%1$s left. Cross to the quieter side.</string>
+    <string name="advice_hazard_generic">%1$s left at this level. Find somewhere quieter.</string>
+    <string name="advice_accruing_traffic">Loud commute. Switch to the quieter platform end.</string>
+    <string name="advice_accruing_transit">Loud carriage. Move a car forward.</string>
+    <string name="advice_accruing_music">%1$d%% used. Take a break between sets.</string>
+    <string name="advice_accruing_machinery">Dose is running. Fit protection before the next hour.</string>
+    <string name="advice_accruing_generic">%1$d dBA, dose running. Take a quiet break soon.</string>
+    <string name="advice_recover">Back under the line. Nothing more to do.</string>
+    <string name="advice_calm">%1$d%% used today. Keep going.</string>
+
+    <!-- Spoken answers to the six voice intents -->
+    <string name="answer_level">%1$d decibels, %2$s.</string>
+    <string name="answer_headroom_none">Nothing is accruing. Stay as long as you like.</string>
+    <string name="answer_headroom">%1$s left at this level.</string>
+    <string name="answer_history">Today: %1$d%% dose, TWA %2$s.</string>
+    <string name="answer_mode_concert">Concert mode on. Six hour cap.</string>
+    <string name="answer_mode_urban">Back to urban mode. I\'ll stay quiet.</string>
+    <string name="answer_calibrate">Calibration is in settings. Adjust until it matches a reference meter.</string>
+</resources>

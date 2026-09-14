@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Ignore the IconLocation for the Tile preview images -->
+    <issue id="IconLocation">
+        <ignore path="res/drawable/tile_preview.png" />
+        <ignore path="res/drawable-round/tile_preview.png" />
+    </issue>
+
+    <!--
+        False positive: the check reads the lowest fragment version declared anywhere in the
+        dependency graph (1.2.4, via a transitive Play Services artifact), but the graph
+        actually resolves androidx.fragment to 1.5.4. Voxara uses no Fragments of its own.
+    -->
+    <issue id="InvalidFragmentVersionForActivityResult" severity="ignore" />
+</lint>

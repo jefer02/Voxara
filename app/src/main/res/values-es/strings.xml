@@ -1,0 +1,159 @@
+<resources>
+    <string name="tile_label">Dosis de ruido</string>
+    <string name="complication_label">Dosis de ruido</string>
+    <string name="channel_dosimeter">Monitoreo de ruido</string>
+
+    <!-- Unidades y metadatos compartidos. Solo mayúsculas. -->
+    <string name="unit_dba">dBA</string>
+    <string name="unit_dbc_value">%1$d dBC</string>
+    <string name="label_dose">DOSIS</string>
+    <string name="no_dose_accruing">SIN ACUMULAR DOSIS</string>
+    <string name="headroom_left">QUEDAN %1$s</string>
+    <string name="headroom_suffix">%1$s DE MARGEN</string>
+    <string name="limit_reached">LÍMITE ALCANZADO</string>
+    <string name="dose_percent">%1$d%% DE DOSIS</string>
+    <string name="bench_source">FUENTE SIMULADA</string>
+    <string name="value_none">—</string>
+
+    <!-- Medidor en vivo -->
+    <string name="daily_limit_reached">LÍMITE DIARIO ALCANZADO</string>
+    <string name="dba_and_dose">dBA · %1$d%% DE DOSIS</string>
+    <string name="protect_or_leave">PROTÉGETE O SAL</string>
+    <string name="cd_live">%1$d decibelios, %2$s, %3$d por ciento de la dosis de hoy consumida</string>
+    <string name="cd_breach">Límite diario alcanzado. Protege tus oídos o sal del lugar.</string>
+
+    <!-- Registro del día -->
+    <string name="day_today">HOY</string>
+    <string name="day_yesterday">AYER</string>
+    <string name="day_n_ago">HACE %1$d DÍAS</string>
+    <string name="twa_8h">TWA 8H</string>
+    <string name="no_dose_logged">SIN DOSIS REGISTRADA</string>
+    <string name="niosh_twa">NIOSH %1$s</string>
+    <string name="cd_day">%1$s, promedio ponderado en el tiempo %2$d decibelios, %3$d por ciento de dosis</string>
+
+    <!-- Modo concierto -->
+    <string name="concert_title">CONCIERTO / CLUB</string>
+    <string name="concert_blurb">Muestreo continuo, con tope de 6 horas. Vuelve a Urbano tras 20 minutos en silencio.</string>
+    <string name="action_start">INICIAR</string>
+    <string name="action_stop">DETENER</string>
+    <string name="cd_concert_on">Modo concierto. %1$d decibelios, quedan %2$s.</string>
+    <string name="cd_concert_off">Modo concierto desactivado</string>
+
+    <!-- Voz -->
+    <string name="voice_listening">ESCUCHANDO</string>
+    <string name="voice_thinking">PENSANDO</string>
+    <string name="voice_no_asr">SIN RECONOCIMIENTO LOCAL</string>
+    <string name="voice_ask_title">PREGUNTA A VOXARA</string>
+    <string name="voice_example">«¿Es seguro aquí dentro?»</string>
+    <string name="voice_quoted">«%1$s»</string>
+    <string name="action_ask">PREGUNTAR</string>
+    <string name="cd_voice_idle">Modo de voz. Toca para preguntar.</string>
+
+    <!-- Modos y ajustes -->
+    <string name="modes_title">MODOS</string>
+    <string name="mode_concert_index">MODO 01</string>
+    <string name="mode_urban_index">MODO 02 · POR DEFECTO</string>
+    <string name="mode_voice_index">MODO 03</string>
+    <string name="mode_concert_title">CONCIERTO / CLUB</string>
+    <string name="mode_urban_title">ENFOQUE / URBANO</string>
+    <string name="mode_voice_title">VOZ / IA</string>
+    <string name="mode_concert_blurb">Continuo, tope de 6 h. Cuenta atrás, no porcentaje.</string>
+    <string name="mode_urban_blurb">Ciclo adaptativo del 1,7 al 20%%. En silencio hasta 80 dBA.</string>
+    <string name="mode_voice_blurb">Una frase, hablada y escrita. Solo el micro del reloj.</string>
+
+    <string name="monitoring">MONITOREO</string>
+    <string name="on">ACTIVO</string>
+    <string name="off">INACTIVO</string>
+    <string name="calibration_offset">AJUSTE DE CALIBRACIÓN</string>
+    <string name="calibration_value">%1$+.1f dB</string>
+    <string name="calibration_note">Referencia: ruido rosa a 94 dB, 1 kHz. Indicativo, no médico: espera ±3 dB.</string>
+    <string name="decrease">−</string>
+    <string name="increase">+</string>
+    <string name="bench_note">El micrófono no está disponible, así que el anillo usa un nivel simulado. Nada de esto es una medición.</string>
+    <string name="scenario_chip">%1$s %2$d</string>
+    <string name="daily_dose">DOSIS DIARIA</string>
+    <string name="who_week">SEMANA OMS</string>
+    <string name="peak">PICO</string>
+    <string name="reset_dose">REINICIAR DOSIS</string>
+    <string name="disclaimer">Medición indicativa, no es un dispositivo médico. El audio nunca sale del reloj.</string>
+
+    <!-- Idioma -->
+    <string name="language">IDIOMA</string>
+    <string name="language_system">SISTEMA</string>
+    <string name="language_english">ENGLISH</string>
+    <string name="language_spanish">ESPAÑOL</string>
+    <string name="language_note">La interfaz, las respuestas habladas y los comandos de voz siguen este ajuste.</string>
+
+    <!-- Estados de riesgo. El color nunca informa solo: estas palabras siempre lo acompañan. -->
+    <string name="risk_calm">SEGURO</string>
+    <string name="risk_accruing">ELEVADO</string>
+    <string name="risk_hazard">ALTO</string>
+    <string name="risk_critical">CRÍTICO</string>
+    <string name="risk_recover">RECUPERANDO</string>
+
+    <!-- Escenas clasificadas -->
+    <string name="scene_traffic">TRÁFICO</string>
+    <string name="scene_transit">TRANSPORTE</string>
+    <string name="scene_live_music">MÚSICA EN VIVO</string>
+    <string name="scene_machinery">MAQUINARIA</string>
+    <string name="scene_conversation">CONVERSACIÓN</string>
+    <string name="scene_quiet_indoor">INTERIOR TRANQUILO</string>
+    <string name="scene_unknown">DESCONOCIDO</string>
+
+    <!-- Bandas por nivel, cuando el clasificador no tiene confianza -->
+    <string name="env_quiet_room">SALA TRANQUILA</string>
+    <string name="env_office">OFICINA</string>
+    <string name="env_conversation">CONVERSACIÓN</string>
+    <string name="env_city_traffic">TRÁFICO URBANO</string>
+    <string name="env_live_music">MÚSICA EN VIVO</string>
+    <string name="env_nightclub">DISCOTECA</string>
+    <string name="env_power_tool">HERRAMIENTA ELÉCTRICA</string>
+
+    <!-- Escenarios de banco de pruebas -->
+    <string name="scenario_office">OFICINA</string>
+    <string name="scenario_cafe">CAFÉ</string>
+    <string name="scenario_traffic">TRÁFICO</string>
+    <string name="scenario_club">CLUB</string>
+    <string name="scenario_jackhammer">MARTILLO</string>
+
+    <!-- Notificación persistente -->
+    <string name="notification_content">%1$d dBA · %2$d%% de dosis</string>
+
+    <!-- Tarjeta -->
+    <string name="tile_todays_dose">DOSIS DE HOY</string>
+    <string name="tile_dose_value">%1$d%%</string>
+
+    <!-- Complicación -->
+    <string name="complication_cd">%1$d por ciento de la dosis de ruido de hoy consumida</string>
+
+    <!--
+        GRAMÁTICA DE CONSEJOS: primero el hecho, luego una sola acción. Nunca más de una
+        instrucción, sin afirmaciones médicas ni culpa. Cada cifra la inyecta el motor de dosis.
+    -->
+    <string name="advice_fine">Todo bien. Hoy no tienes que hacer nada.</string>
+    <string name="advice_comfortable">Nivel cómodo. Nada que hacer.</string>
+    <string name="advice_critical_music">Límite diario alcanzado. Ponte tapones o sal fuera.</string>
+    <string name="advice_critical_machinery">Límite diario alcanzado. Ponte protección ahora.</string>
+    <string name="advice_critical_generic">Límite diario alcanzado. Sal o protege tus oídos.</string>
+    <string name="advice_hazard_music">Quedan %1$s. Aléjate de los altavoces.</string>
+    <string name="advice_hazard_machinery">Quedan %1$s. Apártate o usa protección.</string>
+    <string name="advice_hazard_transit">Quedan %1$s. Camina hasta el otro extremo del andén.</string>
+    <string name="advice_hazard_traffic">Quedan %1$s. Cruza al lado más tranquilo.</string>
+    <string name="advice_hazard_generic">Quedan %1$s a este nivel. Busca un sitio más tranquilo.</string>
+    <string name="advice_accruing_traffic">Trayecto ruidoso. Cambia al extremo tranquilo del andén.</string>
+    <string name="advice_accruing_transit">Vagón ruidoso. Avanza un vagón.</string>
+    <string name="advice_accruing_music">Llevas %1$d%%. Descansa entre canciones.</string>
+    <string name="advice_accruing_machinery">La dosis corre. Ponte protección antes de la próxima hora.</string>
+    <string name="advice_accruing_generic">%1$d dBA, la dosis corre. Descansa pronto en silencio.</string>
+    <string name="advice_recover">Otra vez bajo el límite. Nada más que hacer.</string>
+    <string name="advice_calm">Llevas %1$d%% hoy. Sigue así.</string>
+
+    <!-- Respuestas habladas a las seis intenciones de voz -->
+    <string name="answer_level">%1$d decibelios, %2$s.</string>
+    <string name="answer_headroom_none">No se acumula nada. Quédate el tiempo que quieras.</string>
+    <string name="answer_headroom">Quedan %1$s a este nivel.</string>
+    <string name="answer_history">Hoy: %1$d%% de dosis, TWA %2$s.</string>
+    <string name="answer_mode_concert">Modo concierto activado. Tope de seis horas.</string>
+    <string name="answer_mode_urban">Vuelvo al modo urbano. Me quedo en silencio.</string>
+    <string name="answer_calibrate">La calibración está en ajustes. Ajústala contra un sonómetro de referencia.</string>
+</resources>
