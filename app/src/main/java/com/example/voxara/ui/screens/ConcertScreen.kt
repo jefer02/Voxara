@@ -7,9 +7,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
+import com.example.voxara.R
 import com.example.voxara.core.format.formatCountdown
 import com.example.voxara.data.AppMode
 import com.example.voxara.data.ExposureState
@@ -31,15 +33,17 @@ fun ConcertScreen(
 ) {
     val type = LocalVoxTypography.current
     val active = state.mode == AppMode.CONCERT
+    val countdown = formatCountdown(state.headroomSeconds) ?: stringResource(R.string.value_none)
+    val spokenOn = stringResource(
+        R.string.cd_concert_on, state.dba.roundToInt(), countdown,
+    )
+    val spokenOff = stringResource(R.string.cd_concert_off)
     val dba = state.dba.toFloat()
     val tint = levelColor(dba)
 
     VoxScreen(
         modifier = modifier.semantics {
-            contentDescription = if (active)
-                "Concert mode. ${state.dba.roundToInt()} decibels, " +
-                    "${formatCountdown(state.headroomSeconds)} left."
-            else "Concert mode off"
+            contentDescription = if (active) spokenOn else spokenOff
         },
         background = Color.Black,
         behind = {
@@ -61,23 +65,24 @@ fun ConcertScreen(
                 Meta(
                     // Concert mode counts down in minutes, not dose percent — and below the
                     // 80 dBA threshold there is nothing to count down.
-                    text = if (state.headroomSeconds.isInfinite()) "NO DOSE ACCRUING"
-                    else "${formatCountdown(state.headroomSeconds)} LEFT",
+                    text = if (state.headroomSeconds.isInfinite())
+                        stringResource(R.string.no_dose_accruing)
+                    else stringResource(R.string.headroom_left, countdown),
                     color = tint,
                     small = true,
                 )
                 Box(Modifier.padding(top = 12.dp)) {
-                    Capsule("STOP", Vox.Ink3, onClick = onToggle)
+                    Capsule(stringResource(R.string.action_stop), Vox.Ink3, onClick = onToggle)
                 }
             } else {
-                Meta("CONCERT / CLUB", color = Vox.Incandescent, small = true)
+                Meta(stringResource(R.string.concert_title), color = Vox.Incandescent, small = true)
                 Body(
-                    "Continuous sampling, capped at 6 hours. Auto-drops to Urban after 20 quiet minutes.",
+                    stringResource(R.string.concert_blurb),
                     color = Vox.Ink2,
                     maxLines = 4,
                 )
                 Box(Modifier.padding(top = 12.dp)) {
-                    Capsule("START", Vox.Incandescent, onClick = onToggle)
+                    Capsule(stringResource(R.string.action_start), Vox.Incandescent, onClick = onToggle)
                 }
             }
         }
