@@ -12,8 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.voxara.R
 import com.example.voxara.ui.gauge.VoiceWave
 import com.example.voxara.ui.theme.Vox
 import com.example.voxara.voice.VoiceTurn
@@ -29,14 +31,16 @@ fun VoiceScreen(
     modifier: Modifier = Modifier,
 ) {
     val listening = turn.phase == VoiceTurn.Phase.LISTENING
+    val cdListening = stringResource(R.string.voice_listening)
+    val cdIdle = stringResource(R.string.cd_voice_idle)
     val thinking = turn.phase == VoiceTurn.Phase.THINKING
 
     VoxScreen(
         modifier = modifier.semantics {
             contentDescription = when {
-                listening -> "Listening"
+                listening -> cdListening
                 turn.answer.isNotBlank() -> turn.answer
-                else -> "Voice mode. Tap to ask."
+                else -> cdIdle
             }
         },
         background = Color.Black,
@@ -56,10 +60,10 @@ fun VoiceScreen(
         ColumnCenter {
             Meta(
                 text = when (turn.phase) {
-                    VoiceTurn.Phase.LISTENING -> "LISTENING"
-                    VoiceTurn.Phase.THINKING -> "THINKING"
-                    VoiceTurn.Phase.UNAVAILABLE -> "NO ON-DEVICE ASR"
-                    else -> "ASK VOXARA"
+                    VoiceTurn.Phase.LISTENING -> stringResource(R.string.voice_listening)
+                    VoiceTurn.Phase.THINKING -> stringResource(R.string.voice_thinking)
+                    VoiceTurn.Phase.UNAVAILABLE -> stringResource(R.string.voice_no_asr)
+                    else -> stringResource(R.string.voice_ask_title)
                 },
                 color = if (listening) Vox.Safe else Vox.Ink3,
                 small = true,
@@ -77,9 +81,12 @@ fun VoiceScreen(
             Spacer(Modifier.height(8.dp))
 
             if (turn.heard.isNotBlank()) {
-                TitleLine("“${turn.heard}”", color = Color(0xFFE6F6EC))
+                TitleLine(
+                    stringResource(R.string.voice_quoted, turn.heard),
+                    color = Color(0xFFE6F6EC),
+                )
             } else if (!listening) {
-                TitleLine("“Is it safe in here?”", color = Color(0xFFE6F6EC))
+                TitleLine(stringResource(R.string.voice_example), color = Color(0xFFE6F6EC))
             }
 
             if (turn.answer.isNotBlank()) {
@@ -90,7 +97,8 @@ fun VoiceScreen(
 
             Box(Modifier.padding(top = 12.dp)) {
                 Capsule(
-                    text = if (listening) "STOP" else "ASK",
+                    text = if (listening) stringResource(R.string.action_stop)
+                    else stringResource(R.string.action_ask),
                     tint = if (listening) Vox.Signal else Vox.Safe,
                     onClick = onArm,
                 )

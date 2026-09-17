@@ -8,14 +8,17 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import com.example.voxara.R
 import com.example.voxara.core.advice.AdviceGrammar
 import com.example.voxara.core.advice.IntentRouter
 import com.example.voxara.core.advice.VoiceIntent
 import com.example.voxara.core.format.formatHeadroom
 import com.example.voxara.core.format.formatTwa
 import com.example.voxara.core.scene.Scene
-import com.example.voxara.core.scene.environmentLabel
 import com.example.voxara.data.ExposureState
+import com.example.voxara.data.LocaleStore
+import com.example.voxara.text.render
+import com.example.voxara.text.environmentLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +37,11 @@ import kotlin.math.roundToInt
  *
  * PRIVACY: the mic indicator is on for the whole turn and session audio is discarded at the end.
  */
-class VoiceTurn(private val context: Context) {
+class VoiceTurn(context: Context) {
+
+    /** Answers are written and spoken in the chosen language, not the watch's. */
+    private val context: Context = LocaleStore.localized(context)
+    private val locale: Locale = LocaleStore.resolve(context)
 
     enum class Phase { IDLE, LISTENING, THINKING, ANSWERED, UNAVAILABLE }
 
@@ -59,7 +66,13 @@ class VoiceTurn(private val context: Context) {
         if (tts == null) {
             tts = TextToSpeech(context) { status ->
                 ttsReady = status == TextToSpeech.SUCCESS
-                if (ttsReady) tts?.language = Locale.getDefault()
+                if (ttsReady) {
+                    // If the engine has no voice for the chosen language, it says so and we
+                    // leave the sentence on screen rather than speaking it in the wrong one.
+                    val result = tts?.setLanguage(locale)
+                    ttsReady = result != TextToSpeech.LANG_MISSING_DATA &&
+                        result != TextToSpeech.LANG_NOT_SUPPORTED
+                }
             }
         }
     }
@@ -124,6 +137,8 @@ class VoiceTurn(private val context: Context) {
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
             )
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale.toLanguageTag())
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale.language)
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         runCatching { r.startListening(intent) }.onFailure {
@@ -153,34 +168,50 @@ class VoiceTurn(private val context: Context) {
         val scene = if (state.scene == Scene.UNKNOWN) Scene.UNKNOWN else state.scene
         val sentence = when (intent) {
             VoiceIntent.LEVEL ->
-                "${state.dba.roundToInt()} decibels, ${environmentLabel(state.dba).lowercase()}."
+                context.getString(
+                    R.string.answer_level,
+                    state.dba.roundToInt(),
+                    context.environmentLabel(state.dba).lowercase(locale),
+                )
 
             VoiceIntent.HEADROOM ->
-                if (state.dba < 80) "Nothing is accruing. Stay as long as you like."
-                else "${formatHeadroom(state.headroomMinutes)} left at this level."
+                if (state.dba < 80) context.getString(R.string.answer_headroom_none)
+                else context.getString(
+                    R.string.answer_headroom,
+                    formatHeadroom(state.headroomMinutes),
+                )
 
             VoiceIntent.HISTORY ->
-                "Today: ${state.dosePercent.roundToInt()}% dose, TWA ${formatTwa(state.twaDba)}."
+                context.getString(
+                    R.string.answer_history,
+                    state.dosePercent.roundToInt(),
+                    formatTwa(state.twaDba) ?: context.getString(R.string.value_none),
+                )
 
             VoiceIntent.MODE -> {
-                val wantsConcert = heard.lowercase().let {
-                    it.contains("concert") || it.contains("club") || it.contains("start")
+                // Matched in both languages, for the same reason the router is.
+                val wantsConcert = heard.lowercase(locale).let {
+                    it.contains("concert") || it.contains("club") || it.contains("start") ||
+                        it.contains("concierto") || it.contains("empi") || it.contains("inicia")
                 }
                 onModeRequest?.invoke(if (wantsConcert) "CONCERT" else "URBAN")
-                if (wantsConcert) "Concert mode on. Six hour cap."
-                else "Back to urban mode. I'll stay quiet."
+                context.getString(
+                    if (wantsConcert) R.string.answer_mode_concert
+                    else R.string.answer_mode_urban,
+                )
             }
 
-            VoiceIntent.CALIBRATE ->
-                "Calibration is in settings. Adjust until it matches a reference meter."
+            VoiceIntent.CALIBRATE -> context.getString(R.string.answer_calibrate)
 
-            VoiceIntent.ADVICE, VoiceIntent.UNKNOWN -> AdviceGrammar.advise(
-                AdviceGrammar.State(
-                    dba = state.dba,
-                    dosePercent = state.dosePercent,
-                    headroomMinutes = state.headroomMinutes,
-                    scene = scene,
-                    risk = state.risk,
+            VoiceIntent.ADVICE, VoiceIntent.UNKNOWN -> context.render(
+                AdviceGrammar.advise(
+                    AdviceGrammar.State(
+                        dba = state.dba,
+                        dosePercent = state.dosePercent,
+                        headroomMinutes = state.headroomMinutes,
+                        scene = scene,
+                        risk = state.risk,
+                    )
                 )
             )
         }
