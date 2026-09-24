@@ -67,10 +67,16 @@ class OpenAiCompatibleCoachClient(
     private val model: String,
     private val apiKey: String,
     private val http: HttpTransport = UrlConnectionTransport(),
+    /**
+     * DeepSeek's models reason before answering by default, and that hidden reasoning counts
+     * against max_tokens: the whole budget went to it and the reply came back empty. Only sent
+     * to DeepSeek; other OpenAI-compatible APIs may reject the unknown field.
+     */
+    private val disableThinking: Boolean = baseUrl.contains("deepseek", ignoreCase = true),
 ) : CoachClient {
 
     fun requestBody(request: CoachRequest): String = MiniJson.write(
-        linkedMapOf(
+        linkedMapOf<String, Any?>(
             "model" to model,
             "messages" to listOf(
                 mapOf("role" to "system", "content" to CoachPrompt.system(request.snapshot.locale)),
@@ -80,7 +86,9 @@ class OpenAiCompatibleCoachClient(
             "max_tokens" to CoachPrompt.MAX_TOKENS,
             "temperature" to 0.3,
             "stream" to false,
-        )
+        ).apply {
+            if (disableThinking) put("thinking", mapOf("type" to "disabled"))
+        }
     )
 
     override suspend fun reply(request: CoachRequest): CoachResult {

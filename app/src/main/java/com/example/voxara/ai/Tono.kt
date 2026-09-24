@@ -1,6 +1,7 @@
 package com.example.voxara.ai
 
 import android.content.Context
+import android.util.Log
 import com.example.voxara.BuildConfig
 import com.example.voxara.R
 import com.example.voxara.core.ai.AggregateSnapshot
@@ -94,6 +95,8 @@ class OfflineCoach(private val context: Context) {
  */
 object Tono {
 
+    private const val TAG = "Tono"
+
     private val _ui = MutableStateFlow(CoachUi())
     val ui: StateFlow<CoachUi> = _ui.asStateFlow()
 
@@ -134,22 +137,33 @@ object Tono {
         val consent = VoxaraStore(context).read().aiConsent
         val now = System.currentTimeMillis()
         val today = localEpochDay(now)
-        if (consent && client != null && budget.canCall(today, now, automatic)) {
+        if (consent && client != null) {
+            // A cached reply costs nothing, so it is served even when the rate limit says no.
             val key = cacheKey(request, today)
             synchronized(cache) { cache[key] }?.let {
                 return publish(CoachUi(reply = it, source = ReplySource.CLOUD_AI))
             }
-            _ui.value = _ui.value.copy(loading = true)
-            budget = budget.spend(today, now, automatic)
-            when (val r = client.reply(request)) {
-                is CoachResult.Success -> {
-                    synchronized(cache) { cache[key] = r.reply }
-                    return publish(CoachUi(reply = r.reply, source = ReplySource.CLOUD_AI))
+            if (budget.canCall(today, now, automatic)) {
+                _ui.value = _ui.value.copy(loading = true)
+                budget = budget.spend(today, now, automatic)
+                when (val r = client.reply(request)) {
+                    is CoachResult.Success -> {
+                        synchronized(cache) { cache[key] = r.reply }
+                        return publish(CoachUi(reply = r.reply, source = ReplySource.CLOUD_AI))
+                    }
+                    is CoachResult.Failure -> {
+                        // The reason is a fixed code (never the key or the question).
+                        Log.w(TAG, "cloud reply failed: ${r.reason}")
+                        return publish(
+                            CoachUi(reply = offline.reply(request), source = ReplySource.OFFLINE, cloudFailed = true)
+                        )
+                    }
                 }
-                is CoachResult.Failure -> return publish(
-                    CoachUi(reply = offline.reply(request), source = ReplySource.OFFLINE, cloudFailed = true)
-                )
             }
+            // A rate-limited background refresh (Home reappearing) keeps the last cloud reply
+            // instead of swapping in the built-in one.
+            val current = _ui.value
+            if (automatic && current.source == ReplySource.CLOUD_AI && current.reply != null) return current
         }
         return publish(CoachUi(reply = offline.reply(request), source = ReplySource.OFFLINE))
     }
