@@ -31,71 +31,49 @@ enum class RiskState {
     }
 }
 
-/** The transition detector. Owns the rules about which haptic fires and how often. */
+/**
+ * The ring's state tracker plus the one gentle event it owns: relief when the level falls back
+ * after a loud stretch. Every INTERRUPTING alert (sustained level, dose tiers, weekly budget) is
+ * decided by `core.alerts.AlertEngine`, which is deterministic and never rate-limits a 100% alert.
+ */
 class RiskStateMachine(private val calmCooldownMs: Long = 600_000L) {
 
     var state: RiskState = RiskState.CALM
         private set
 
-    private var breachedDose = false
-    private var crossedThreshold = false
+    private var wasLoud = false
     private var lastCalmAt = 0L
-    private var alertsToday = 0
-
-    /** Hard cap in FOCUS/URBAN mode: four interruptions a day, no more. */
-    var dailyAlertCap = 4
 
     sealed interface Event {
-        /** 85 dBA crossed upwards: "you're now on the clock." */
-        data object ThresholdCrossed : Event
-        /** Daily dose hit 100%: get out. */
-        data object DoseFull : Event
         /** 140 dBC impulse peak. */
         data object ImpulsePeak : Event
-        /** Back under 80 dBA after a loud stretch. Relief, not another alert. */
+        /** Back under 80 dBA after a loud (>= 85 dBA) stretch. Relief, not another alert. */
         data object BackToSafe : Event
     }
 
     fun resetDay() {
-        breachedDose = false
-        crossedThreshold = false
-        alertsToday = 0
+        wasLoud = false
         state = RiskState.CALM
     }
 
-    /**
-     * @return the event worth interrupting the wearer for, or null.
-     */
-    fun update(dba: Double, dosePercent: Double, nowMs: Long, respectCap: Boolean = true): Event? {
+    /** @return the relief event, or null. */
+    fun update(dba: Double, dosePercent: Double, nowMs: Long): Event? {
         val next = RiskState.of(dba, dosePercent)
         val previous = state
         state = if (next.ordinal < previous.ordinal && previous != RiskState.CALM) {
             if (next == RiskState.CALM) RiskState.RECOVER else next
         } else next
 
-        if (dosePercent >= 100.0 && !breachedDose) {
-            breachedDose = true
-            return spend(Event.DoseFull, respectCap)
-        }
-        if (dba >= 85.0 && !crossedThreshold) {
-            crossedThreshold = true
-            return spend(Event.ThresholdCrossed, respectCap)
-        }
-        if (dba < 80.0 && crossedThreshold) {
-            crossedThreshold = false
-            if (nowMs - lastCalmAt >= calmCooldownMs) {
+        if (dba >= 85.0) wasLoud = true
+        if (dba < 80.0 && wasLoud) {
+            wasLoud = false
+            if (lastCalmAt == 0L || nowMs - lastCalmAt >= calmCooldownMs) {
                 lastCalmAt = nowMs
-                return Event.BackToSafe // relief is never rate-capped against the alert budget
+                return Event.BackToSafe
             }
         }
         return null
     }
 
     fun impulse(): Event = Event.ImpulsePeak
-
-    private fun spend(e: Event, respectCap: Boolean): Event? {
-        if (respectCap && alertsToday >= dailyAlertCap) return null
-        alertsToday++
-        return e
-    }
 }
