@@ -50,6 +50,8 @@ class VoiceTurn(context: Context) {
         val amplitude: Float = 0f,
         val heard: String = "",
         val answer: String = "",
+        /** The question went to Tono (cloud or safety answer); its reply is shown instead. */
+        val handedOff: Boolean = false,
     )
 
     private val _turn = MutableStateFlow(Turn())
@@ -61,6 +63,17 @@ class VoiceTurn(context: Context) {
 
     /** Applied before the sentence starts, so a mode change never lags the answer. */
     var onModeRequest: ((String) -> Unit)? = null
+
+    /**
+     * Called with what was heard before the on-device answer. Returning true hands the question to
+     * Tono (the caller answers and may call [speak]); false keeps the deterministic answer.
+     */
+    var onHeard: ((String) -> Boolean)? = null
+
+    /** Speaks [text] in the chosen language when a voice is available. */
+    fun speak(text: String) {
+        if (ttsReady && text.isNotBlank()) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "voxara-tono")
+    }
 
     fun prepare() {
         if (tts == null) {
@@ -118,6 +131,11 @@ class VoiceTurn(context: Context) {
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     ?.firstOrNull()
                     .orEmpty()
+                if (heard.isNotBlank() && onHeard?.invoke(heard) == true) {
+                    _turn.update { Turn(phase = Phase.ANSWERED, heard = heard, handedOff = true) }
+                    runCatching { recognizer?.cancel() }
+                    return
+                }
                 answer(state, IntentRouter.route(heard), heard)
             }
 
