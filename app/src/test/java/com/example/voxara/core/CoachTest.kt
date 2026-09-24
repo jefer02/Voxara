@@ -201,6 +201,16 @@ class CoachTest {
     }
 
     @Test
+    fun `DeepSeek requests turn off hidden reasoning so it cannot eat the token cap`() {
+        val req = CoachRequest(CoachTask.STATUS, snapshot)
+        fun body(url: String) =
+            MiniJson.parse(OpenAiCompatibleCoachClient(url, "m", "k", FakeTransport(200, "")).requestBody(req)) as Map<*, *>
+        assertEquals(mapOf("type" to "disabled"), body("https://api.deepseek.com")["thinking"])
+        // Other OpenAI-compatible APIs may reject an unknown field, so it is never sent to them.
+        assertFalse(body("https://example.invalid/").containsKey("thinking"))
+    }
+
+    @Test
     fun `a non-IO transport error fails softly instead of crashing`() = runBlocking {
         val throwing = object : HttpTransport {
             override fun postJson(url: String, headers: Map<String, String>, body: String): Pair<Int, String> =
