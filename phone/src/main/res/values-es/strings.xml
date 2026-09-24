@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_app_name">Voxara acompañante</string>
+    <string name="phone_title">Voxara · escucha con auriculares</string>
+    <string name="phone_what">Tu reloj Voxara puede incluir la escucha con auriculares de este teléfono en tu presupuesto auditivo semanal. Es opcional y está desactivado hasta que lo actives.</string>
+    <string name="phone_sends">Lo que se envía a tu reloj, aproximadamente cada 15 minutos mientras escuchas: la hora, cuánto tiempo, el volumen multimedia y el tipo de salida (cable, Bluetooth…). El reloj lo convierte en un nivel estimado.</string>
+    <string name="phone_never">Nunca se envía ni se guarda: audio, títulos de canciones o videos, nombres de apps, nombres de auriculares ni direcciones Bluetooth. Nada va a internet; solo viaja a tu propio reloj.</string>
+    <string name="phone_limits">Límites: muestrear cada 15 minutos no ve pausas ni cambios de volumen intermedios, así que estos números son estimaciones aproximadas. Los auriculares con cable solo se ven cuando coincide una muestra. No es un dispositivo médico.</string>
+    <string name="phone_turn_on">Activar la sincronización de escucha</string>
+    <string name="phone_turn_off">Desactivar la sincronización de escucha</string>
+    <string name="phone_status_off">Desactivado. No se muestrea nada.</string>
+    <string name="phone_status_waiting">Activado. Esperando la primera muestra de escucha.</string>
+    <string name="phone_status_synced">Activado. Último envío a tu reloj: %1$s</string>
+</resources>

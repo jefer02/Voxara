@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_app_name">Voxara companion</string>
+    <string name="phone_title">Voxara · headphone listening</string>
+    <string name="phone_what">Your Voxara watch can include headphone listening from this phone in its weekly hearing budget. This is optional and off until you turn it on.</string>
+    <string name="phone_sends">What is sent to your watch, about every 15 minutes while you listen: the time, how long, the media volume, and the type of output (wired, Bluetooth…). The watch turns this into an estimated level.</string>
+    <string name="phone_never">Never sent or stored: audio, song or video titles, app names, headphone names or Bluetooth addresses. Nothing goes to the internet; it travels only to your own watch.</string>
+    <string name="phone_limits">Limits: sampling every 15 minutes cannot see pauses or volume changes in between, so these numbers are rough estimates. Wired headphones are only seen when a sample happens to run. Not a medical device.</string>
+    <string name="phone_turn_on">Turn on listening sync</string>
+    <string name="phone_turn_off">Turn off listening sync</string>
+    <string name="phone_status_off">Off. Nothing is being sampled.</string>
+    <string name="phone_status_waiting">On. Waiting for the first listening sample.</string>
+    <string name="phone_status_synced">On. Last sent to your watch: %1$s</string>
+</resources>
