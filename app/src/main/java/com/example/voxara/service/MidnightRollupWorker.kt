@@ -7,6 +7,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.voxara.complication.DoseComplicationService
+import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.tile.VoxaraTileService
@@ -25,14 +26,11 @@ class MidnightRollupWorker(
 
     override suspend fun doWork(): Result {
         val store = VoxaraStore(applicationContext)
-        val p = store.read()
-        val today = todayEpoch()
-        if (p.dayEpoch != 0L && p.dayEpoch != today) {
-            store.rollOverDay(p.todayProfile)
-            if (ExposureRepository.isInitialised()) {
-                ExposureRepository.engine.resetDay()
-                ExposureRepository.hydrate(store.read())
-            }
+        // Atomic and keyed on the stored day: a no-op when the dosimeter already rolled.
+        // While the dosimeter runs it owns the in-memory ledger and reloads it itself.
+        val rolled = store.rollOverIfNeeded(localEpochDay(System.currentTimeMillis()))
+        if (rolled && ExposureRepository.isInitialised() && !ExposureRepository.serviceActive) {
+            ExposureRepository.hydrate(store.read())
         }
         VoxaraTileService.requestRefresh(applicationContext)
         DoseComplicationService.requestRefresh(applicationContext)
@@ -62,12 +60,6 @@ class MidnightRollupWorker(
                 set(Calendar.MILLISECOND, 0)
             }
             return (next.timeInMillis - System.currentTimeMillis()).coerceAtLeast(60_000L)
-        }
-
-        private fun todayEpoch(): Long {
-            val cal = Calendar.getInstance()
-            val offset = (cal.get(Calendar.ZONE_OFFSET) + cal.get(Calendar.DST_OFFSET)).toLong()
-            return TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() + offset)
         }
     }
 }
