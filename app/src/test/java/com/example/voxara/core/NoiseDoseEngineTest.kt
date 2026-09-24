@@ -108,13 +108,15 @@ class NoiseDoseEngineTest {
         assertEquals(RiskState.CRITICAL, RiskState.of(70.0, 100.0))
     }
 
+    // The daily alert cap moved to AlertEngine (Phase 1): see AlertEngineTest.
+
     @Test
-    fun `the daily alert cap is hard`() {
-        val m = RiskStateMachine()
-        m.dailyAlertCap = 1
-        assertEquals(RiskStateMachine.Event.ThresholdCrossed, m.update(86.0, 0.0, 0L))
-        m.update(70.0, 0.0, 1_000L)
-        assertNull("second interruption is refused by the cap", m.update(86.0, 0.0, 2_000L))
+    fun `relief follows a loud stretch, with a cooldown`() {
+        val m = RiskStateMachine(calmCooldownMs = 10_000L)
+        assertNull(m.update(90.0, 0.0, 0L))
+        assertEquals(RiskStateMachine.Event.BackToSafe, m.update(70.0, 0.0, 1_000L))
+        assertNull(m.update(90.0, 0.0, 2_000L))
+        assertNull("within the cooldown", m.update(70.0, 0.0, 3_000L))
     }
 
     @Test
