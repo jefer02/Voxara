@@ -169,6 +169,15 @@ class VoiceTurn(context: Context) {
         _turn.update { it.copy(phase = Phase.IDLE, amplitude = 0f) }
     }
 
+    /**
+     * Ends any turn and forgets its answer, so a tapped question shows Tono's reply rather than
+     * the last spoken answer (which otherwise stays on the Ask screen).
+     */
+    fun clear() {
+        runCatching { recognizer?.cancel() }
+        _turn.value = Turn()
+    }
+
     private fun buildRecognizer(): SpeechRecognizer =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)

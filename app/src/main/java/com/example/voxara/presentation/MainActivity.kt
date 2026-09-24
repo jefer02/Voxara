@@ -239,6 +239,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun ask(task: CoachTask, question: String?) {
+        // Home's automatic status refresh must not wipe a voice answer the wearer is reading.
+        if (task != CoachTask.STATUS) voice.clear()
         lifecycleScope.launch {
             Tono.ask(
                 this@MainActivity, ExposureRepository.state.value, task,
