@@ -12,9 +12,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <!-- Health Services passive listeners (heart rate / sleep) feed the risk state machine. -->
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!-- Asked in context, only to tell a Bluetooth speaker or car kit from headphones. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Only to post a tap-to-resume prompt; the mic service itself never starts from boot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
@@ -26,11 +27,33 @@
         <service
             android:name=".service.DosimeterService"
             android:exported="false"
-            android:foregroundServiceType="microphone|specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Continuous noise-dose accounting while the microphone permission is not yet granted." />
+            android:foregroundServiceType="microphone" />
+
+        <!-- Listening spans from the Voxara phone companion (same app id + signature only). -->
+        <service
+            android:name=".sync.ListeningSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/voxara/listening"
+                    android:scheme="wear" />
+            </intent-filter>
         </service>
+
+        <!-- "Got it" / "Snooze 1 h" on hearing alerts. -->
+        <receiver
+            android:name=".service.AlertActionReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".service.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".complication.DoseComplicationService"
@@ -47,6 +70,35 @@
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="300" />
+        </service>
+
+        <service
+            android:name=".complication.ListeningComplicationService"
+            android:exported="true"
+            android:label="@string/complication_listening_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="RANGED_VALUE,SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="900" />
+        </service>
+
+        <service
+            android:name=".tile.ListeningTileService"
+            android:exported="true"
+            android:label="@string/tile_listening_label"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_preview" />
         </service>
 
         <service

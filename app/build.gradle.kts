@@ -1,7 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+/**
+ * AI settings come from the untracked local.properties, never from source. The key is for
+ * development only: release builds get an empty string, so it can never ship inside an APK.
+ */
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun localProp(name: String, default: String = ""): String =
+    (localProps.getProperty(name) ?: default).trim()
+fun quoted(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.example.voxara"
@@ -15,9 +29,17 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.9"
+
+        // OpenAI-compatible endpoint (DeepSeek by default). Both are overridable per machine.
+        buildConfigField("String", "AI_BASE_URL", quoted(localProp("AI_BASE_URL", "https://api.deepseek.com")))
+        buildConfigField("String", "AI_MODEL", quoted(localProp("AI_MODEL", "deepseek-flash")))
+        buildConfigField("String", "AI_API_KEY", quoted(""))
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "AI_API_KEY", quoted(localProp("AI_API_KEY")))
+        }
         release {
             optimization {
                 enable = false
@@ -29,8 +51,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     useLibrary("wear-sdk")
+    testOptions {
+        unitTests {
+            // Robolectric screenshot tests render real resources.
+            isIncludeAndroidResources = true
+            all {
+                it.systemProperty("roborazzi.test.record", "true")
+                it.maxHeapSize = "2g"
+            }
+        }
+    }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -39,6 +72,7 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+    implementation(libs.compose.navigation)
     implementation(libs.compose.ui.tooling)
     implementation(libs.core.splashscreen)
     implementation(libs.core.ktx)
@@ -63,6 +97,11 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.ui.test.junit4)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.tiles.renderer)
