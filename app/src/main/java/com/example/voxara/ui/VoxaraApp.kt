@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
@@ -52,22 +53,26 @@ fun VoxaraApp(env: UiEnv, actions: VoxaraActions, ambient: Boolean) {
         hp > hpSeen -> { LimitAlertScreen(env, LimitKind.WEEK_HEADPHONE, actions) { hpSeen = hp }; return }
     }
 
+    // Destinations read env through State, not the builder's closure: the nav graph keeps the
+    // destination lambdas it was first built with, so a captured env would freeze each screen.
+    val currentEnv by rememberUpdatedState(env)
+    val currentActions by rememberUpdatedState(actions)
     val nav = rememberSwipeDismissableNavController()
     val go: (String) -> Unit = { nav.navigate(it) }
     SwipeDismissableNavHost(navController = nav, startDestination = Routes.HOME) {
-        composable(Routes.HOME) { HomeScreen(env, actions, go) }
-        composable(Routes.NOW) { NowScreen(env, actions) }
-        composable(Routes.HEADPHONES) { HeadphonesScreen(env, actions) }
-        composable(Routes.TODAY) { TodayScreen(env) }
-        composable(Routes.WEEK) { WeekScreen(env, actions) }
-        composable(Routes.ASK) { AskScreen(env, actions) }
-        composable(Routes.SETTINGS) { SettingsScreen(env, actions, go) }
+        composable(Routes.HOME) { HomeScreen(currentEnv, currentActions, go) }
+        composable(Routes.NOW) { NowScreen(currentEnv, currentActions) }
+        composable(Routes.HEADPHONES) { HeadphonesScreen(currentEnv, currentActions) }
+        composable(Routes.TODAY) { TodayScreen(currentEnv) }
+        composable(Routes.WEEK) { WeekScreen(currentEnv, currentActions) }
+        composable(Routes.ASK) { AskScreen(currentEnv, currentActions) }
+        composable(Routes.SETTINGS) { SettingsScreen(currentEnv, currentActions, go) }
         composable(Routes.CALIBRATION) {
             CalibrationScreen(
-                state = s,
-                onEnsureMonitoring = actions.onEnsureMonitoring,
-                onProbe = actions.onProbe,
-                onSave = actions.onSaveCalibration,
+                state = currentEnv.state,
+                onEnsureMonitoring = currentActions.onEnsureMonitoring,
+                onProbe = currentActions.onProbe,
+                onSave = currentActions.onSaveCalibration,
                 onClose = { nav.popBackStack() },
             )
         }
