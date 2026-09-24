@@ -1,6 +1,7 @@
 package com.example.voxara.tile
 
 import android.content.Context
+import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.degrees
@@ -29,24 +30,31 @@ import androidx.wear.tiles.tooling.preview.Preview
 import androidx.wear.tiles.tooling.preview.TilePreviewData
 import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.voxara.R
+import com.example.voxara.core.design.Palette
 import com.example.voxara.core.format.formatHeadroom
+import com.example.voxara.core.monitoring.MonitoringStatus
+import com.example.voxara.core.monitoring.monitoringStatus
+import com.example.voxara.core.risk.RiskZone
+import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.presentation.MainActivity
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import androidx.concurrent.futures.CallbackToFutureAdapter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-private const val RESOURCES_VERSION = "1"
+private const val RESOURCES_VERSION = "2"
 
 /**
- * TILE — the segmented dose donut. Renders from cached state; never wakes the mic.
- * One arc, one integer, one colour, tinted by risk band.
+ * TILE — today's dose as one thick ring, one number, the zone in WORDS and how fresh the data
+ * is. Renders from the cached ledger; it never wakes the microphone. Tap opens the app (which is
+ * also how a paused monitor resumes: Android 14+ needs a visible surface).
  */
 class VoxaraTileService : TileService() {
 
@@ -79,145 +87,130 @@ class VoxaraTileService : TileService() {
     }
 }
 
-// ---------------------------------------------------------------- layout
+// ---------------------------------------------------------------- shared tile helpers
 
-private const val VOID = 0xFF04060A.toInt()
-private const val INK1 = 0xFFF2F7FF.toInt()
-private const val INK3 = 0xFF4E6178.toInt()
-private const val TRACK = 0x14FFFFFF
+/** The zone that matters for a cached reading: the worse of the level and the daily dose. */
+internal fun zoneFor(dba: Double, dosePercent: Double): RiskZone =
+    maxOf(RiskZone.of(dba), RiskZone.ofPercent(dosePercent))
 
-/** Same ramp as the ring, evaluated on the tile's cached level. */
-internal fun tintFor(dba: Double, dosePercent: Double): Int = when {
-    dosePercent >= 100.0 || dba >= 106.0 -> 0xFFFF2E6B.toInt()
-    dba >= 95.0 -> 0xFFFF8A1F.toInt()
-    dba >= 85.0 -> 0xFFFFC531.toInt()
-    else -> 0xFF2BFF88.toInt()
+/** Zone colour as an ARGB int (the shared palette). */
+internal fun tintFor(dba: Double, dosePercent: Double): Int = Palette.zone(zoneFor(dba, dosePercent)).toInt()
+
+internal fun zoneWordRes(z: RiskZone): Int = when (z) {
+    RiskZone.OK -> R.string.zone_ok
+    RiskZone.MODERATE -> R.string.zone_moderate
+    RiskZone.LOUD -> R.string.zone_loud
+    RiskZone.DANGEROUS -> R.string.zone_dangerous
 }
+
+internal fun openApp(context: Context, id: String) = ModifiersBuilders.Modifiers.Builder()
+    .setClickable(
+        ModifiersBuilders.Clickable.Builder()
+            .setId(id)
+            .setOnClick(
+                ActionBuilders.LaunchAction.Builder()
+                    .setAndroidActivity(
+                        ActionBuilders.AndroidActivity.Builder()
+                            .setPackageName(context.packageName)
+                            .setClassName(MainActivity::class.java.name)
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+    )
+    .build()
+
+/** Text in the tile type scale: never below 12 sp. */
+internal fun tileText(s: String, size: Float, weight: Int, color: Int): LayoutElementBuilders.LayoutElement =
+    Text.Builder()
+        .setText(s)
+        .setMaxLines(2)
+        .setFontStyle(
+            FontStyle.Builder().setSize(sp(size.coerceAtLeast(12f))).setWeight(weight).setColor(argb(color)).build()
+        )
+        .build()
+
+/** A thick full ring with [fraction] filled in [tint]. */
+internal fun ringBox(fraction: Float, tint: Int, center: LayoutElementBuilders.LayoutElement, modifiers: ModifiersBuilders.Modifiers): Box {
+    val sweep = fraction.coerceIn(0f, 1f) * 360f
+    return Box.Builder()
+        .setWidth(expand()).setHeight(expand())
+        .addContent(
+            Arc.Builder().setAnchorAngle(degrees(0f)).setAnchorType(ARC_ANCHOR_START)
+                .addContent(ArcLine.Builder().setLength(degrees(360f)).setThickness(dp(12f)).setColor(argb(Palette.SURFACE_3.toInt())).build())
+                .build()
+        )
+        .apply {
+            if (sweep > 1f) addContent(
+                Arc.Builder().setAnchorAngle(degrees(0f)).setAnchorType(ARC_ANCHOR_START)
+                    .addContent(ArcLine.Builder().setLength(degrees(sweep)).setThickness(dp(12f)).setColor(argb(tint)).build())
+                    .build()
+            )
+        }
+        .addContent(center)
+        .setModifiers(modifiers)
+        .build()
+}
+
+internal fun blackRoot(content: LayoutElementBuilders.LayoutElement): LayoutElementBuilders.LayoutElement =
+    Box.Builder().setWidth(expand()).setHeight(expand())
+        .setModifiers(
+            ModifiersBuilders.Modifiers.Builder()
+                .setBackground(ModifiersBuilders.Background.Builder().setColor(argb(Palette.BLACK.toInt())).build())
+                .build()
+        )
+        .addContent(content)
+        .build()
 
 @androidx.annotation.OptIn(androidx.wear.protolayout.expression.ProtoLayoutExperimental::class)
 internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders.Tile {
     val dose = p.dosePercent
     val dba = p.lastDba
-    val tint = tintFor(dba, dose)
-    val headroom = headroomMinutes(dba, dose)
+    val zone = zoneFor(dba, dose)
+    val tint = Palette.zone(zone).toInt()
     // Built by the tile host, which hands us its own context: resolve the language ourselves.
     val res = LocaleStore.localized(context)
+    // Left on but no heartbeat: the watch stopped monitoring. Tapping the tile opens the app.
+    val paused = monitoringStatus(
+        enabled = p.monitoringEnabled,
+        serviceActive = ExposureRepository.serviceActive,
+        lastHeartbeatMs = p.heartbeatMs,
+        nowMs = System.currentTimeMillis(),
+    ) == MonitoringStatus.PAUSED
+    val secondary = Palette.TEXT_SECONDARY.toInt()
+    val primary = Palette.TEXT_PRIMARY.toInt()
 
-    val launch = ModifiersBuilders.Modifiers.Builder()
-        .setClickable(
-            ModifiersBuilders.Clickable.Builder()
-                .setId("voxara_open")
-                .setOnClick(
-                    ActionBuilders.LaunchAction.Builder()
-                        .setAndroidActivity(
-                            ActionBuilders.AndroidActivity.Builder()
-                                .setPackageName(context.packageName)
-                                .setClassName(MainActivity::class.java.name)
-                                .build()
-                        )
-                        .build()
-                )
-                .build()
+    val bottom = when {
+        paused -> res.getString(R.string.paused_resume)
+        p.heartbeatMs > 0 -> res.getString(
+            R.string.tile_updated,
+            DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(p.heartbeatMs)),
         )
-        .build()
+        else -> res.getString(R.string.card_now_none)
+    }
+    val detail = if (dba < 80.0) res.getString(R.string.zone_with_level, res.getString(zoneWordRes(zone)), dba.roundToInt())
+    else res.getString(R.string.headroom_suffix, formatHeadroom(headroomMinutes(dba, dose)))
 
-    val sweep = (dose / 100.0).coerceIn(0.0, 1.0) * 360.0
-
-    val donut = Box.Builder()
-        .setWidth(expand())
-        .setHeight(expand())
-        .addContent(
-            Arc.Builder()
-                .setAnchorAngle(degrees(0f))
-                .setAnchorType(ARC_ANCHOR_START)
-                .addContent(
-                    ArcLine.Builder()
-                        .setLength(degrees(360f))
-                        .setThickness(dp(9f))
-                        .setColor(argb(TRACK))
-                        .build()
-                )
-                .build()
-        )
-        .apply {
-            if (sweep > 1.0) {
-                addContent(
-                    Arc.Builder()
-                        .setAnchorAngle(degrees(0f))
-                        .setAnchorType(ARC_ANCHOR_START)
-                        .addContent(
-                            ArcLine.Builder()
-                                .setLength(degrees(sweep.toFloat()))
-                                .setThickness(dp(9f))
-                                .setColor(argb(tint))
-                                .build()
-                        )
-                        .build()
-                )
-            }
-        }
-        .addContent(
-            Column.Builder()
-                .addContent(meta(res.getString(R.string.tile_todays_dose), INK3))
-                .addContent(Spacer.Builder().setHeight(dp(2f)).build())
-                .addContent(
-                    Text.Builder()
-                        .setText(res.getString(R.string.tile_dose_value, dose.roundToInt()))
-                        .setFontStyle(
-                            FontStyle.Builder()
-                                .setSize(sp(34f))
-                                .setWeight(FONT_WEIGHT_BOLD)
-                                .setColor(argb(tint))
-                                .build()
-                        )
-                        .build()
-                )
-                .addContent(Spacer.Builder().setHeight(dp(2f)).build())
-                .addContent(
-                    meta(
-                        if (dba < 80.0) res.getString(R.string.no_dose_accruing)
-                        else res.getString(R.string.headroom_suffix, formatHeadroom(headroom)),
-                        INK1,
-                    )
-                )
-                .build()
-        )
-        .setModifiers(launch)
-        .build()
-
-    val root = Box.Builder()
-        .setWidth(expand())
-        .setHeight(expand())
-        .setModifiers(
-            ModifiersBuilders.Modifiers.Builder()
-                .setBackground(
-                    ModifiersBuilders.Background.Builder().setColor(argb(VOID)).build()
-                )
-                .build()
-        )
-        .addContent(donut)
+    val center = Column.Builder()
+        .addContent(tileText(res.getString(R.string.tile_todays_dose), 12f, FONT_WEIGHT_MEDIUM, secondary))
+        .addContent(Spacer.Builder().setHeight(dp(2f)).build())
+        .addContent(tileText(res.getString(R.string.tile_dose_value, dose.roundToInt()), 36f, FONT_WEIGHT_BOLD, primary))
+        .addContent(tileText(detail, 13f, FONT_WEIGHT_MEDIUM, tint))
+        .addContent(Spacer.Builder().setHeight(dp(2f)).build())
+        .addContent(tileText(bottom, 12f, FONT_WEIGHT_MEDIUM, if (paused) Palette.ZONE_MODERATE.toInt() else secondary))
         .build()
 
     return TileBuilders.Tile.Builder()
         .setResourcesVersion(RESOURCES_VERSION)
         .setFreshnessIntervalMillis(5 * 60 * 1000)
-        .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(root))
-        .build()
-}
-
-@androidx.annotation.OptIn(androidx.wear.protolayout.expression.ProtoLayoutExperimental::class)
-private fun meta(s: String, color: Int): LayoutElementBuilders.LayoutElement =
-    Text.Builder()
-        .setText(s)
-        .setFontStyle(
-            FontStyle.Builder()
-                .setSize(sp(10f))
-                .setWeight(FONT_WEIGHT_MEDIUM)
-                .setLetterSpacing(androidx.wear.protolayout.DimensionBuilders.em(0.14f))
-                .setColor(argb(color))
-                .build()
+        .setTileTimeline(
+            TimelineBuilders.Timeline.fromLayoutElement(
+                blackRoot(ringBox((dose / 100.0).toFloat(), tint, center, openApp(context, "voxara_open")))
+            )
         )
         .build()
+}
 
 /** Headroom re-derived from the cached ledger, never recomputed from a live mic. */
 internal fun headroomMinutes(dba: Double, dosePercent: Double): Double {
@@ -233,6 +226,6 @@ fun tilePreview(context: Context) = TilePreviewData(
 ) {
     buildTile(
         context,
-        VoxaraStore.Persisted(dosePercent = 46.0, lastDba = 88.0),
+        VoxaraStore.Persisted(dosePercent = 46.0, lastDba = 88.0, heartbeatMs = System.currentTimeMillis()),
     )
 }
