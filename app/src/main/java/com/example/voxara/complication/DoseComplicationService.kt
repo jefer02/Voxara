@@ -19,6 +19,9 @@ import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.tile.headroomMinutes
 import com.example.voxara.tile.tintFor
+import com.example.voxara.tile.zoneFor
+import com.example.voxara.tile.zoneWordRes
+import com.example.voxara.core.design.Palette
 import kotlin.math.roundToInt
 
 /**
@@ -66,7 +69,8 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
                         Icon.createWithResource(this, R.drawable.ic_voxara_status)
                     ).build()
                 )
-                .setColorRamp(ColorRamp(intArrayOf(0xFF2BFF88.toInt(), tint), true))
+                // Zone colours from the shared palette; the text says the value in words too.
+                .setColorRamp(ColorRamp(intArrayOf(Palette.ZONE_OK.toInt(), tint), true))
                 .build()
 
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(
@@ -77,7 +81,7 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
             )
                 .setTitle(
                     PlainComplicationText.Builder(
-                        if (dba < 80.0) res.getString(R.string.risk_calm)
+                        if (dba < 80.0) res.getString(zoneWordRes(zoneFor(dba, dose)))
                         else formatHeadroom(headroomMinutes(dba, dose))
                     ).build()
                 )
