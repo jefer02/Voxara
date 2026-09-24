@@ -9,6 +9,7 @@ import android.os.VibrationEffect.Composition.PRIMITIVE_LOW_TICK
 import android.os.VibrationEffect.Composition.PRIMITIVE_QUICK_RISE
 import android.os.VibrationEffect.Composition.PRIMITIVE_SPIN
 import android.os.VibrationEffect.Composition.PRIMITIVE_THUD
+import android.os.VibrationEffect.Composition.PRIMITIVE_TICK
 import android.os.Vibrator
 import android.os.VibratorManager
 
@@ -16,7 +17,17 @@ import android.os.VibratorManager
  * HAPTIC TAXONOMY - composed from VibrationEffect.startComposition() primitives, never canned
  * system effects. The watch assumes you cannot hear it: haptic first, screen second.
  */
-enum class Pattern { THRESHOLD, DOSE_FULL, IMPULSE, CALM }
+enum class Pattern {
+    THRESHOLD, DOSE_FULL, IMPULSE, CALM,
+    /** Advisory: one soft tick. */
+    SOFT_TICK,
+    /** 80% tiers: two soft ticks. */
+    TWO_SOFT,
+    /** Weekly 100%: long-short-long. */
+    LONG_SHORT_LONG,
+    /** Very loud listening right now: quick triple. */
+    QUICK_TRIPLE,
+}
 
 class HapticConductor(private val vibrator: Vibrator) {
 
@@ -25,7 +36,9 @@ class HapticConductor(private val vibrator: Vibrator) {
     private var lastCalmAt = 0L
 
     private val supportsPrimitives: Boolean = runCatching {
-        vibrator.areAllPrimitivesSupported(PRIMITIVE_QUICK_RISE, PRIMITIVE_THUD, PRIMITIVE_LOW_TICK)
+        vibrator.areAllPrimitivesSupported(
+            PRIMITIVE_QUICK_RISE, PRIMITIVE_THUD, PRIMITIVE_LOW_TICK, PRIMITIVE_TICK, PRIMITIVE_CLICK, PRIMITIVE_SPIN,
+        )
     }.getOrDefault(false)
 
     fun fire(pattern: Pattern) {
@@ -64,6 +77,27 @@ class HapticConductor(private val vibrator: Vibrator) {
         Pattern.CALM -> VibrationEffect.startComposition()
             .addPrimitive(PRIMITIVE_LOW_TICK, 0.35f, 0)
             .compose()
+
+        Pattern.SOFT_TICK -> VibrationEffect.startComposition()
+            .addPrimitive(PRIMITIVE_TICK, 0.6f, 0)
+            .compose()
+
+        Pattern.TWO_SOFT -> VibrationEffect.startComposition()
+            .addPrimitive(PRIMITIVE_TICK, 0.7f, 0)
+            .addPrimitive(PRIMITIVE_TICK, 0.7f, 160)
+            .compose()
+
+        Pattern.LONG_SHORT_LONG -> VibrationEffect.startComposition()
+            .addPrimitive(PRIMITIVE_THUD, 1.0f, 0)
+            .addPrimitive(PRIMITIVE_CLICK, 1.0f, 220)
+            .addPrimitive(PRIMITIVE_THUD, 1.0f, 180)
+            .compose()
+
+        Pattern.QUICK_TRIPLE -> VibrationEffect.startComposition()
+            .addPrimitive(PRIMITIVE_CLICK, 1.0f, 0)
+            .addPrimitive(PRIMITIVE_CLICK, 1.0f, 70)
+            .addPrimitive(PRIMITIVE_CLICK, 1.0f, 70)
+            .compose()
     }
 
     /** Older or cheaper actuators: hand-rolled envelopes with the same rhythm. */
@@ -77,6 +111,16 @@ class HapticConductor(private val vibrator: Vibrator) {
         )
         Pattern.IMPULSE -> VibrationEffect.createOneShot(400, 255)
         Pattern.CALM -> VibrationEffect.createOneShot(160, 90)
+        Pattern.SOFT_TICK -> VibrationEffect.createOneShot(40, 140)
+        Pattern.TWO_SOFT -> VibrationEffect.createWaveform(
+            longArrayOf(0, 40, 140, 40), intArrayOf(0, 150, 0, 150), -1
+        )
+        Pattern.LONG_SHORT_LONG -> VibrationEffect.createWaveform(
+            longArrayOf(0, 350, 150, 90, 150, 350), intArrayOf(0, 255, 0, 255, 0, 255), -1
+        )
+        Pattern.QUICK_TRIPLE -> VibrationEffect.createWaveform(
+            longArrayOf(0, 45, 60, 45, 60, 45), intArrayOf(0, 255, 0, 255, 0, 255), -1
+        )
     }
 
     companion object {
