@@ -35,21 +35,29 @@ import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.LedgerBook
 import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.monitoring.monitoringStatus
+import com.example.voxara.core.situation.Situation
+import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.data.AppLanguage
-import com.example.voxara.data.AppMode
 import com.example.voxara.data.ExposureDb
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
+import com.example.voxara.haptics.HapticConductor
+import com.example.voxara.haptics.Pattern
 import com.example.voxara.service.DosimeterService
 import com.example.voxara.service.MidnightRollupWorker
 import com.example.voxara.service.MonitoringWatchdogWorker
 import com.example.voxara.service.Notifications
+import com.example.voxara.sync.CompanionLink
+import com.example.voxara.sync.WearContract
+import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.VoxaraApp
 import com.example.voxara.ui.theme.VoxaraTheme
 import com.example.voxara.voice.VoiceTurn
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -57,6 +65,7 @@ class MainActivity : ComponentActivity() {
 
     private val ambient = mutableStateOf(false)
     private lateinit var voice: VoiceTurn
+    private val confirmHaptics by lazy { HapticConductor(this) }
 
     /** The language the resources below were inflated with; a change to it re-creates us. */
     private var language = AppLanguage.SYSTEM
@@ -66,6 +75,20 @@ class MainActivity : ComponentActivity() {
 
     /** Bumped after any permission result so the UI re-reads the grants. */
     private val permissionTick = mutableStateOf(0)
+
+    /** A screen the phone app asked to open (voxara://watch/calibration), until shown. */
+    private val pendingRoute = mutableStateOf<String?>(null)
+
+    private fun readDeepLink(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme != WearContract.LINK_SCHEME || uri.host != WearContract.LINK_HOST) return
+        if (uri.path == "/calibration") pendingRoute.value = Routes.CALIBRATION
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        readDeepLink(intent)
+    }
 
     /**
      * Every resource this activity resolves - and so every word the wearer reads - comes from
@@ -122,16 +145,15 @@ class MainActivity : ComponentActivity() {
             turn.prepare()
             turn.onModeRequest = { mode ->
                 // The mode change is already applied when the sentence starts.
-                DosimeterService.send(
-                    this,
-                    if (mode == "CONCERT") DosimeterService.ACTION_CONCERT else DosimeterService.ACTION_URBAN,
-                )
+                if (mode == "CONCERT") selectSituation(SituationChoice.CONCERT, confirm = false)
+                else lifecycleScope.launch { ExposureRepository.store.leaveConcert() }
             }
             // Symptoms always get the fixed safe answer; with cloud consent Tono answers the rest;
             // otherwise the deterministic on-device intents reply.
             turn.onHeard = { heard ->
                 val state = ExposureRepository.state.value
-                val toTono = SymptomGuard.detect(heard) || (state.aiConsent && Tono.cloudAvailable)
+                // A symptom question always gets the fixed safe answer, even with Tono off.
+                val toTono = SymptomGuard.detect(heard) || (state.tonoEnabled && state.aiConsent && Tono.cloudAvailable)
                 if (toTono) {
                     lifecycleScope.launch {
                         val ui = Tono.ask(this@MainActivity, ExposureRepository.state.value, CoachTask.ASK, question = heard)
@@ -149,6 +171,15 @@ class MainActivity : ComponentActivity() {
             // After onboarding, the app just resumes monitoring; permissions were asked in context.
             if (p.onboarded) resumeIfEnabled()
         }
+        // Settings changed anywhere (this UI, the phone app, a notification) reach the screen and
+        // are published to the phone app. The alert engine reads them from the store as before.
+        lifecycleScope.launch {
+            ExposureRepository.store.flow.collect { p ->
+                ExposureRepository.applySettings(p)
+                CompanionLink.publishSettings(this@MainActivity, p)
+            }
+        }
+        readDeepLink(intent)
         // Debug builds: display-only bench driver (src/debug). Release: a no-op (src/release).
         lifecycleScope.launch { Bench.run(this@MainActivity) }
 
@@ -221,6 +252,9 @@ class MainActivity : ComponentActivity() {
     private fun setLanguage(choice: AppLanguage) {
         if (choice == language) return
         LocaleStore.set(this, choice)
+        // Outlives the recreate below: the change time is what the phone sync compares.
+        val store = ExposureRepository.store
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { store.stampLanguage() }
         voice.release()
         recreate()
     }
@@ -239,6 +273,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun ask(task: CoachTask, question: String?) {
+        // Tono off: nothing asks it (its screens are hidden); voice keeps its on-device answers.
+        if (!ExposureRepository.state.value.tonoEnabled) return
         // Home's automatic status refresh must not wipe a voice answer the wearer is reading.
         if (task != CoachTask.STATUS) voice.clear()
         lifecycleScope.launch {
@@ -247,6 +283,18 @@ class MainActivity : ComponentActivity() {
                 question = question, automatic = task == CoachTask.STATUS,
             )
         }
+    }
+
+    /**
+     * The wearer picked a mode on the watch: a minimal confirmation tap (no rate limits: it answers
+     * a touch), the choice stored and stamped so it syncs to the phone. Concert measures
+     * continuously, so it starts the dosimeter exactly as the old Concert button did.
+     */
+    private fun selectSituation(choice: SituationChoice, confirm: Boolean) {
+        if (confirm) confirmHaptics.fire(Pattern.CONFIRM)
+        ExposureRepository.update { it.copy(situationChoice = choice, mode = Situation.resolve(choice)) }
+        lifecycleScope.launch { ExposureRepository.store.setSituationChoice(choice) }
+        if (choice == SituationChoice.CONCERT) DosimeterService.start(this)
     }
 
     private fun actions() = VoxaraActions(
@@ -259,15 +307,7 @@ class MainActivity : ComponentActivity() {
             if (DosimeterService.hasMic(this)) DosimeterService.start(this)
             else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         },
-        onConcertToggle = {
-            val next = if (ExposureRepository.state.value.mode == AppMode.CONCERT) AppMode.URBAN else AppMode.CONCERT
-            ExposureRepository.setMode(next)
-            lifecycleScope.launch { ExposureRepository.store.setMode(next.name) }
-            DosimeterService.send(
-                this,
-                if (next == AppMode.CONCERT) DosimeterService.ACTION_CONCERT else DosimeterService.ACTION_URBAN,
-            )
-        },
+        onSituationChoice = { choice -> selectSituation(choice, confirm = true) },
         onCalibrationTrim = { offset ->
             val clamped = offset.coerceIn(TRIM_RANGE.start, TRIM_RANGE.endInclusive)
             ExposureRepository.update { it.copy(calibrationOffsetDb = clamped) }
@@ -328,6 +368,10 @@ class MainActivity : ComponentActivity() {
             ExposureRepository.update { it.copy(aiConsent = on) }
             lifecycleScope.launch { ExposureRepository.store.setAiConsent(on) }
         },
+        onTonoEnabled = { on ->
+            ExposureRepository.update { it.copy(tonoEnabled = on) }
+            lifecycleScope.launch { ExposureRepository.store.setTonoEnabled(on) }
+        },
         onAsk = ::ask,
         onVoiceArm = {
             if (voice.turn.value.phase == VoiceTurn.Phase.LISTENING) voice.stop()
@@ -369,7 +413,10 @@ class MainActivity : ComponentActivity() {
         )
         VoxaraTheme(ambient = isAmbient, reduceMotion = reduceMotion()) {
             AppScaffold {
-                VoxaraApp(env = env, actions = actions(), ambient = isAmbient)
+                VoxaraApp(
+                    env = env, actions = actions(), ambient = isAmbient,
+                    pendingRoute = pendingRoute.value, onRouteShown = { pendingRoute.value = null },
+                )
             }
         }
     }

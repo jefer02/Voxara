@@ -9,15 +9,22 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.example.voxara.R
 import com.example.voxara.core.alerts.Alert
 import com.example.voxara.core.alerts.AlertKind
+import com.example.voxara.core.alerts.AlertPolicy
+import com.example.voxara.core.alerts.HapticPrefs
 import com.example.voxara.core.alerts.Tier
+import com.example.voxara.data.ExposureDb
+import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
 import com.example.voxara.haptics.HapticConductor
 import com.example.voxara.haptics.pattern
 import com.example.voxara.presentation.MainActivity
+import com.example.voxara.sync.CompanionLink
+import com.example.voxara.sync.MirroredAlert
 import kotlin.math.roundToInt
 
 /**
@@ -57,11 +64,27 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
 
     init { ensureChannel(context) }
 
-    /** Delivers [alerts] (most severe first). Only the most severe one vibrates. */
-    fun deliver(alerts: List<Alert>) {
+    /**
+     * Delivers [alerts] (most severe first). Only the most severe one that may vibrate does:
+     * advisories honour the wearer's haptic preference, warnings and limits always vibrate
+     * (AlertPolicy). Every delivered alert is written to the alert history; a failed write
+     * never blocks the haptic or the notification.
+     */
+    fun deliver(alerts: List<Alert>, prefs: HapticPrefs = ExposureRepository.state.value.hapticPrefs) {
         if (alerts.isEmpty()) return
-        haptics.fire(alerts.first().kind.pattern())
+        alerts.firstOrNull { AlertPolicy.vibrates(it.kind, prefs) }?.let { a ->
+            haptics.fire(a.kind.pattern(), AlertPolicy.repeats(a.kind, prefs))
+        }
+        val now = System.currentTimeMillis()
+        alerts.forEach { a ->
+            runCatching { ExposureDb.get(context).alerts.add(a.kind, a.value, a.level, now) }
+                .onFailure { Log.w("VoxaraAlerts", "alert history write failed", it) }
+        }
         alerts.forEach { post(it) }
+        // Last, and asynchronous: the optional copy on the phone for 100% alerts.
+        alerts.filter { it.kind.tier == Tier.LIMIT }.forEach {
+            CompanionLink.mirrorLimit(context, MirroredAlert(it.kind, it.value, it.level, now))
+        }
     }
 
     private fun post(alert: Alert) {
@@ -96,7 +119,12 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
             .setContentIntent(open)
             .setAutoCancel(true)
             .addAction(0, res.getString(R.string.alert_action_ack), action(ACTION_ACK))
-        if (kind.snoozable) builder.addAction(0, res.getString(R.string.alert_action_snooze), action(ACTION_SNOOZE))
+        if (kind.snoozable) {
+            val minutes = ExposureRepository.state.value.snoozeMinutes
+            val label = if (minutes == 60) res.getString(R.string.alert_action_snooze)
+            else res.getString(R.string.alert_action_snooze_min, minutes)
+            builder.addAction(0, label, action(ACTION_SNOOZE))
+        }
         builder.addAction(0, res.getString(R.string.alert_action_open), open)
 
         context.getSystemService(NotificationManager::class.java).notify(id, builder.build())
