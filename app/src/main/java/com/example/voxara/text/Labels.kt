@@ -10,7 +10,6 @@ import com.example.voxara.core.scene.EnvBand
 import com.example.voxara.core.scene.Scene
 import com.example.voxara.core.scene.environmentBand
 import com.example.voxara.data.AppLanguage
-import com.example.voxara.data.AppMode
 import com.example.voxara.data.Scenario
 
 /**
@@ -88,27 +87,6 @@ fun AdviceKind.textRes(): Int = when (this) {
 /** The advice sentence, in the language currently in force on this context. */
 fun Context.render(advice: Advice): String =
     getString(advice.kind.textRes(), *advice.args.toTypedArray())
-
-@StringRes
-fun AppMode.titleRes(): Int = when (this) {
-    AppMode.CONCERT -> R.string.mode_concert_title
-    AppMode.URBAN -> R.string.mode_urban_title
-    AppMode.VOICE -> R.string.mode_voice_title
-}
-
-@StringRes
-fun AppMode.indexRes(): Int = when (this) {
-    AppMode.CONCERT -> R.string.mode_concert_index
-    AppMode.URBAN -> R.string.mode_urban_index
-    AppMode.VOICE -> R.string.mode_voice_index
-}
-
-@StringRes
-fun AppMode.blurbRes(): Int = when (this) {
-    AppMode.CONCERT -> R.string.mode_concert_blurb
-    AppMode.URBAN -> R.string.mode_urban_blurb
-    AppMode.VOICE -> R.string.mode_voice_blurb
-}
 
 @StringRes
 fun Scenario.labelRes(): Int = when (this) {

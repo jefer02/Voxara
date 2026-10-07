@@ -20,6 +20,7 @@ import com.example.voxara.R
 import com.example.voxara.audio.AudioBurstSampler
 import com.example.voxara.audio.DeviceAudioInfo
 import com.example.voxara.audio.HeadphoneMonitor
+import com.example.voxara.audio.PowerPolicy
 import com.example.voxara.core.headphones.Attribution
 import com.example.voxara.core.headphones.HeadphoneCategory
 import com.example.voxara.core.headphones.attribute
@@ -31,6 +32,7 @@ import com.example.voxara.core.alerts.AlertEngine
 import com.example.voxara.core.alerts.AlertInputs
 import com.example.voxara.core.alerts.AlertMemory
 import com.example.voxara.core.alerts.AlertSettings
+import com.example.voxara.core.alerts.inQuietHours
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_ADULT
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_SENSITIVE
 import com.example.voxara.core.ledger.ExposureKind
@@ -45,11 +47,14 @@ import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.risk.RiskState
 import com.example.voxara.core.risk.RiskStateMachine
 import com.example.voxara.core.scene.SceneHysteresis
-import com.example.voxara.data.AppMode
+import com.example.voxara.core.situation.ModeChangeHapticGate
+import com.example.voxara.core.situation.Situation
+import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.data.ExposureDb
 import com.example.voxara.data.ExposureState
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
+import com.example.voxara.sync.CompanionLink
 import com.example.voxara.haptics.HapticConductor
 import com.example.voxara.haptics.Pattern
 import com.example.voxara.presentation.MainActivity
@@ -89,11 +94,6 @@ class DosimeterService : LifecycleService() {
         private const val TAG = "VoxaraDosimeter"
         const val ACTION_START = "com.example.voxara.START"
         const val ACTION_STOP = "com.example.voxara.STOP"
-        const val ACTION_CONCERT = "com.example.voxara.CONCERT"
-        const val ACTION_URBAN = "com.example.voxara.URBAN"
-
-        private const val CONCERT_CAP_MS = 6L * 60 * 60 * 1000
-        private const val CONCERT_EXIT_QUIET_MS = 20L * 60 * 1000
         private const val PERSIST_EVERY_MS = 30_000L
         /** The ongoing notification is rebuilt on a risk change, otherwise at most once a minute. */
         private const val NOTIFY_EVERY_MS = 60_000L
@@ -141,7 +141,10 @@ class DosimeterService : LifecycleService() {
     private var lastNotifyAt = 0L
     private var lastRisk: RiskState? = null
     private var quietSinceMs = 0L
-    private var concertStartedAt = 0L
+    private var leavingConcert = false
+    /** When this dosimeter run started: no mode-change haptic in its first minutes. */
+    private var startedAtMs = 0L
+    private val modeHaptics = ModeChangeHapticGate()
     private var currentDayEpoch = 0L
     private val sensitive: Boolean get() = ExposureRepository.state.value.sensitiveListener
     private val weeklyBudgetPa2h: Double
@@ -180,6 +183,7 @@ class DosimeterService : LifecycleService() {
         seenResetGeneration = ExposureRepository.resetGeneration.get()
         lifecycleScope.launch {
             val store = ExposureRepository.store
+            store.migrateSituation()
             // Close any day that ended while nothing was running, before the ledger is loaded.
             store.rollOverIfNeeded(localEpochDay(System.currentTimeMillis()))
             val p = store.read()
@@ -205,6 +209,13 @@ class DosimeterService : LifecycleService() {
                         alertSettings = p.alertSettings,
                         sensitiveListener = p.sensitiveListener,
                         usualHeadphones = p.usualHeadphones,
+                        hapticPrefs = p.hapticPrefs,
+                        snoozeMinutes = p.snoozeMinutes,
+                        tonoEnabled = p.tonoEnabled,
+                        aiConsent = p.aiConsent,
+                        situationChoice = p.situationChoice,
+                        mode = Situation.resolve(p.situationChoice),
+                        concertStartedAtMs = p.concertStartedAtMs,
                     )
                 }
             }
@@ -236,18 +247,6 @@ class DosimeterService : LifecycleService() {
                 return START_NOT_STICKY
             }
 
-            ACTION_CONCERT -> {
-                concertStartedAt = System.currentTimeMillis()
-                ExposureRepository.update {
-                    it.copy(
-                        mode = AppMode.CONCERT,
-                        concertEndsAtMs = concertStartedAt + CONCERT_CAP_MS,
-                    )
-                }
-                lifecycleScope.launch { ExposureRepository.store.setMode(AppMode.CONCERT.name) }
-            }
-
-            ACTION_URBAN -> dropToUrban()
         }
 
         if (!running) {
@@ -268,6 +267,7 @@ class DosimeterService : LifecycleService() {
 
     private suspend fun loop() {
         ready.await()
+        startedAtMs = System.currentTimeMillis()
         ExposureRepository.serviceActive = true
         ExposureRepository.update {
             it.copy(monitoring = true, monitoringStatus = MonitoringStatus.RUNNING)
@@ -288,7 +288,7 @@ class DosimeterService : LifecycleService() {
                     val repo = ExposureRepository.state.value
                     val probe = ExposureRepository.calibrationProbe.value
                     val continuous =
-                        probe != null || repo.mode == AppMode.CONCERT || state == SampleState.HAZARD
+                        probe != null || repo.mode == SituationMode.CONCERT || state == SampleState.HAZARD
                     val burstMs = if (continuous) CONTINUOUS_BURST_MS else state.burstMs
                     val periodMs = if (continuous) CONTINUOUS_BURST_MS else state.periodMs
 
@@ -369,7 +369,7 @@ class DosimeterService : LifecycleService() {
 
                     // Classifier: every burst in ACCRUING and above, every 5th burst in AMBIENT.
                     burstIndex++
-                    val everyNth = if (repo.mode == AppMode.CONCERT) 1 else state.classifierEveryNthBurst
+                    val everyNth = if (repo.mode == SituationMode.CONCERT) 1 else state.classifierEveryNthBurst
                     if (everyNth > 0 && burstIndex % everyNth == 0) {
                         val (scene, confidence) = classifier.classify(burst)
                         hysteresis.offer(scene, confidence)
@@ -409,7 +409,9 @@ class DosimeterService : LifecycleService() {
                     if (impulse && engine.peakDbc >= PEAK_CEILING_DBC) haptics.fire(Pattern.IMPULSE)
                     evaluateAlerts(now, sustainedDba, dose, weeklyPercent, repo)
                     when (riskMachine.update(leq, dose, now)) {
-                        RiskStateMachine.Event.BackToSafe -> haptics.fire(Pattern.CALM)
+                        // Relief is advisory-class: it honours "vibrate for advisories".
+                        RiskStateMachine.Event.BackToSafe ->
+                            if (repo.hapticPrefs.advisoryHaptics) haptics.fire(Pattern.CALM)
                         RiskStateMachine.Event.ImpulsePeak -> haptics.fire(Pattern.IMPULSE)
                         null -> Unit
                     }
@@ -427,7 +429,7 @@ class DosimeterService : LifecycleService() {
                         ListeningComplicationService.requestRefresh(this)
                     }
 
-                    state = if (repo.mode == AppMode.CONCERT) SampleState.HAZARD else SampleState.of(leq)
+                    state = if (repo.mode == SituationMode.CONCERT) SampleState.HAZARD else SampleState.of(leq)
                     val sleep = (periodMs - burstMs).coerceAtLeast(0L)
                     if (sleep > 0) delay(sleep)
                 } catch (c: CancellationException) {
@@ -514,7 +516,8 @@ class DosimeterService : LifecycleService() {
 
     /**
      * The deterministic alert engine decides; the notifier delivers. Never depends on the AI.
-     * In Concert mode the wearer expects interruptions, so the advisory cap is lifted.
+     * The situation mode can only ADD here: Concert lifts the advisory cap and plays alerts
+     * "Strong" ([Situation]); every threshold, cooldown and quiet-hours rule is the wearer's.
      */
     private suspend fun evaluateAlerts(
         now: Long,
@@ -523,9 +526,7 @@ class DosimeterService : LifecycleService() {
         weeklyPercent: Double,
         repo: ExposureState,
     ) {
-        val settings: AlertSettings = repo.alertSettings.let {
-            if (repo.mode == AppMode.CONCERT) it.copy(dailyCap = Int.MAX_VALUE) else it
-        }
+        val settings: AlertSettings = Situation.alertSettings(repo.mode, repo.alertSettings)
         val (alerts, memory) = AlertEngine.evaluate(
             AlertInputs(
                 nowMs = now,
@@ -545,7 +546,7 @@ class DosimeterService : LifecycleService() {
             // Snoozes are owned by the notification actions: keep whatever is stored.
             ExposureRepository.store.updateAlertMemory { stored -> memory.copy(snoozedUntil = stored.snoozedUntil) }
         }
-        notifier.deliver(alerts)
+        notifier.deliver(alerts, Situation.hapticPrefs(repo.mode, repo.hapticPrefs))
     }
 
     /** Day history from both minute ledgers, refreshed about once a minute. */
@@ -615,28 +616,59 @@ class DosimeterService : LifecycleService() {
 
     private fun concertHousekeeping(leq: Double, now: Long) {
         val s = ExposureRepository.state.value
-        if (s.mode != AppMode.CONCERT) {
+        if (s.mode != SituationMode.CONCERT || leavingConcert) {
             quietSinceMs = 0L
             return
         }
-        if (concertStartedAt != 0L && now - concertStartedAt >= CONCERT_CAP_MS) {
-            dropToUrban()
+        val started = s.concertStartedAtMs
+        if (started != null && now - started >= Situation.CONCERT_CAP_MS) {
+            leaveConcert()
             return
         }
-        if (leq < 80.0) {
+        if (leq < Situation.CONCERT_EXIT_BELOW_DBA) {
             if (quietSinceMs == 0L) quietSinceMs = now
-            if (now - quietSinceMs >= CONCERT_EXIT_QUIET_MS) dropToUrban()
+            if (now - quietSinceMs >= Situation.CONCERT_EXIT_QUIET_MS) leaveConcert()
         } else {
             quietSinceMs = 0L
         }
     }
 
-    /** Concert mode auto-drops to Urban after 20 min below 80 dBA, or at the 6 h cap. */
-    private fun dropToUrban() {
+    /**
+     * Concert ends on its own after 20 min below 80 dBA, or at the 6 h cap, and returns to what was
+     * chosen before it. An automatic change: it may vibrate MODE_CHANGE, within the gate's limits.
+     */
+    private fun leaveConcert() {
         quietSinceMs = 0L
-        concertStartedAt = 0L
-        ExposureRepository.update { it.copy(mode = AppMode.URBAN, concertEndsAtMs = 0L) }
-        lifecycleScope.launch { ExposureRepository.store.setMode(AppMode.URBAN.name) }
+        leavingConcert = true
+        lifecycleScope.launch {
+            try {
+                val next = ExposureRepository.store.leaveConcert() ?: return@launch
+                ExposureRepository.update {
+                    it.copy(situationChoice = next, mode = Situation.resolve(next), concertStartedAtMs = null)
+                }
+                playModeChange(System.currentTimeMillis())
+                // The phone follows even when no watch screen is open to publish it.
+                CompanionLink.publishSettings(this@DosimeterService, ExposureRepository.store.read())
+            } finally {
+                leavingConcert = false
+            }
+        }
+    }
+
+    private fun playModeChange(now: Long) {
+        val s = ExposureRepository.state.value
+        val allowed = modeHaptics.tryPlay(
+            ModeChangeHapticGate.Context(
+                nowMs = now,
+                localDay = localEpochDay(now),
+                serviceStartedAtMs = startedAtMs,
+                lastAlertHapticAtMs = haptics.lastAlertAtMs.takeIf { it > 0L },
+                quietHours = inQuietHours(s.alertSettings, localMinuteOfDay(now)),
+                powerSave = PowerPolicy.read(this).powerSaveMode,
+                advisoryHaptics = s.hapticPrefs.advisoryHaptics,
+            )
+        )
+        if (allowed) haptics.fire(Pattern.MODE_CHANGE)
     }
 
     /**
