@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SOLO EN DEBUG (src/debug): ninguna de estas cadenas va en release. -->
+<resources>
+    <string name="debug_haptics_title">Laboratorio de vibración</string>
+    <string name="debug_haptics_state">No molestar: %1$s · timbre: %2$s</string>
+    <string name="debug_haptics_note">Toca un patrón para sentirlo. Activa No molestar en los ajustes rápidos y vuelve a probarlos.</string>
+    <string name="debug_haptics_strong_on">Reproducir dos veces (Fuerte): sí</string>
+    <string name="debug_haptics_strong_off">Reproducir dos veces (Fuerte): no</string>
+    <string name="debug_haptics_composed">primitivas</string>
+    <string name="debug_haptics_fallback">onda de respaldo</string>
+    <string name="debug_on">activado</string>
+    <string name="debug_off">desactivado</string>
+    <string name="debug_role_advisory">aviso</string>
+    <string name="debug_role_warning">advertencia</string>
+    <string name="debug_role_limit">límite</string>
+    <string name="debug_role_impulse">impulso</string>
+    <string name="debug_role_calm">alivio</string>
+    <string name="debug_role_mode">cambio de modo</string>
+    <string name="debug_role_confirm">confirmación</string>
+</resources>

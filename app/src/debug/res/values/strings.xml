@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DEBUG BUILD ONLY (src/debug): none of these strings ship in release. -->
+<resources>
+    <string name="debug_haptics_title">Haptics lab</string>
+    <string name="debug_haptics_state">Do Not Disturb: %1$s · ringer: %2$s</string>
+    <string name="debug_haptics_note">Tap a pattern to feel it. Turn Do Not Disturb on from quick settings and try them again.</string>
+    <string name="debug_haptics_strong_on">Play twice (Strong): on</string>
+    <string name="debug_haptics_strong_off">Play twice (Strong): off</string>
+    <string name="debug_haptics_composed">primitives</string>
+    <string name="debug_haptics_fallback">waveform fallback</string>
+    <string name="debug_on">on</string>
+    <string name="debug_off">off</string>
+    <string name="debug_role_advisory">advisory</string>
+    <string name="debug_role_warning">warning</string>
+    <string name="debug_role_limit">limit</string>
+    <string name="debug_role_impulse">impulse</string>
+    <string name="debug_role_calm">relief</string>
+    <string name="debug_role_mode">mode change</string>
+    <string name="debug_role_confirm">confirmation</string>
+</resources>
