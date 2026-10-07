@@ -4,7 +4,9 @@ import android.content.Context
 import com.example.voxara.core.advice.Advice
 import com.example.voxara.audio.DeviceAudioInfo
 import com.example.voxara.audio.PowerPolicy
+import com.example.voxara.core.alerts.AlertPolicy
 import com.example.voxara.core.alerts.AlertSettings
+import com.example.voxara.core.alerts.HapticPrefs
 import com.example.voxara.core.calibration.CalibrationRecord
 import com.example.voxara.core.headphones.HeadphoneCategory
 import com.example.voxara.core.headphones.ListeningEstimate
@@ -19,6 +21,9 @@ import com.example.voxara.core.dose.NoiseDoseEngine
 import com.example.voxara.core.dose.SampleState
 import com.example.voxara.core.risk.RiskState
 import com.example.voxara.core.scene.Scene
+import com.example.voxara.core.situation.Situation
+import com.example.voxara.core.situation.SituationChoice
+import com.example.voxara.core.situation.SituationMode
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,13 +32,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.atomic.AtomicInteger
-
-/** THREE MODES, ONE ENGINE. Titles and blurbs are resolved from resources by the UI layer. */
-enum class AppMode {
-    CONCERT,
-    URBAN,
-    VOICE,
-}
 
 /**
  * The scenario chips of the dossier's live gauge, kept as a bench driver for mic-less devices.
@@ -58,11 +56,15 @@ data class ExposureState(
     val risk: RiskState = RiskState.CALM,
     val scene: Scene = Scene.UNKNOWN,
     val sampleState: SampleState = SampleState.IDLE,
-    val mode: AppMode = AppMode.URBAN,
+    /** The situation mode in force (Auto already resolved). Never changes an alert threshold. */
+    val mode: SituationMode = SituationMode.DEFAULT,
+    /** The wearer's choice: Auto or a fixed mode (synced with the phone). */
+    val situationChoice: SituationChoice = SituationChoice.DEFAULT,
     val monitoring: Boolean = false,
     val micGranted: Boolean = false,
     val simulated: Boolean = false,
-    val concertEndsAtMs: Long = 0L,
+    /** When Concert was chosen (for its 6 h cap); null when Concert is not the choice. */
+    val concertStartedAtMs: Long? = null,
     val calibrationOffsetDb: Double = 0.0,
     /** The last 7 local days from the minute ledger, index 0 = today. */
     val days: List<DaySummary> = emptyList(),
@@ -99,6 +101,12 @@ data class ExposureState(
     val aiConsent: Boolean = false,
     /** Whether this watch exposes the system battery-optimisation list. */
     val batterySettingsAvailable: Boolean = false,
+    /** Haptic preferences (warnings and limits always vibrate regardless; see AlertPolicy). */
+    val hapticPrefs: HapticPrefs = HapticPrefs(),
+    /** Snooze length for alert notifications, 15-120 min. */
+    val snoozeMinutes: Int = AlertPolicy.SNOOZE_DEFAULT_MINUTES,
+    /** Tono shown on the watch; off hides it and keeps voice commands. */
+    val tonoEnabled: Boolean = true,
 ) {
     val headroomMinutes: Double get() = headroomSeconds / 60.0
 
@@ -173,6 +181,30 @@ object ExposureRepository {
 
     fun isInitialised() = initialised
 
+    /**
+     * Settings written from anywhere (this UI, the phone companion, a notification) applied to the
+     * live state without touching the dose figures.
+     */
+    fun applySettings(p: VoxaraStore.Persisted) = _state.update {
+        it.copy(
+            alertSettings = p.alertSettings,
+            sensitiveListener = p.sensitiveListener,
+            usualHeadphones = p.usualHeadphones,
+            aiConsent = p.aiConsent,
+            hapticPrefs = p.hapticPrefs,
+            snoozeMinutes = p.snoozeMinutes,
+            tonoEnabled = p.tonoEnabled,
+            situationChoice = p.situationChoice,
+            mode = Situation.resolve(p.situationChoice),
+            concertStartedAtMs = p.concertStartedAtMs,
+            weeklyFraction = if (it.sensitiveListener == p.sensitiveListener) it.weeklyFraction
+            else it.weeklyFraction * budgetOf(it.sensitiveListener) / budgetOf(p.sensitiveListener),
+            headphoneWeeklyFraction = p.headphoneWeeklyPa2h / budgetOf(p.sensitiveListener),
+        )
+    }
+
+    private fun budgetOf(sensitive: Boolean) = if (sensitive) WHO_WEEKLY_PA2H_SENSITIVE else WHO_WEEKLY_PA2H_ADULT
+
     fun hydrate(p: VoxaraStore.Persisted) {
         if (!serviceActive) engine.restore(p.dosePercent, p.weeklyPa2h, p.peakDbc)
         _state.update {
@@ -186,11 +218,16 @@ object ExposureRepository {
                 twaDba = engine.twaDba(),
                 calibrationOffsetDb = p.calibrationOffsetDb,
                 alertSettings = p.alertSettings,
-                mode = runCatching { AppMode.valueOf(p.mode) }.getOrDefault(AppMode.URBAN),
+                situationChoice = p.situationChoice,
+                mode = Situation.resolve(p.situationChoice),
+                concertStartedAtMs = p.concertStartedAtMs,
                 sensitiveListener = p.sensitiveListener,
                 calibrations = p.calibrations,
                 usualHeadphones = p.usualHeadphones,
                 aiConsent = p.aiConsent,
+                hapticPrefs = p.hapticPrefs,
+                snoozeMinutes = p.snoozeMinutes,
+                tonoEnabled = p.tonoEnabled,
                 headphoneWeeklyPa2h = p.headphoneWeeklyPa2h,
                 headphoneWeeklyFraction = p.headphoneWeeklyPa2h /
                     (if (p.sensitiveListener) WHO_WEEKLY_PA2H_SENSITIVE else WHO_WEEKLY_PA2H_ADULT),
@@ -199,8 +236,6 @@ object ExposureRepository {
     }
 
     fun update(transform: (ExposureState) -> ExposureState) = _state.update(transform)
-
-    fun setMode(mode: AppMode) = _state.update { it.copy(mode = mode) }
 
     /** Manual reset of today's dose. The service notices [resetGeneration] and clears its copy. */
     fun resetDay() {
