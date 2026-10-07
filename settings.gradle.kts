@@ -24,4 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Voxara"
 include(":app")
- include(":phone")
+include(":phone")
+include(":shared")
+include(":shared-ui")
