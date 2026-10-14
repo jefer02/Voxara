@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tono's built-in answers, shared by the watch and the phone (moved from app/src/main/res). -->
+<resources>
+    <string name="tono_chip_tips">Consejos</string>
+    <string name="tono_chip_week">¿Mi semana?</string>
+    <string name="tono_chip_why_estimated">¿Por qué estimado?</string>
+    <string name="tono_insight_today">Llevas el %1$d%% del sonido permitido hoy y el %2$d%% de esta semana.</string>
+    <string name="tono_insight_week">Esta semana llevas el %1$d%% de lo permitido. Días seguidos dentro del límite: %2$d.</string>
+    <string name="tono_status_busy">Un día intenso para tus oídos</string>
+    <string name="tono_status_calm">Un día tranquilo para tus oídos</string>
+    <string name="tono_status_limit">Agotaste el sonido permitido hoy</string>
+    <string name="tono_status_listening">Escuchando hoy, todo en orden</string>
+    <string name="tono_status_loud">Mucho ruido a tu alrededor ahora</string>
+    <string name="tono_status_week">Tu semana se está llenando</string>
+    <string name="tono_suggest_keep">Sigue así.</string>
+    <string name="tono_suggest_quieter">Un lugar más tranquilo o protección auditiva ayudan de inmediato.</string>
+    <string name="tono_suggest_rest">Un rato de calma hoy ayuda a que tus oídos se recuperen.</string>
+    <string name="tono_suggest_volume">Bajar un poco el volumen te da mucho más tiempo de escucha.</string>
+    <string name="tono_symptom_insight">Zumbidos, oír apagado o dolor de oído merecen revisarse con un profesional de la audición, como un audiólogo o un médico.</string>
+    <string name="tono_symptom_status">No puedo evaluar síntomas</string>
+    <string name="tono_symptom_suggestion">Consulta a un profesional de la audición, sobre todo si persiste.</string>
+    <string name="tono_why_alert">El sonido se acumula con el tiempo: cuanto más fuerte, más rápido se agota lo permitido.</string>
+    <string name="tono_why_projection">A este ritmo llegarías al límite semanal en unos %1$d días.</string>
+</resources>
