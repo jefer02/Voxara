@@ -17,4 +17,9 @@
     <string name="debug_role_calm">relief</string>
     <string name="debug_role_mode">mode change</string>
     <string name="debug_role_confirm">confirmation</string>
+    <string name="debug_detection_title">Auto-mode detection log</string>
+    <string name="debug_detection_stats">Detection log: %1$d rows · %2$d KB</string>
+    <string name="debug_detection_export">Export detection log</string>
+    <string name="debug_detection_exported">Saved to %1$s. On the computer: adb pull %1$s</string>
+    <string name="debug_detection_clear">Clear detection log</string>
 </resources>

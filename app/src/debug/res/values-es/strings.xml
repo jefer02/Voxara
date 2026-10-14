@@ -17,4 +17,9 @@
     <string name="debug_role_calm">alivio</string>
     <string name="debug_role_mode">cambio de modo</string>
     <string name="debug_role_confirm">confirmación</string>
+    <string name="debug_detection_title">Registro de detección del modo Auto</string>
+    <string name="debug_detection_stats">Registro de detección: %1$d filas · %2$d KB</string>
+    <string name="debug_detection_export">Exportar registro de detección</string>
+    <string name="debug_detection_exported">Guardado en %1$s. En el ordenador: adb pull %1$s</string>
+    <string name="debug_detection_clear">Borrar registro de detección</string>
 </resources>
