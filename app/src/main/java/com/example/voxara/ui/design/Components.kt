@@ -63,14 +63,7 @@ import kotlin.math.sin
 
 /** The zone's word, localised. */
 @Composable
-fun zoneWord(z: RiskZone): String = stringResource(
-    when (z) {
-        RiskZone.OK -> R.string.zone_ok
-        RiskZone.MODERATE -> R.string.zone_moderate
-        RiskZone.LOUD -> R.string.zone_loud
-        RiskZone.DANGEROUS -> R.string.zone_dangerous
-    }
-)
+fun zoneWord(z: RiskZone): String = stringResource(z.wordRes())
 
 /** Icon + word in a pill: the zone, readable without colour. */
 @Composable

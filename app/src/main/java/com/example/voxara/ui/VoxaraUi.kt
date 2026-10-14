@@ -6,6 +6,7 @@ import com.example.voxara.core.alerts.AlertSettings
 import com.example.voxara.core.calibration.CalibrationRecord
 import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.headphones.HeadphoneCategory
+import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.ExposureState
 import com.example.voxara.data.Scenario
@@ -21,6 +22,9 @@ object Routes {
     const val ASK = "ask"
     const val SETTINGS = "settings"
     const val CALIBRATION = "calibration"
+    const val MODE = "mode"
+    /** Debug builds only: registered when DebugTools.available. */
+    const val DEBUG_HAPTICS = "debug_haptics"
 }
 
 /** Everything a screen may read. */
@@ -42,7 +46,8 @@ data class UiEnv(
 data class VoxaraActions(
     val onMonitoring: (Boolean) -> Unit = {},
     val onResume: () -> Unit = {},
-    val onConcertToggle: () -> Unit = {},
+    /** The wearer picked Auto or a fixed situation mode on the watch. */
+    val onSituationChoice: (SituationChoice) -> Unit = {},
     val onCalibrationTrim: (Double) -> Unit = {},
     val onSaveCalibration: (CalibrationRecord) -> Unit = {},
     val onEnsureMonitoring: () -> Unit = {},
@@ -57,6 +62,8 @@ data class VoxaraActions(
     val onRequestNotifications: () -> Unit = {},
     val onRequestBluetooth: () -> Unit = {},
     val onAiConsent: (Boolean) -> Unit = {},
+    /** Tono on the watch on/off. Off hides Tono; voice commands keep working. */
+    val onTonoEnabled: (Boolean) -> Unit = {},
     val onAsk: (CoachTask, String?) -> Unit = { _, _ -> },
     val onVoiceArm: () -> Unit = {},
     val onLanguage: (AppLanguage) -> Unit = {},

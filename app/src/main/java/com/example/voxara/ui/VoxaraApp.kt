@@ -1,6 +1,7 @@
 package com.example.voxara.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -10,6 +11,7 @@ import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.example.voxara.core.alerts.limitLevel
+import com.example.voxara.debug.DebugTools
 import com.example.voxara.ui.screens.AmbientScreen
 import com.example.voxara.ui.screens.AskScreen
 import com.example.voxara.ui.screens.CalibrationScreen
@@ -17,6 +19,7 @@ import com.example.voxara.ui.screens.HeadphonesScreen
 import com.example.voxara.ui.screens.HomeScreen
 import com.example.voxara.ui.screens.LimitAlertScreen
 import com.example.voxara.ui.screens.LimitKind
+import com.example.voxara.ui.screens.ModeScreen
 import com.example.voxara.ui.screens.NowScreen
 import com.example.voxara.ui.screens.OnboardingScreen
 import com.example.voxara.ui.screens.SettingsScreen
@@ -29,7 +32,14 @@ import com.example.voxara.ui.screens.WeekScreen
  * shows full screen while the app is open (the haptic and the notification already fired).
  */
 @Composable
-fun VoxaraApp(env: UiEnv, actions: VoxaraActions, ambient: Boolean) {
+fun VoxaraApp(
+    env: UiEnv,
+    actions: VoxaraActions,
+    ambient: Boolean,
+    /** A screen the phone app asked to open (e.g. calibration); shown once, then [onRouteShown]. */
+    pendingRoute: String? = null,
+    onRouteShown: () -> Unit = {},
+) {
     if (ambient) {
         AmbientScreen(env)
         return
@@ -59,9 +69,17 @@ fun VoxaraApp(env: UiEnv, actions: VoxaraActions, ambient: Boolean) {
     val currentActions by rememberUpdatedState(actions)
     val nav = rememberSwipeDismissableNavController()
     val go: (String) -> Unit = { nav.navigate(it) }
+    LaunchedEffect(pendingRoute) {
+        if (pendingRoute != null) {
+            nav.navigate(pendingRoute)
+            onRouteShown()
+        }
+    }
     SwipeDismissableNavHost(navController = nav, startDestination = Routes.HOME) {
         composable(Routes.HOME) { HomeScreen(currentEnv, currentActions, go) }
-        composable(Routes.NOW) { NowScreen(currentEnv, currentActions) }
+        composable(Routes.NOW) { NowScreen(currentEnv, currentActions, go) }
+        composable(Routes.MODE) { ModeScreen(currentEnv, currentActions) }
+        if (DebugTools.available) composable(Routes.DEBUG_HAPTICS) { DebugTools.HapticsScreen() }
         composable(Routes.HEADPHONES) { HeadphonesScreen(currentEnv, currentActions) }
         composable(Routes.TODAY) { TodayScreen(currentEnv) }
         composable(Routes.WEEK) { WeekScreen(currentEnv, currentActions) }
