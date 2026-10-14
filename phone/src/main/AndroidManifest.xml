@@ -2,25 +2,43 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-        Voxara phone companion (v1). It reads only: which audio output is connected (by type),
-        whether media is playing, and the media volume. Never titles, app names, device names or
-        addresses. BLUETOOTH_CONNECT is needed to receive Bluetooth connection broadcasts (API 31+).
+        Voxara phone companion (v2). Headphone sampling (optional, OFF by default) reads only which
+        audio output is connected (by type), whether media is playing, and the media volume. Never
+        titles, app names, device names or addresses. BLUETOOTH_CONNECT is needed to receive
+        Bluetooth connection broadcasts (API 31+) and is asked in context.
     -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
+    <!-- Sync problems and, if the wearer turns it on, mirrored 100% alerts. Asked in context. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- "Open the Galaxy Wearable app": the apps that pair a watch with this phone. -->
+    <queries>
+        <package android:name="com.samsung.android.app.watchmanager" />
+        <package android:name="com.google.android.apps.wear.companion" />
+        <package android:name="com.google.android.wearable.app" />
+    </queries>
+
+    <!--
+        allowBackup=false plus data extraction rules: the exposure history, settings and status on
+        this phone are excluded from cloud backup AND device-to-device transfer.
+    -->
     <application
+        android:name=".VoxaraPhoneApp"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@drawable/ic_voxara"
         android:label="@string/phone_app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault">
+        android:theme="@style/Theme.VoxaraPhone">
 
         <activity
-            android:name=".ConsentActivity"
-            android:exported="true">
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -38,6 +56,61 @@
                 <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
             </intent-filter>
         </receiver>
+
+        <!-- The Voxara watch app (same app id + signature only): status, settings, capability. -->
+        <service
+            android:name=".sync.PhoneListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/voxara/status"
+                    android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/voxara/settings/watch"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:path="/voxara/alert/limit"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data
+                    android:host="*"
+                    android:path="/voxara_watch_app"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+
+        <!-- Home-screen widget: today's dose from the watch, with its time (refreshed after each sync). -->
+        <receiver
+            android:name=".widget.DoseWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dose_widget_info" />
+        </receiver>
+
+        <!-- CSV export through the share sheet (files in the cache, read-only grants). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.export"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/export_paths" />
+        </provider>
     </application>
 
 </manifest>
