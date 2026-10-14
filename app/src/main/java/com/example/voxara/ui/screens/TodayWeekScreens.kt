@@ -185,17 +185,19 @@ fun WeekScreen(env: UiEnv, actions: VoxaraActions) {
             MetricCard(VoxIcons.Shield, stringResource(R.string.score_title), "$score / 100", detail = stringResource(R.string.score_sub))
         }
         item { BodyText(stringResource(R.string.score_explain), color = VColor.TextSecondary) }
-        item {
-            PillButton(
-                stringResource(R.string.week_ask_summary, name),
-                onClick = { actions.onAsk(CoachTask.WEEKLY_SUMMARY, null) },
-                icon = VoxIcons.Sparkle,
-                style = PillStyle.TONAL,
-            )
-        }
-        env.coach.reply?.let { r ->
-            item { HeroStatus(r.insight, maxLines = 4) }
-            item { BodyText(r.suggestion, color = VColor.BrandStart) }
+        if (env.state.tonoEnabled) {
+            item {
+                PillButton(
+                    stringResource(R.string.week_ask_summary, name),
+                    onClick = { actions.onAsk(CoachTask.WEEKLY_SUMMARY, null) },
+                    icon = VoxIcons.Sparkle,
+                    style = PillStyle.TONAL,
+                )
+            }
+            env.coach.reply?.let { r ->
+                item { HeroStatus(r.insight, maxLines = 4) }
+                item { BodyText(r.suggestion, color = VColor.BrandStart) }
+            }
         }
     }
 }

@@ -239,6 +239,11 @@
     <string name="channel_alerts">Hearing alerts</string>
     <string name="alert_action_ack">Got it</string>
     <string name="alert_action_snooze">Snooze 1 h</string>
+    <string name="alert_action_snooze_min">Snooze %1$d min</string>
+    <string name="tono_enabled_on">Tono: on</string>
+    <string name="tono_enabled_off">Tono: off</string>
+    <string name="tono_enabled_note">Off hides Tono on the watch. Voice commands keep working, and symptom questions still get the safe answer.</string>
+    <string name="voice_title">VOICE</string>
     <string name="alert_action_open">Open</string>
     <string name="alert_ambient_loud_title">Loud around you</string>
     <string name="alert_ambient_loud_body">About %1$d dBA for the last few minutes. A quieter spot or ear protection helps.</string>
@@ -311,26 +316,7 @@
 
     <!-- Phase 4: Tono, the coach -->
     <string name="ai_name">Tono</string>
-    <string name="tono_status_limit">Today’s sound allowance is used up</string>
-    <string name="tono_status_loud">Loud around you right now</string>
-    <string name="tono_status_week">Your week is getting full</string>
-    <string name="tono_status_busy">A busy day for your ears</string>
-    <string name="tono_status_listening">Listening today, all on track</string>
-    <string name="tono_status_calm">A calm day for your ears</string>
-    <string name="tono_insight_today">You are at %1$d%% of today’s sound allowance and %2$d%% of this week’s.</string>
-    <string name="tono_insight_week">This week you are at %1$d%% of your allowance. Days within your limit in a row: %2$d.</string>
-    <string name="tono_why_alert">Sound adds up over time: the louder it is, the faster the allowance goes.</string>
-    <string name="tono_why_projection">At this pace you would reach the weekly limit in about %1$d days.</string>
-    <string name="tono_suggest_quieter">A quieter spot or ear protection helps right away.</string>
-    <string name="tono_suggest_volume">Lowering the volume a little buys a lot of listening time.</string>
-    <string name="tono_suggest_rest">Some quiet time today lets your ears recover.</string>
-    <string name="tono_suggest_keep">Keep doing what you are doing.</string>
-    <string name="tono_chip_week">My week?</string>
-    <string name="tono_chip_why_estimated">Why estimated?</string>
-    <string name="tono_chip_tips">Tips</string>
-    <string name="tono_symptom_status">I can’t assess symptoms</string>
-    <string name="tono_symptom_insight">Ringing, muffled hearing or ear pain are worth checking with a hearing professional, such as an audiologist or doctor.</string>
-    <string name="tono_symptom_suggestion">Please see a hearing professional, especially if it lasts.</string>
+    <string name="tono_says">%1$s says</string>
     <string name="tono_settings_title">TONO · AI COACH</string>
     <string name="tono_consent_on">Cloud AI: On</string>
     <string name="tono_consent_off">Cloud AI: Off</string>
@@ -345,10 +331,6 @@
     <string name="tono_not_medical">Not a medical device.</string>
 
     <!-- Phase 5: design system -->
-    <string name="zone_ok">OK</string>
-    <string name="zone_moderate">Moderate</string>
-    <string name="zone_loud">Loud</string>
-    <string name="zone_dangerous">Dangerous</string>
 
     <!-- Phase 6: redesign (home, now, today, week, ask, settings, onboarding) -->
     <string name="alert_why">Why?</string>
@@ -456,4 +438,12 @@
 
     <!-- Phase 6: lint fix -->
     <string name="today_note">The daily dose follows NIOSH: 85 dBA for 8 hours is the full daily dose, and every 3 dB more halves the time.</string>
+    <!-- Situation modes (names and blurbs live in shared-ui) -->
+    <string name="mode_title">Mode</string>
+    <string name="mode_chip">Mode: %1$s</string>
+    <string name="mode_auto_value">Auto · %1$s</string>
+    <string name="mode_auto_detected">Detected from the sound around you: %1$s.</string>
+    <string name="mode_auto_listening">Still listening: %1$s until Voxara is sure.</string>
+    <string name="mode_auto_unavailable">Automatic detection isn\'t available in this version, so Auto uses Street. It still switches to Concert for loud live music.</string>
+    <string name="mode_auto_concert_note">Concert detected: alerts vibrate twice and are never capped. Ends after 20 quiet minutes.</string>
 </resources>
