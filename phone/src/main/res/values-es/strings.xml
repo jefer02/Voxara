@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="phone_app_name">Voxara acompañante</string>
+    <string name="phone_app_name">Voxara</string>
+
     <string name="phone_title">Voxara · escucha con auriculares</string>
     <string name="phone_what">Tu reloj Voxara puede incluir la escucha con auriculares de este teléfono en tu presupuesto auditivo semanal. Es opcional y está desactivado hasta que lo actives.</string>
     <string name="phone_sends">Lo que se envía a tu reloj, aproximadamente cada 15 minutos mientras escuchas: la hora, cuánto tiempo, el volumen multimedia y el tipo de salida (cable, Bluetooth…). El reloj lo convierte en un nivel estimado.</string>
@@ -11,4 +12,327 @@
     <string name="phone_status_off">Desactivado. No se muestrea nada.</string>
     <string name="phone_status_waiting">Activado. Esperando la primera muestra de escucha.</string>
     <string name="phone_status_synced">Activado. Último envío a tu reloj: %1$s</string>
+
+    <string name="nav_home">Inicio</string>
+    <string name="nav_trends">Tendencias</string>
+    <string name="nav_tono">Tono</string>
+    <string name="nav_watch">Reloj</string>
+    <string name="nav_settings">Ajustes</string>
+
+    <string name="action_back">Atrás</string>
+    <string name="action_sync_now">Sincronizar ahora</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="action_open_on_watch">Abrir Voxara en el reloj</string>
+    <string name="action_open_calibration">Abrir la calibración en el reloj</string>
+    <string name="action_install_on_watch">Instalar en el reloj</string>
+    <string name="action_open_wearable">Abrir la app Galaxy Wearable</string>
+    <string name="action_continue">Continuar</string>
+    <string name="action_skip">Ahora no</string>
+    <string name="action_done">Listo</string>
+    <string name="action_allow">Permitir</string>
+    <string name="action_see_all">Ver todo</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_delete">Borrar</string>
+    <string name="action_decrease">Reducir %1$s</string>
+    <string name="action_increase">Aumentar %1$s</string>
+
+    <string name="value_percent">%1$d %%</string>
+    <string name="value_dba">%1$d dBA</string>
+    <string name="value_none">—</string>
+
+    <string name="fresh_now">Actualizado ahora mismo</string>
+    <string name="fresh_min">Actualizado hace %1$d min</string>
+    <string name="fresh_at">A las %1$s</string>
+    <string name="fresh_stale">Último dato · %1$s</string>
+    <string name="fresh_never">Aún sin sincronizar</string>
+    <string name="fresh_stale_hint">Estas cifras son de la última sincronización, no en vivo.</string>
+    <string name="syncing">Sincronizando…</string>
+    <string name="last_synced">Última sincronización %1$s</string>
+
+    <string name="link_checking">Buscando tu reloj…</string>
+    <string name="link_linked">%1$s · vinculado</string>
+    <string name="link_no_watch">Ningún reloj conectado</string>
+    <string name="link_not_installed">Voxara no está en tu reloj</string>
+    <string name="link_problem">Problema de sincronización</string>
+    <string name="link_api_missing">Faltan los servicios de Wear OS</string>
+    <string name="link_explain">Tu reloj está emparejado con este teléfono mediante la app Galaxy Wearable. Voxara nunca empareja dispositivos Bluetooth: su vínculo es solo su app del teléfono encontrando su app del reloj a través de esa conexión.</string>
+    <string name="link_no_watch_body">Comprueba que el reloj esté encendido, cerca del teléfono y conectado en la app Galaxy Wearable.</string>
+    <string name="link_not_installed_body">Instala Voxara en %1$s para vincularlo.</string>
+    <string name="link_debug_install">Versión de depuración: instala la app del reloj desde Android Studio o con adb install mientras el reloj está conectado para depuración.</string>
+    <string name="link_problem_unreachable">El reloj no respondió. Mantenlo cerca del teléfono con el Bluetooth activado, abre Voxara en él una vez y vuelve a intentarlo.</string>
+    <string name="link_problem_incompatible">El reloj envió algo que esta app no puede leer. Actualiza Voxara en el teléfono y en el reloj.</string>
+    <string name="link_problem_no_api">A este teléfono le faltan los servicios de Google Play o la app Galaxy Wearable / Wear OS, así que no puede hablar con un reloj.</string>
+    <string name="link_other_watches">Otros relojes con Voxara</string>
+    <string name="link_use_this">Usar este reloj</string>
+    <string name="link_open_failed">No se pudo abrir en el reloj. ¿Está cerca y desbloqueado?</string>
+    <string name="link_store_failed">No se pudo abrir la tienda en el reloj. Instala Voxara desde Play Store en el reloj.</string>
+    <string name="link_opened">Mira tu reloj.</string>
+
+    <string name="home_title">Voxara</string>
+    <string name="home_status_fallback">Cuidando de tus oídos</string>
+    <string name="home_score">Puntuación de cuidado auditivo</string>
+    <string name="home_score_sub">Hábitos de escucha, no una prueba auditiva</string>
+    <string name="home_score_cd">Puntuación de cuidado auditivo %1$d de 100</string>
+    <string name="stat_today">Hoy</string>
+    <string name="stat_today_sub">del sonido permitido hoy</string>
+    <string name="stat_week">Presupuesto de 7 días</string>
+    <string name="stat_week_sub">móvil, entorno</string>
+    <string name="stat_headphones">Auriculares</string>
+    <string name="stat_headphones_sub">esta semana, estimado</string>
+    <string name="stat_cd">%1$s: %2$d por ciento, %3$s. %4$s</string>
+    <string name="zone_strip_title">Hoy, minuto a minuto</string>
+    <string name="zone_strip_cd">Hoy hasta ahora: %1$s</string>
+    <string name="zone_strip_part">%1$s de %2$s a %3$s</string>
+    <string name="zone_strip_none">aún no se ha medido nada</string>
+    <string name="zone_not_measured">Sin medir</string>
+    <string name="last_alert_title">Última alerta</string>
+    <string name="last_alert_none">Aún sin alertas</string>
+    <string name="uncalibrated_title">Estimación sin calibrar</string>
+    <string name="uncalibrated_body">Las lecturas pueden desviarse ±3–5 dB o más hasta que calibres en el reloj.</string>
+    <string name="coverage">Medido %1$s hoy</string>
+    <string name="coverage_none">Aún no se ha medido nada hoy</string>
+    <string name="home_empty_title">Aún no hay datos</string>
+    <string name="home_empty_body">Cuando tu reloj haya medido un rato, sincroniza para ver tu día aquí.</string>
+    <string name="see_today">Hoy en detalle</string>
+    <string name="see_alerts">Historial de alertas</string>
+    <string name="see_headphones">Auriculares</string>
+    <string name="tono_says">%1$s te dice</string>
+
+    <string name="today_title">Hoy</string>
+    <string name="today_hourly">Hora a hora</string>
+    <string name="today_avg">Media</string>
+    <string name="today_loudest">Minuto más fuerte</string>
+    <string name="today_measured">Medido</string>
+    <string name="today_dose">Dosis</string>
+    <string name="today_alerts">Alertas de hoy</string>
+    <string name="today_no_alerts">Hoy no hubo alertas</string>
+    <string name="today_empty">Aún no se ha medido nada hoy.</string>
+    <string name="chart_hourly_cd">Niveles por hora. Hora más fuerte %1$d dBA a las %2$s.</string>
+    <string name="chart_hourly_empty_cd">Aún no hay niveles por hora.</string>
+
+    <string name="trends_title">Tendencias</string>
+    <string name="range_day">Día</string>
+    <string name="range_week">Semana</string>
+    <string name="range_month">Mes</string>
+    <string name="trends_daily_dose">Dosis diaria</string>
+    <string name="trends_limit_line" formatted="false">Línea = 100 % del límite diario</string>
+    <string name="trends_budget">Presupuesto móvil de 7 días</string>
+    <string name="trends_budget_note">Entorno, al final de cada día.</string>
+    <string name="trends_compare">Esta semana frente a la anterior</string>
+    <string name="trends_compare_value">%1$d %% frente a %2$d %%</string>
+    <string name="trends_compare_up">%1$d puntos más que la semana pasada</string>
+    <string name="trends_compare_down">%1$d puntos menos que la semana pasada</string>
+    <string name="trends_compare_same">Más o menos igual que la semana pasada</string>
+    <string name="trends_split">Entorno frente a auriculares</string>
+    <string name="split_ambient">Entorno %1$d %%</string>
+    <string name="split_headphones">Auriculares %1$d %%</string>
+    <string name="trends_empty">Las tendencias aparecen tras unos días de datos sincronizados.</string>
+    <string name="chart_bars_cd">Dosis diaria de los últimos %1$d días. Máximo %2$d por ciento.</string>
+    <string name="chart_line_cd">Presupuesto móvil de 7 días. Ahora %1$d por ciento.</string>
+
+    <string name="alerts_title">Alertas</string>
+    <string name="alert_ack">Confirmada</string>
+    <string name="alert_snoozed">Pospuesta</string>
+    <string name="alert_open">Sin confirmar</string>
+    <string name="tier_advisory">Aviso</string>
+    <string name="tier_warning">Advertencia</string>
+    <string name="tier_limit">Límite</string>
+    <string name="alerts_empty">No hay alertas en el historial sincronizado.</string>
+    <string name="alert_level">Nivel %1$d %%</string>
+    <string name="alert_kind_ambient_loud">Entorno ruidoso</string>
+    <string name="alert_kind_daily_50">La mitad del sonido permitido hoy</string>
+    <string name="alert_kind_daily_80" formatted="false">80 % del sonido permitido hoy</string>
+    <string name="alert_kind_daily_100">Límite diario alcanzado</string>
+    <string name="alert_kind_week_80" formatted="false">80 % del presupuesto semanal</string>
+    <string name="alert_kind_week_100">Presupuesto semanal alcanzado</string>
+    <string name="alert_kind_hp_week_80" formatted="false">Auriculares: 80 % de la semana</string>
+    <string name="alert_kind_hp_week_100">Auriculares: presupuesto semanal alcanzado</string>
+    <string name="alert_kind_hp_loud">Escucha muy alta</string>
+    <string name="alert_row_cd">%1$s, %2$s, %3$s, %4$s, %5$s</string>
+
+    <string name="hp_title">Auriculares</string>
+    <string name="hp_sampling">Escucha con auriculares desde este teléfono</string>
+    <string name="hp_sampling_on">Activada</string>
+    <string name="hp_sampling_off">Desactivada</string>
+    <string name="hp_estimate_title">Nivel de escucha estimado</string>
+    <string name="hp_estimate_label">estimado ±10 dB</string>
+    <string name="hp_estimate_none">Hoy no se midió escucha con auriculares.</string>
+    <string name="hp_weekly">Dosis semanal de auriculares</string>
+    <string name="hp_today">Escucha hoy</string>
+    <string name="hp_type">Mis auriculares suelen ser</string>
+    <string name="hp_type_earbuds">Intraurales</string>
+    <string name="hp_type_over">De diadema</string>
+    <string name="hp_type_none">Sin definir</string>
+    <string name="hp_type_note">Sirve para estimar cuánto del entorno llega a tu oído. El teléfono no puede detectar si son intraurales o de diadema.</string>
+    <string name="hp_bt_needed">Permite el Bluetooth para que el teléfono note cuándo se conectan los auriculares.</string>
+
+    <string name="tono_title">Tono</string>
+    <string name="tono_placeholder">Pregunta por tu día o tu semana</string>
+    <string name="tono_send">Enviar</string>
+    <string name="tono_weekly_title">Tu semana</string>
+    <string name="tono_weekly_button">Resumen semanal</string>
+    <string name="tono_today_button">¿Cómo va mi día?</string>
+    <string name="tono_source_ai">Redactado por IA en la nube</string>
+    <string name="tono_source_offline">Respuesta integrada</string>
+    <string name="tono_source_safety">Respuesta de seguridad</string>
+    <string name="tono_cloud_failed">La IA en la nube no respondió; esta es la respuesta integrada.</string>
+    <string name="tono_optin_title">La IA en la nube está desactivada</string>
+    <string name="tono_optin_body">Tono responde con respuestas integradas. Con la IA en la nube activada, un modelo redacta las respuestas viendo solo totales redondeados: nunca audio, nunca preguntas sobre síntomas, nada que te identifique.</string>
+    <string name="tono_optin_action">Activar la IA en la nube</string>
+    <string name="tono_unavailable">Esta versión no tiene IA en la nube: Tono responde con respuestas integradas.</string>
+    <string name="tono_off_title">Tono está desactivado</string>
+    <string name="tono_off_body">Activa Tono para recibir resúmenes en lenguaje sencillo. Las alertas nunca dependen de Tono.</string>
+    <string name="tono_turn_on">Activar Tono</string>
+    <string name="tono_thinking">Tono está pensando…</string>
+    <string name="tono_not_medical">No es un dispositivo médico. Las preguntas sobre síntomas reciben una respuesta fija y nunca se envían.</string>
+    <string name="tono_you">Tú</string>
+    <string name="tono_empty">Haz una pregunta o toca una sugerencia.</string>
+
+    <string name="watch_title">Reloj</string>
+    <string name="watch_connected">Conectado</string>
+    <string name="watch_not_connected">Sin conexión</string>
+    <string name="watch_version">Voxara %1$s en el reloj</string>
+    <string name="watch_version_unknown">Versión desconocida hasta la primera sincronización</string>
+    <string name="watch_checklist">Comprobaciones</string>
+    <string name="check_mic">Permiso de micrófono</string>
+    <string name="check_mic_ok">Concedido</string>
+    <string name="check_mic_missing">No concedido. Abre Voxara en el reloj y permítelo.</string>
+    <string name="check_cal">Calibración</string>
+    <string name="check_cal_ok">Calibrado %1$s</string>
+    <string name="check_cal_missing">Estimación sin calibrar (±3–5 dB o más)</string>
+    <string name="check_monitoring">Monitoreo</string>
+    <string name="mon_running">Activo</string>
+    <string name="mon_paused">En pausa. Abre Voxara en el reloj para reanudarlo.</string>
+    <string name="mon_off">Apagado</string>
+    <string name="check_notifications">Notificaciones de alerta en el reloj</string>
+    <string name="check_notifications_off">Bloqueadas. Permite las notificaciones de Voxara en el reloj.</string>
+    <string name="check_battery">Batería</string>
+    <string name="battery_ok">Sin restricciones detectadas</string>
+    <string name="battery_power_save">El ahorro de energía está activado. Puede pausar el monitoreo.</string>
+    <string name="battery_optimized">La optimización de batería puede pausar Voxara.</string>
+    <string name="check_unknown">Se sabrá tras la primera sincronización</string>
+    <string name="check_as_of">Comprobado %1$s</string>
+    <string name="battery_tips_title">Mantén Voxara activo en One UI Watch</string>
+    <string name="battery_tip_1">Deja el ahorro de energía del reloj desactivado mientras monitoreas.</string>
+    <string name="battery_tip_2">En este teléfono: Ajustes › Aplicaciones › Galaxy Wearable › Batería › Sin restricciones.</string>
+    <string name="battery_tip_3">Si el monitoreo se pausa, el reloj muestra una notificación: un toque lo reanuda.</string>
+    <string name="cal_how_title">Cómo funciona la calibración</string>
+    <string name="cal_how_body">La calibración se hace en el reloj, donde está el micrófono. Necesitas una referencia: un sonómetro o una app de medición en el teléfono (±3–5 dB). El reloj mide 10 segundos de sonido estable, introduces el nivel de referencia y guarda la corrección para ese reloj. El teléfono nunca fija correcciones.</string>
+    <string name="troubleshoot_title">Solución de problemas</string>
+    <string name="ts_1">No se encuentra el reloj: abre la app Galaxy Wearable, comprueba que el reloj esté conectado y el Bluetooth activado.</string>
+    <string name="ts_2">No se encuentra Voxara en el reloj: instálala desde Play Store en el reloj.</string>
+    <string name="ts_3">La sincronización sigue fallando: abre Voxara en el reloj una vez, mantén ambos dispositivos cerca y toca Sincronizar ahora.</string>
+    <string name="ts_4">Las cifras parecen antiguas: son de la última sincronización. Desliza hacia abajo o toca Sincronizar ahora.</string>
+    <string name="ts_5">Más de un reloj: elige cuál usa Voxara en Otros relojes.</string>
+
+    <string name="settings_title">Ajustes</string>
+    <string name="pending_sync">Pendiente de sincronizar</string>
+    <string name="settings_pending_note">Los cambios llegan al reloj cuando está conectado. Mientras tanto, conserva sus ajustes actuales.</string>
+    <string name="sec_alerts">Alertas</string>
+    <string name="set_threshold">Nivel de alerta por ruido</string>
+    <string name="set_threshold_note">Recibes una alerta tras %1$d minutos por encima de este nivel. Predeterminado: 85 dBA.</string>
+    <string name="set_sensitive">Oyente sensible</string>
+    <string name="set_sensitive_note">Usa el presupuesto semanal más estricto de la OMS (75 dB en lugar de 80 dB).</string>
+    <string name="set_quiet">Horas de silencio</string>
+    <string name="set_quiet_from">Desde</string>
+    <string name="set_quiet_to">Hasta</string>
+    <string name="set_quiet_note" formatted="false">Los avisos y las advertencias esperan a que terminen las horas de silencio. Las alertas del 100 % nunca se retienen.</string>
+    <string name="set_cap">Avisos por día</string>
+    <string name="set_cap_note" formatted="false">Las advertencias y las alertas del 100 % nunca se limitan.</string>
+    <string name="set_haptics">Intensidad de la vibración</string>
+    <string name="haptic_standard">Normal</string>
+    <string name="haptic_strong">Fuerte</string>
+    <string name="set_advisory_haptics">Vibrar con los avisos</string>
+    <string name="set_haptics_note" formatted="false">Las advertencias y las alertas del 100 % siempre vibran.</string>
+    <string name="set_snooze">Duración de posponer</string>
+    <string name="snooze_value">%1$d min</string>
+    <string name="set_snooze_note" formatted="false">Como máximo 2 horas. Las alertas del 100 % nunca se pueden posponer.</string>
+    <string name="sec_headphones">Auriculares</string>
+    <string name="set_hp_loud">Alerta de escucha muy alta</string>
+    <string name="set_hp_loud_note">Para niveles de auriculares estimados, tras 5 minutos por encima.</string>
+    <string name="sec_tono">Tono y privacidad</string>
+    <string name="set_tono">Tono</string>
+    <string name="set_tono_note">Desactivado oculta a Tono en el teléfono y en el reloj. Las alertas nunca dependen de Tono.</string>
+    <string name="set_cloud">IA en la nube</string>
+    <string name="set_cloud_note">Desactivada por defecto. Solo se envían totales redondeados. Las preguntas sobre síntomas nunca se envían.</string>
+    <string name="privacy_numbers">Voxara guarda solo números: sin audio, sin títulos de canciones, sin nombres de apps, sin identificadores del dispositivo.</string>
+    <string name="privacy_backup">Copias de seguridad: esta app del teléfono queda excluida de las copias y de la transferencia entre dispositivos. En el reloj también se excluyen el historial de exposición y las correcciones de calibración: una calibración pertenece al micrófono de ese reloj. Los ajustes del reloj se recuperan desde este teléfono.</string>
+    <string name="sec_language">Idioma</string>
+    <string name="lang_system">Sistema</string>
+    <string name="lang_en">English</string>
+    <string name="lang_es">Español</string>
+    <string name="set_language_note">Se aplica al teléfono y al reloj.</string>
+    <string name="sec_data">Datos</string>
+    <string name="set_retention">Guardar el historial en este teléfono</string>
+    <string name="retention_days">%1$d días</string>
+    <string name="set_export">Exportar CSV</string>
+    <string name="set_export_note">Solo números, compartidos con la app que elijas.</string>
+    <string name="set_delete">Borrar todos los datos</string>
+    <string name="set_delete_note">Borra este teléfono y pide al reloj que borre también su historial.</string>
+    <string name="delete_confirm_title">¿Borrar todos los datos?</string>
+    <string name="delete_confirm_body">Tu historial de exposición y de alertas se borrará de este teléfono y del reloj. Los ajustes y la calibración se conservan. No se puede deshacer.</string>
+    <string name="deleted_everywhere">Borrado en el teléfono y en el reloj.</string>
+    <string name="deleted_phone_only">Borrado en el teléfono. El reloj se borrará la próxima vez que se conecte.</string>
+    <string name="delete_pending_note">Pendiente de borrar los datos del reloj.</string>
+    <string name="export_failed">No se pudo crear la exportación.</string>
+    <string name="sec_about">Acerca de</string>
+    <string name="how_it_works">Cómo funciona Voxara</string>
+    <string name="version">Versión %1$s</string>
+    <string name="licences">Fuente Inter: SIL Open Font License 1.1</string>
+    <string name="setup_again">Repetir la configuración</string>
+    <string name="sync_failed_toast">La sincronización no terminó. Consulta Reloj para ver cómo resolverlo.</string>
+    <string name="sync_done_toast">Sincronizado.</string>
+
+    <string name="how_title">Cómo funciona Voxara</string>
+    <string name="how_measure_title">Qué se mide</string>
+    <string name="how_measure_body">El micrófono del reloj toma lecturas breves del nivel de sonido a tu alrededor. Solo guarda los números (decibelios). El audio nunca se graba, guarda ni envía.</string>
+    <string name="how_aweight_title">Ponderación A</string>
+    <string name="how_aweight_body">Los niveles tienen ponderación A (dBA), como oye el oído: las frecuencias muy graves y muy agudas cuentan menos.</string>
+    <string name="how_sustained_title">Sostenido, no instantáneo</string>
+    <string name="how_sustained_body">Las alertas de nivel usan una media de 3 minutos, así que un golpe aislado nunca dispara una.</string>
+    <string name="how_niosh_title">Dosis diaria (NIOSH)</string>
+    <string name="how_niosh_body" formatted="false">85 dBA durante 8 horas es el 100 % del día. Cada 3 dB más reduce el tiempo a la mitad: 88 dBA durante 4 horas, 94 dBA durante 1 hora.</string>
+    <string name="how_who_title">Presupuesto semanal (OMS)</string>
+    <string name="how_who_body">El presupuesto de 7 días sigue la norma OMS-UIT H.870: 80 dB durante 40 horas a la semana (75 dB para oyentes sensibles). Es móvil: la exposición antigua sale día a día.</string>
+    <string name="how_headphones_title">Auriculares</string>
+    <string name="how_headphones_body">Los niveles de los auriculares se estiman a partir del volumen y del tipo de salida (±10 dB); el micrófono nunca los escucha. Cada minuto cuenta una vez: auriculares o entorno, lo que suene más fuerte en el oído.</string>
+    <string name="how_accuracy_title">Precisión</string>
+    <string name="how_accuracy_body">Los micrófonos de reloj no son sonómetros: espera ±3–5 dB tras calibrar, y más sin calibrar. Toma cada número como una estimación.</string>
+    <string name="how_privacy_title">Privacidad</string>
+    <string name="how_privacy_body">Solo se guardan números y solo viajan entre tu propio reloj y tu teléfono. La IA en la nube es opcional y está desactivada por defecto; solo ve totales redondeados.</string>
+    <string name="how_medical_title">No es un dispositivo médico</string>
+    <string name="how_medical_body">Voxara ayuda con los hábitos de escucha. No diagnostica ni trata. Si notas zumbidos, audición apagada o dolor de oído, consulta a un profesional de la audición.</string>
+
+    <string name="setup_step">Paso %1$d de %2$d</string>
+    <string name="setup_welcome_title">Te damos la bienvenida a Voxara</string>
+    <string name="setup_welcome_body">Tu reloj mide el sonido a tu alrededor y estima tu escucha con auriculares, para que sepas cuándo se acumula.</string>
+    <string name="setup_point_1">Presupuestos de sonido diarios y semanales</string>
+    <string name="setup_point_2">Alertas tranquilas en tu muñeca</string>
+    <string name="setup_point_3">Tono te lo explica con palabras sencillas</string>
+    <string name="setup_privacy_title">Números, nunca audio</string>
+    <string name="setup_privacy_body">Voxara nunca graba audio. Guarda los niveles de sonido como números, en tu reloj y en este teléfono.</string>
+    <string name="setup_medical">No es un dispositivo médico. Los niveles son estimaciones (±3–5 dB).</string>
+    <string name="setup_link_title">Tu reloj</string>
+    <string name="setup_notify_title">Notificaciones</string>
+    <string name="setup_notify_body" formatted="false">Permite las notificaciones para que este teléfono te avise de problemas de sincronización y, si lo activas, muestre las alertas del 100 %.</string>
+    <string name="setup_notify_granted">Las notificaciones están permitidas.</string>
+    <string name="setup_hp_title">Auriculares en este teléfono</string>
+    <string name="setup_ai_title">Tono e IA en la nube</string>
+    <string name="setup_ai_body">Tono responde con respuestas integradas. La IA en la nube es opcional y está desactivada; si la activas, solo se envían totales redondeados.</string>
+    <string name="setup_done_title">Todo listo</string>
+    <string name="setup_done_body">Voxara sigue midiendo y alertando en tu reloj aunque el teléfono esté lejos.</string>
+    <string name="setup_off_default">Desactivado por defecto</string>
+    <string name="set_mirror" formatted="false">Mostrar las alertas del 100 % en este teléfono</string>
+    <string name="set_mirror_note">Desactivado por defecto. Una copia de la alerta de límite del reloj cuando el teléfono está cerca. Nunca sustituye la alerta del reloj y nunca se reenvía al reloj.</string>
+    <string name="channel_mirror" formatted="false">Alertas del 100 % de tu reloj</string>
+    <string name="mirror_body">De tu reloj a las %1$s. El reloj ya te avisó.</string>
+    <string name="widget_name">Sonido de hoy</string>
+    <string name="widget_desc">La dosis de hoy de tu reloj Voxara, con la hora en que se midió.</string>
+    <string name="widget_no_data">Sin datos de hoy</string>
+    <string name="widget_as_of">A las %1$s</string>
+    <!-- Modos de situación (nombres y descripciones en shared-ui) -->
+    <string name="sec_mode">Modo</string>
+    <string name="mode_selected_cd">Seleccionado</string>
+    <string name="watch_mode">Modo en el reloj: %1$s</string>
+    <string name="watch_mode_auto">Auto · %1$s</string>
 </resources>
