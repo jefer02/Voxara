@@ -6,17 +6,12 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import com.example.voxara.R
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.risk.RiskZone
 
@@ -41,22 +36,6 @@ object VColor {
 
     val brand: Brush get() = Brush.linearGradient(listOf(BrandStart, BrandEnd))
 }
-
-/** Inter (SIL OFL 1.1, bundled): one variable font, weights by variation axis. */
-@OptIn(ExperimentalTextApi::class)
-private fun inter(weight: FontWeight) = Font(
-    R.font.inter_variable,
-    weight = weight,
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
-)
-
-val InterFamily = FontFamily(
-    inter(FontWeight.Normal),
-    inter(FontWeight.Medium),
-    inter(FontWeight.SemiBold),
-    inter(FontWeight.Bold),
-    inter(FontWeight.ExtraBold),
-)
 
 /**
  * TYPE SCALE — nothing below 12 sp; numerals are tabular so a changing level never jitters.
