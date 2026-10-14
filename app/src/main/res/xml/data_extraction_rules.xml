@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ backup and device transfer. Excluded:
+    - voxara_exposure.db: the exposure history (minute ledger and alert history) stays on this watch;
+    - datastore/voxara.preferences_pb: it holds the calibration offsets, which belong to THIS watch's
+      microphone and must never be restored onto another watch, together with the running dose
+      counters. The same file holds the settings: they come back from the phone app when it is
+      linked (the phone keeps its own copy), or start from the defaults.
+    Kept: the language choice (voxara_locale shared preferences).
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="voxara_exposure.db" />
+        <exclude domain="database" path="voxara_exposure.db-journal" />
+        <exclude domain="file" path="datastore/voxara.preferences_pb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="voxara_exposure.db" />
+        <exclude domain="database" path="voxara_exposure.db-journal" />
+        <exclude domain="file" path="datastore/voxara.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>
