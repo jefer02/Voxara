@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The zone words: every zone is shown as a word and an icon, never by colour alone. Shared by watch and phone (moved from app/src/main/res). -->
+<resources>
+    <string name="zone_ok">OK</string>
+    <string name="zone_moderate">Moderate</string>
+    <string name="zone_loud">Loud</string>
+    <string name="zone_dangerous">Dangerous</string>
+    <!-- Situation modes (watch and phone). A mode never lowers or delays a hearing alert. -->
+    <string name="situation_auto">Auto</string>
+    <string name="situation_quiet">Quiet</string>
+    <string name="situation_street">Street</string>
+    <string name="situation_transport">Transport</string>
+    <string name="situation_concert">Concert</string>
+    <string name="situation_work">Work</string>
+    <string name="situation_auto_blurb">Voxara picks the mode from the sound around you, using the measurements it already takes, and changes it slowly. When unsure, it uses Street.</string>
+    <string name="situation_quiet_blurb">Home or a quiet place: your week comes first.</string>
+    <string name="situation_street_blurb">Out and about: the live level comes first.</string>
+    <string name="situation_transport_blurb">Bus, train or metro: headphones come first.</string>
+    <string name="situation_concert_blurb">Live music: alerts vibrate twice and are never capped. Ends after 6 h, or after 20 min below 80 dBA.</string>
+    <string name="situation_work_blurb">At work: today\'s dose comes first.</string>
+    <string name="situation_rule">Modes change what comes first and how Tono talks. They never lower or delay hearing alerts.</string>
+</resources>

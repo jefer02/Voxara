@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The zone words: every zone is shown as a word and an icon, never by colour alone. Shared by watch and phone (moved from app/src/main/res). -->
+<resources>
+    <string name="zone_ok">Bien</string>
+    <string name="zone_moderate">Moderado</string>
+    <string name="zone_loud">Fuerte</string>
+    <string name="zone_dangerous">Peligroso</string>
+    <!-- Modos de situación (reloj y móvil). Un modo nunca rebaja ni retrasa un aviso auditivo. -->
+    <string name="situation_auto">Auto</string>
+    <string name="situation_quiet">Tranquilo</string>
+    <string name="situation_street">Calle</string>
+    <string name="situation_transport">Transporte</string>
+    <string name="situation_concert">Concierto</string>
+    <string name="situation_work">Trabajo</string>
+    <string name="situation_auto_blurb">Voxara elige el modo según el sonido a tu alrededor, con las mediciones que ya hace, y lo cambia despacio. Si no está seguro, usa Calle.</string>
+    <string name="situation_quiet_blurb">En casa o en un sitio tranquilo: primero tu semana.</string>
+    <string name="situation_street_blurb">En la calle: primero el nivel en directo.</string>
+    <string name="situation_transport_blurb">Autobús, tren o metro: primero los auriculares.</string>
+    <string name="situation_concert_blurb">Música en directo: los avisos vibran dos veces y no tienen tope. Termina a las 6 h o tras 20 min por debajo de 80 dBA.</string>
+    <string name="situation_work_blurb">En el trabajo: primero la dosis de hoy.</string>
+    <string name="situation_rule">Los modos cambian qué ves primero y cómo habla Tono. Nunca rebajan ni retrasan los avisos auditivos.</string>
+</resources>
