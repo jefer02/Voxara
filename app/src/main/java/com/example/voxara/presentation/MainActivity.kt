@@ -292,7 +292,11 @@ class MainActivity : ComponentActivity() {
      */
     private fun selectSituation(choice: SituationChoice, confirm: Boolean) {
         if (confirm) confirmHaptics.fire(Pattern.CONFIRM)
-        ExposureRepository.update { it.copy(situationChoice = choice, mode = Situation.resolve(choice)) }
+        ExposureRepository.update {
+            // Re-picking Auto keeps what it already detected; a fixed choice drops the detection.
+            val detected = it.detectedMode.takeIf { choice == SituationChoice.AUTO }
+            it.copy(situationChoice = choice, detectedMode = detected, mode = Situation.resolve(choice, detected))
+        }
         lifecycleScope.launch { ExposureRepository.store.setSituationChoice(choice) }
         if (choice == SituationChoice.CONCERT) DosimeterService.start(this)
     }

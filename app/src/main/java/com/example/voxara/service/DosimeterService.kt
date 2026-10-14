@@ -16,6 +16,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
+import com.example.voxara.BuildConfig
 import com.example.voxara.R
 import com.example.voxara.audio.AudioBurstSampler
 import com.example.voxara.audio.DeviceAudioInfo
@@ -47,13 +48,17 @@ import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.risk.RiskState
 import com.example.voxara.core.risk.RiskStateMachine
 import com.example.voxara.core.scene.SceneHysteresis
+import com.example.voxara.core.situation.AutoModeDetector
 import com.example.voxara.core.situation.ModeChangeHapticGate
 import com.example.voxara.core.situation.Situation
-import com.example.voxara.core.situation.SituationMode
+import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.data.ExposureDb
 import com.example.voxara.data.ExposureState
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
+import com.example.voxara.debug.DetectionLog
+import com.example.voxara.debug.DetectionTrace
+import com.example.voxara.core.scene.SceneModel
 import com.example.voxara.sync.CompanionLink
 import com.example.voxara.haptics.HapticConductor
 import com.example.voxara.haptics.Pattern
@@ -79,6 +84,15 @@ import kotlin.math.roundToInt
  *   ACCRUING  80-94     2.0 s / 10 s    20%    dose integrator active
  *   HAZARD    >= 95     continuous      100%   one open capture session
  *   CONCERT   user      continuous      100%   time-boxed to 6 h
+ *
+ * Concert means the wearer CHOSE Concert; an Auto-detected Concert keeps the level ladder above
+ * (it adds Concert's alert behaviour, not microphone time).
+ *
+ * AUTO MODE: while the choice is Auto, each burst also carries scene features (computed inside
+ * the sampler from the same PCM) and feeds [AutoModeDetector]. No extra capture: it classifies at
+ * the ladder's own pace — once a minute when idle, twice a minute in AMBIENT, every 10 s when
+ * accruing, and at most every 5 s while continuous. Slow on purpose: a situation changes over
+ * minutes, and the detector needs several agreeing votes anyway.
  *
  * Each burst stands for the wall-clock time since the previous measured burst (capped, see
  * [representedSeconds]). A burst that could not be measured stands for nothing: no simulated or
@@ -145,6 +159,11 @@ class DosimeterService : LifecycleService() {
     /** When this dosimeter run started: no mode-change haptic in its first minutes. */
     private var startedAtMs = 0L
     private val modeHaptics = ModeChangeHapticGate()
+    /**
+     * Automatic situation detection (Auto only). Probabilities and levels in memory, nothing else.
+     * Licence gate: without SCENE_MODEL_ENABLED (release default) only the Concert rule runs.
+     */
+    private val autoModes = AutoModeDetector(AutoModeDetector.Config(sceneModel = BuildConfig.SCENE_MODEL_ENABLED))
     private var currentDayEpoch = 0L
     private val sensitive: Boolean get() = ExposureRepository.state.value.sensitiveListener
     private val weeklyBudgetPa2h: Double
@@ -214,7 +233,8 @@ class DosimeterService : LifecycleService() {
                         tonoEnabled = p.tonoEnabled,
                         aiConsent = p.aiConsent,
                         situationChoice = p.situationChoice,
-                        mode = Situation.resolve(p.situationChoice),
+                        detectedMode = if (p.situationChoice == SituationChoice.AUTO) it.detectedMode else null,
+                        mode = Situation.resolve(p.situationChoice, it.detectedMode),
                         concertStartedAtMs = p.concertStartedAtMs,
                     )
                 }
@@ -287,8 +307,12 @@ class DosimeterService : LifecycleService() {
                     beatIfDue()
                     val repo = ExposureRepository.state.value
                     val probe = ExposureRepository.calibrationProbe.value
+                    // Only a CHOSEN Concert captures continuously (battery); see the class doc.
+                    val manualConcert = repo.situationChoice == SituationChoice.CONCERT
+                    val auto = repo.situationChoice == SituationChoice.AUTO && probe == null
+                    if (!auto) forgetDetection()
                     val continuous =
-                        probe != null || repo.mode == SituationMode.CONCERT || state == SampleState.HAZARD
+                        probe != null || manualConcert || state == SampleState.HAZARD
                     val burstMs = if (continuous) CONTINUOUS_BURST_MS else state.burstMs
                     val periodMs = if (continuous) CONTINUOUS_BURST_MS else state.periodMs
 
@@ -299,12 +323,12 @@ class DosimeterService : LifecycleService() {
                         }
                         val s = session ?: withContext(Dispatchers.IO) { sampler.open(probe) }
                         session = s
-                        val b = s?.let { withContext(Dispatchers.IO) { it.read(burstMs, offsetFor(it)) } }
+                        val b = s?.let { withContext(Dispatchers.IO) { it.read(burstMs, offsetFor(it), sceneFeatures = auto) } }
                         if (b == null) { session?.close(); session = null }
                         b
                     } else {
                         session?.close(); session = null
-                        capture(burstMs)
+                        capture(burstMs, sceneFeatures = auto)
                     }
 
                     // ---- debug calibration probe: readout only, never the ledger or the alerts
@@ -336,6 +360,7 @@ class DosimeterService : LifecycleService() {
                         val hp = headphones.snapshot(nowMs)
                         hp.listeningDba?.let { foldListening(it, periodMs / 1000.0, nowMs, hp) }
                         publishHeadphones(hp, nowMs)
+                        if (auto) applyDetection(autoModes.tick(nowMs), nowMs)
                         ExposureRepository.update { it.copy(micGranted = false, monitoring = true) }
                         delay(periodMs)
                         continue
@@ -367,9 +392,12 @@ class DosimeterService : LifecycleService() {
                     publishHeadphones(hp, now)
                     val weeklyPercent = 100.0 * ambient.weeklyPa2h(now) / weeklyBudgetPa2h
 
+                    // Automatic situation: this burst's features, no extra microphone time.
+                    if (auto) detectSituation(burst, now, hp)
+
                     // Classifier: every burst in ACCRUING and above, every 5th burst in AMBIENT.
                     burstIndex++
-                    val everyNth = if (repo.mode == SituationMode.CONCERT) 1 else state.classifierEveryNthBurst
+                    val everyNth = if (manualConcert) 1 else state.classifierEveryNthBurst
                     if (everyNth > 0 && burstIndex % everyNth == 0) {
                         val (scene, confidence) = classifier.classify(burst)
                         hysteresis.offer(scene, confidence)
@@ -407,7 +435,8 @@ class DosimeterService : LifecycleService() {
 
                     // Haptic first, screen second — the watch assumes you cannot hear it.
                     if (impulse && engine.peakDbc >= PEAK_CEILING_DBC) haptics.fire(Pattern.IMPULSE)
-                    evaluateAlerts(now, sustainedDba, dose, weeklyPercent, repo)
+                    // The live state: an Auto-detected Concert applies to this very evaluation.
+                    evaluateAlerts(now, sustainedDba, dose, weeklyPercent, ExposureRepository.state.value)
                     when (riskMachine.update(leq, dose, now)) {
                         // Relief is advisory-class: it honours "vibrate for advisories".
                         RiskStateMachine.Event.BackToSafe ->
@@ -429,7 +458,7 @@ class DosimeterService : LifecycleService() {
                         ListeningComplicationService.requestRefresh(this)
                     }
 
-                    state = if (repo.mode == SituationMode.CONCERT) SampleState.HAZARD else SampleState.of(leq)
+                    state = if (manualConcert) SampleState.HAZARD else SampleState.of(leq)
                     val sleep = (periodMs - burstMs).coerceAtLeast(0L)
                     if (sleep > 0) delay(sleep)
                 } catch (c: CancellationException) {
@@ -457,10 +486,95 @@ class DosimeterService : LifecycleService() {
         }
     }
 
-    private suspend fun capture(burstMs: Long): AudioBurstSampler.Burst? {
+    private suspend fun capture(burstMs: Long, sceneFeatures: Boolean): AudioBurstSampler.Burst? {
         if (!hasMic(this)) return null
         return withContext(Dispatchers.IO) {
-            sampler.capture(burstMs, offsetFor = { ExposureRepository.state.value.offsetFor(it) })
+            sampler.capture(
+                burstMs,
+                offsetFor = { ExposureRepository.state.value.offsetFor(it) },
+                sceneFeatures = sceneFeatures,
+            )
+        }
+    }
+
+    // ------------------------------------------------------------- automatic situation
+
+    /**
+     * One vote from this burst's scene features (if it completed any and the detector wants one),
+     * otherwise just the staleness check. The feature vectors are dropped right here.
+     */
+    private fun detectSituation(burst: AudioBurstSampler.Burst, now: Long, hp: HeadphoneMonitor.Snapshot) {
+        val t0 = System.nanoTime()
+        val vote = if (burst.sceneFeatures.isNotEmpty() && autoModes.wantsVote(now)) {
+            autoModes.voteOf(now, burst.sceneFeatures, burst.leqDba)
+        } else null
+        val inferenceNs = System.nanoTime() - t0
+        val decision = if (vote != null) {
+            autoModes.offer(
+                vote,
+                AutoModeDetector.Context(headphonesPlaying = hp.playing, localMinuteOfDay = localMinuteOfDay(now)),
+            )
+        } else {
+            autoModes.tick(now)
+        }
+        applyDetection(decision, now)
+        if (vote != null && DetectionLog.available) logDetection(burst, vote, decision, inferenceNs, hp.playing)
+    }
+
+    /** Debug builds: one numbers-only row per classification (DetectionLog, src/debug). */
+    private fun logDetection(
+        burst: AudioBurstSampler.Burst,
+        vote: AutoModeDetector.Vote,
+        decision: AutoModeDetector.Decision,
+        inferenceNs: Long,
+        headphones: Boolean,
+    ) {
+        val classes = SceneModel.classes
+        val top = vote.classProbabilities?.let { p ->
+            p.indices.sortedByDescending { p[it] }.take(3).map { classes[it] to p[it] }
+        } ?: emptyList()
+        DetectionLog.record(
+            this,
+            DetectionTrace(
+                atMs = vote.atMs,
+                dba = burst.leqDba,
+                featureMs = burst.sceneFeatureNanos / 1e6,
+                vectors = burst.sceneFeatures.size,
+                inferenceMs = inferenceNs / 1e6,
+                topClasses = top,
+                vote = decision.vote,
+                musicLike = vote.musicLike,
+                tonalityDb = vote.tonalityDb,
+                vetoes = decision.vetoes.map { it.name },
+                detected = decision.detected,
+                mode = ExposureRepository.state.value.mode,
+                confidence = decision.confidence,
+                headphonesPlaying = headphones,
+                sceneModelEnabled = BuildConfig.SCENE_MODEL_ENABLED,
+            ),
+        )
+    }
+
+    /**
+     * Publishes a changed detection. When it changes the mode in force, the wearer may get the
+     * polite MODE_CHANGE tap, only within ModeChangeHapticGate's limits.
+     */
+    private fun applyDetection(decision: AutoModeDetector.Decision, now: Long) {
+        if (!decision.changed) return
+        val before = ExposureRepository.state.value.mode
+        ExposureRepository.update {
+            if (it.situationChoice != SituationChoice.AUTO) it
+            else it.copy(detectedMode = decision.detected, mode = Situation.resolve(it.situationChoice, decision.detected))
+        }
+        if (ExposureRepository.state.value.mode != before) playModeChange(now)
+    }
+
+    /** A fixed choice (or the calibration probe) needs no detection: forget it, silently. */
+    private fun forgetDetection() {
+        if (autoModes.detected == null && ExposureRepository.state.value.detectedMode == null) return
+        autoModes.reset()
+        ExposureRepository.update {
+            it.copy(detectedMode = null, mode = Situation.resolve(it.situationChoice, null))
         }
     }
 
@@ -616,7 +730,8 @@ class DosimeterService : LifecycleService() {
 
     private fun concertHousekeeping(leq: Double, now: Long) {
         val s = ExposureRepository.state.value
-        if (s.mode != SituationMode.CONCERT || leavingConcert) {
+        // The 6 h cap and the quiet exit belong to a CHOSEN Concert; an Auto one exits by itself.
+        if (s.situationChoice != SituationChoice.CONCERT || leavingConcert) {
             quietSinceMs = 0L
             return
         }
@@ -644,7 +759,7 @@ class DosimeterService : LifecycleService() {
             try {
                 val next = ExposureRepository.store.leaveConcert() ?: return@launch
                 ExposureRepository.update {
-                    it.copy(situationChoice = next, mode = Situation.resolve(next), concertStartedAtMs = null)
+                    it.copy(situationChoice = next, mode = Situation.resolve(next, it.detectedMode), concertStartedAtMs = null)
                 }
                 playModeChange(System.currentTimeMillis())
                 // The phone follows even when no watch screen is open to publish it.

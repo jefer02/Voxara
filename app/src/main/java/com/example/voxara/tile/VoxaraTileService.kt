@@ -35,6 +35,7 @@ import com.example.voxara.core.format.formatHeadroom
 import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.monitoring.monitoringStatus
 import com.example.voxara.core.risk.RiskZone
+import com.example.voxara.ui.design.wordRes
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
@@ -96,12 +97,7 @@ internal fun zoneFor(dba: Double, dosePercent: Double): RiskZone =
 /** Zone colour as an ARGB int (the shared palette). */
 internal fun tintFor(dba: Double, dosePercent: Double): Int = Palette.zone(zoneFor(dba, dosePercent)).toInt()
 
-internal fun zoneWordRes(z: RiskZone): Int = when (z) {
-    RiskZone.OK -> R.string.zone_ok
-    RiskZone.MODERATE -> R.string.zone_moderate
-    RiskZone.LOUD -> R.string.zone_loud
-    RiskZone.DANGEROUS -> R.string.zone_dangerous
-}
+internal fun zoneWordRes(z: RiskZone): Int = z.wordRes()
 
 internal fun openApp(context: Context, id: String) = ModifiersBuilders.Modifiers.Builder()
     .setClickable(
