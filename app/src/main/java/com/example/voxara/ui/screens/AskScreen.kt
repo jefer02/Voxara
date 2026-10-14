@@ -47,11 +47,19 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
     val turn = env.turn
     val listening = turn.phase == VoiceTurn.Phase.LISTENING
     val coach = env.coach
-    val showCoach = turn.handedOff || turn.phase == VoiceTurn.Phase.IDLE
+    val tono = env.state.tonoEnabled
+    // With Tono off this is the voice screen: on-device answers, plus the fixed safe answer to a
+    // symptom question (handed off even then, so it still shows).
+    val showCoach = (tono || turn.handedOff) && (turn.handedOff || turn.phase == VoiceTurn.Phase.IDLE)
     val reply = coach.reply
 
     VoxList {
-        item { SectionLabel(name.uppercase(), color = VColor.BrandStart) }
+        item {
+            SectionLabel(
+                if (tono) stringResource(R.string.home_ask, name).uppercase() else stringResource(R.string.voice_title),
+                color = VColor.BrandStart,
+            )
+        }
         if (turn.heard.isNotBlank()) {
             item { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary, maxLines = 3) }
         }
@@ -60,8 +68,8 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 listening -> stringResource(R.string.voice_listening)
                 turn.phase == VoiceTurn.Phase.THINKING || coach.loading -> stringResource(R.string.tono_loading, name)
                 !showCoach && turn.answer.isNotBlank() -> turn.answer
-                reply != null -> reply.insight
-                else -> stringResource(R.string.ask_hint, name)
+                showCoach && reply != null -> reply.insight
+                else -> stringResource(R.string.ask_hint, if (tono) name else stringResource(R.string.app_name))
             }
             HeroStatus(
                 text, maxLines = 5,
@@ -105,13 +113,15 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 style = if (listening) PillStyle.TONAL else PillStyle.PRIMARY,
             )
         }
-        item {
-            PillButton(
-                label = stringResource(R.string.ask_today),
-                onClick = { actions.onAsk(CoachTask.DAILY_INSIGHT, null) },
-                icon = VoxIcons.Sparkle,
-                style = PillStyle.TONAL,
-            )
+        if (tono) {
+            item {
+                PillButton(
+                    label = stringResource(R.string.ask_today),
+                    onClick = { actions.onAsk(CoachTask.DAILY_INSIGHT, null) },
+                    icon = VoxIcons.Sparkle,
+                    style = PillStyle.TONAL,
+                )
+            }
         }
         item { BodyText(stringResource(R.string.tono_not_medical), color = VColor.TextTertiary) }
     }

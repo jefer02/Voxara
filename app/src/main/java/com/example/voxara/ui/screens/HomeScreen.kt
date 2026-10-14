@@ -24,6 +24,8 @@ import com.example.voxara.core.ai.HearingCareScore
 import com.example.voxara.core.format.formatClock
 import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.risk.RiskZone
+import com.example.voxara.core.situation.FeaturedCard
+import com.example.voxara.core.situation.Situation
 import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
@@ -47,27 +49,41 @@ import kotlin.math.roundToInt
 @Composable
 fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
     val s = env.state
+    val tono = s.tonoEnabled
     val name = stringResource(R.string.ai_name)
     // Refresh Tono's status line when Home appears (automatic calls are rate-limited to hourly).
-    LaunchedEffect(Unit) { actions.onAsk(CoachTask.STATUS, null) }
+    LaunchedEffect(tono) { if (tono) actions.onAsk(CoachTask.STATUS, null) }
 
     val score = HearingCareScore.of(
         s.weeklyFraction * 100, s.headphoneWeeklyFraction * 100,
         s.days.take(7).count { it.nioshDosePercent >= 100.0 },
     )
-    val status = env.coach.reply?.status ?: stringResource(R.string.home_status_fallback)
+    // With Tono off the hero is Voxara's own line, never a (stale) Tono reply.
+    val status = env.coach.reply?.status?.takeIf { tono } ?: stringResource(R.string.home_status_fallback)
 
     VoxList(
         edgeButton = {
             EdgeButton(onClick = { navigate(Routes.ASK) }) {
-                Icon(VoxIcons.Ask, contentDescription = null, modifier = Modifier.size(20.dp))
-                Text(stringResource(R.string.home_ask, name), style = VType.TitleSmall)
+                Icon(if (tono) VoxIcons.Ask else VoxIcons.Mic, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text(
+                    if (tono) stringResource(R.string.home_ask, name) else stringResource(R.string.ask_speak),
+                    style = VType.TitleSmall,
+                )
             }
         },
     ) {
-        item { SectionLabel(name.uppercase(), color = VColor.BrandStart, modifier = Modifier.semantics { heading() }) }
+        // The brand is always Voxara; Tono is only the voice of the status line under it.
+        item {
+            SectionLabel(
+                stringResource(R.string.app_name).uppercase(),
+                color = VColor.BrandStart, modifier = Modifier.semantics { heading() },
+            )
+        }
+        if (tono) {
+            item { SectionLabel(stringResource(R.string.tono_says, name).uppercase(), color = VColor.TextTertiary) }
+        }
         item { HeroStatus(status) }
-        if (env.coach.source == ReplySource.CLOUD_AI) {
+        if (tono && env.coach.source == ReplySource.CLOUD_AI) {
             item { SectionLabel(stringResource(R.string.home_source_ai), color = VColor.TextTertiary) }
         }
 
@@ -99,52 +115,60 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
             }
         }
 
-        item {
-            val zone = RiskZone.of(s.dba)
-            MetricCard(
-                icon = VoxIcons.zone(zone),
-                label = stringResource(R.string.card_now),
-                value = if (s.dba > 0.0) stringResource(R.string.card_now_value, s.dba.roundToInt(), zoneWord(zone))
-                else stringResource(R.string.card_now_none),
-                detail = if (!s.calibrated) stringResource(R.string.uncalibrated_short) else null,
-                accent = VColor.zone(zone),
-                onClick = { navigate(Routes.NOW) },
-            )
-        }
-        item {
-            val est = s.headphoneEstimate?.takeIf { s.headphoneListening }
-            MetricCard(
-                icon = VoxIcons.Headphones,
-                label = stringResource(R.string.card_headphones),
-                value = when {
-                    est != null -> stringResource(R.string.card_headphones_listening, est.dba.roundToInt())
-                    s.headphoneCategory != null -> stringResource(R.string.card_headphones_connected)
-                    else -> stringResource(R.string.card_headphones_none)
-                },
-                detail = stringResource(R.string.card_week_share, (s.headphoneWeeklyFraction * 100).roundToInt()),
-                onClick = { navigate(Routes.HEADPHONES) },
-            )
-        }
-        item {
-            val today = s.days.firstOrNull()
-            MetricCard(
-                icon = VoxIcons.Calendar,
-                label = stringResource(R.string.card_today),
-                value = stringResource(R.string.card_today_value, s.dosePercent.roundToInt()),
-                detail = today?.let { stringResource(R.string.day_measured_plain, formatClock(it.measuredMinutes)) },
-                accent = VColor.zone(RiskZone.ofPercent(s.dosePercent)),
-                onClick = { navigate(Routes.TODAY) },
-            )
-        }
-        item {
-            MetricCard(
-                icon = VoxIcons.Chart,
-                label = stringResource(R.string.card_week),
-                value = stringResource(R.string.card_week_value, (s.weeklyFraction * 100).roundToInt()),
-                detail = stringResource(R.string.card_week_detail, (s.headphoneWeeklyFraction * 100).roundToInt()),
-                accent = VColor.zone(RiskZone.ofPercent(maxOf(s.weeklyFraction, s.headphoneWeeklyFraction) * 100)),
-                onClick = { navigate(Routes.WEEK) },
-            )
+        // The situation mode decides which card leads; the others keep their usual order.
+        val featured = Situation.featuredCard(s.mode)
+        (listOf(featured) + FeaturedCard.entries.filter { it != featured }).forEach { card ->
+            item {
+                when (card) {
+                    FeaturedCard.NOW -> {
+                        val zone = RiskZone.of(s.dba)
+                        MetricCard(
+                            icon = VoxIcons.zone(zone),
+                            label = stringResource(R.string.card_now),
+                            value = if (s.dba > 0.0) stringResource(R.string.card_now_value, s.dba.roundToInt(), zoneWord(zone))
+                            else stringResource(R.string.card_now_none),
+                            detail = if (!s.calibrated) stringResource(R.string.uncalibrated_short) else null,
+                            accent = VColor.zone(zone),
+                            onClick = { navigate(Routes.NOW) },
+                        )
+                    }
+                    FeaturedCard.HEADPHONES -> {
+                        val est = s.headphoneEstimate?.takeIf { s.headphoneListening }
+                        MetricCard(
+                            icon = VoxIcons.Headphones,
+                            label = stringResource(R.string.card_headphones),
+                            value = when {
+                                est != null -> stringResource(R.string.card_headphones_listening, est.dba.roundToInt())
+                                s.headphoneCategory != null -> stringResource(R.string.card_headphones_connected)
+                                else -> stringResource(R.string.card_headphones_none)
+                            },
+                            detail = stringResource(R.string.card_week_share, (s.headphoneWeeklyFraction * 100).roundToInt()),
+                            onClick = { navigate(Routes.HEADPHONES) },
+                        )
+                    }
+                    FeaturedCard.TODAY -> {
+                        val today = s.days.firstOrNull()
+                        MetricCard(
+                            icon = VoxIcons.Calendar,
+                            label = stringResource(R.string.card_today),
+                            value = stringResource(R.string.card_today_value, s.dosePercent.roundToInt()),
+                            detail = today?.let { stringResource(R.string.day_measured_plain, formatClock(it.measuredMinutes)) },
+                            accent = VColor.zone(RiskZone.ofPercent(s.dosePercent)),
+                            onClick = { navigate(Routes.TODAY) },
+                        )
+                    }
+                    FeaturedCard.WEEK -> {
+                        MetricCard(
+                            icon = VoxIcons.Chart,
+                            label = stringResource(R.string.card_week),
+                            value = stringResource(R.string.card_week_value, (s.weeklyFraction * 100).roundToInt()),
+                            detail = stringResource(R.string.card_week_detail, (s.headphoneWeeklyFraction * 100).roundToInt()),
+                            accent = VColor.zone(RiskZone.ofPercent(maxOf(s.weeklyFraction, s.headphoneWeeklyFraction) * 100)),
+                            onClick = { navigate(Routes.WEEK) },
+                        )
+                    }
+                }
+            }
         }
         item {
             MetricCard(
@@ -155,6 +179,6 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
                 onClick = { navigate(Routes.SETTINGS) },
             )
         }
-        item { BodyText(stringResource(R.string.tono_not_medical), color = VColor.TextTertiary) }
+        if (tono) item { BodyText(stringResource(R.string.tono_not_medical), color = VColor.TextTertiary) }
     }
 }
