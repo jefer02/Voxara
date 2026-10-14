@@ -176,7 +176,7 @@ class AlertEngineTest {
 
     @Test
     fun `each alert tier has its own haptic`() {
-        assertEquals(Pattern.TWO_SOFT, AlertKind.HEADPHONE_WEEK_80.pattern())
+        assertEquals(Pattern.TWO_FIRM, AlertKind.HEADPHONE_WEEK_80.pattern())
         assertEquals(Pattern.LONG_SHORT_LONG, AlertKind.HEADPHONE_WEEK_100.pattern())
         assertEquals(Pattern.QUICK_TRIPLE, AlertKind.HEADPHONE_LOUD_NOW.pattern())
         assertEquals(Pattern.DOSE_FULL, AlertKind.DAILY_100.pattern())
