@@ -68,14 +68,16 @@ fun LimitAlertScreen(env: UiEnv, kind: LimitKind, actions: VoxaraActions, onDism
             item { HeroStatus(stringResource(title, percent), maxLines = 4) }
             item { BodyText(stringResource(body, percent)) }
             item { PillButton(stringResource(R.string.alert_action_ack), onClick = onDismiss) }
-            item {
-                PillButton(
-                    stringResource(R.string.alert_why),
-                    onClick = { actions.onAsk(CoachTask.ALERT_WHY, null) },
-                    style = PillStyle.TONAL,
-                )
+            if (env.state.tonoEnabled) {
+                item {
+                    PillButton(
+                        stringResource(R.string.alert_why),
+                        onClick = { actions.onAsk(CoachTask.ALERT_WHY, null) },
+                        style = PillStyle.TONAL,
+                    )
+                }
+                if (reply != null && reply.why.isNotBlank()) item { BodyText(reply.why, color = VColor.Text) }
             }
-            if (reply != null && reply.why.isNotBlank()) item { BodyText(reply.why, color = VColor.Text) }
         }
     }
 }

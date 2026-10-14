@@ -18,7 +18,9 @@ import com.example.voxara.R
 import com.example.voxara.core.dose.DOSE_THRESHOLD_DBA
 import com.example.voxara.core.format.formatHeadroom
 import com.example.voxara.core.risk.RiskZone
-import com.example.voxara.data.AppMode
+import com.example.voxara.core.situation.SituationChoice
+import com.example.voxara.core.situation.SituationMode
+import com.example.voxara.ui.Routes
 import com.example.voxara.text.sceneOrBandLabelRes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
@@ -40,12 +42,12 @@ import kotlin.math.roundToInt
  * is also said in words with its own icon, so it never depends on colour.
  */
 @Composable
-fun NowScreen(env: UiEnv, actions: VoxaraActions) {
+fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {}) {
     val s = env.state
     val zone = RiskZone.of(s.dba)
     val word = zoneWord(zone)
     val spoken = stringResource(R.string.cd_now, s.dba.roundToInt(), word, s.dosePercent.roundToInt())
-    val concert = s.mode == AppMode.CONCERT
+    val concert = s.mode == SituationMode.CONCERT
 
     VoxList {
         item {
@@ -81,16 +83,19 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions) {
         if (!s.calibrated && !s.simulated) {
             item { SectionLabel(stringResource(R.string.uncalibrated_badge), color = VColor.TextSecondary) }
         }
+        // The mode chip: one tap to the mode picker (Concert lives there now).
         item {
             PillButton(
-                label = stringResource(if (concert) R.string.concert_stop else R.string.concert_start),
-                onClick = actions.onConcertToggle,
-                icon = if (concert) VoxIcons.Pause else VoxIcons.Play,
+                label = stringResource(R.string.mode_chip, modeValue(s.situationChoice, s.mode)),
+                onClick = { navigate(Routes.MODE) },
+                icon = VoxIcons.Tune,
                 style = if (concert) PillStyle.PRIMARY else PillStyle.TONAL,
             )
         }
-        item {
-            BodyText(stringResource(if (concert) R.string.concert_on_note else R.string.concert_off_note), color = VColor.TextSecondary)
+        if (concert) {
+            // A chosen Concert measures continuously; an Auto-detected one does not.
+            val note = if (s.situationChoice == SituationChoice.CONCERT) R.string.concert_on_note else R.string.mode_auto_concert_note
+            item { BodyText(stringResource(note), color = VColor.TextSecondary) }
         }
     }
 }

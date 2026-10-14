@@ -19,6 +19,8 @@ import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.Scenario
+import com.example.voxara.debug.DebugTools
+import com.example.voxara.debug.DetectionLog
 import com.example.voxara.text.labelRes
 import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
@@ -80,6 +82,17 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         item { BodyText(stringResource(R.string.keep_running_body)) }
         if (s.batterySettingsAvailable && s.power?.ignoringBatteryOptimizations == false) {
             item { PillButton(stringResource(R.string.battery_settings), onClick = actions.onOpenBatterySettings, style = PillStyle.OUTLINED) }
+        }
+
+        // ------------------------------------------------------------------ mode
+        item { SectionLabel(stringResource(R.string.mode_title)) }
+        item {
+            MetricCard(
+                icon = VoxIcons.Tune,
+                label = stringResource(R.string.mode_title),
+                value = modeValue(s.situationChoice, s.mode),
+                onClick = { navigate(Routes.MODE) },
+            )
         }
 
         // ------------------------------------------------------------------ alerts
@@ -155,7 +168,16 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
 
         // ------------------------------------------------------------------ Tono
         item { SectionLabel(stringResource(R.string.tono_settings_title)) }
-        if (env.cloudAvailable) {
+        item {
+            PillButton(
+                label = stringResource(if (s.tonoEnabled) R.string.tono_enabled_on else R.string.tono_enabled_off),
+                onClick = { actions.onTonoEnabled(!s.tonoEnabled) },
+                icon = VoxIcons.Ask,
+                style = if (s.tonoEnabled) PillStyle.PRIMARY else PillStyle.TONAL,
+            )
+        }
+        item { BodyText(stringResource(R.string.tono_enabled_note)) }
+        if (env.cloudAvailable && s.tonoEnabled) {
             item {
                 PillButton(
                     label = stringResource(if (s.aiConsent) R.string.tono_consent_on else R.string.tono_consent_off),
@@ -215,6 +237,9 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
 
         if (env.debug) {
             item { SectionLabel(stringResource(R.string.set_debug), color = VColor.BrandStart) }
+            // Debug builds only: the class and its strings exist in src/debug, a no-op in release.
+            if (DebugTools.available) item { DebugTools.SettingsEntries(navigate) }
+            if (DetectionLog.available) item { DetectionLog.SettingsEntries() }
             item {
                 Panel { CalibrationProbePanel(s, actions.onProbe, actions.onSaveSourceOffset) }
             }
