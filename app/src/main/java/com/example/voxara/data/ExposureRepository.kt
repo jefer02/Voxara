@@ -60,6 +60,11 @@ data class ExposureState(
     val mode: SituationMode = SituationMode.DEFAULT,
     /** The wearer's choice: Auto or a fixed mode (synced with the phone). */
     val situationChoice: SituationChoice = SituationChoice.DEFAULT,
+    /**
+     * What automatic detection concluded while the choice is Auto; null when it is not sure yet
+     * (Auto is then Street) or the choice is fixed. In memory only, never persisted.
+     */
+    val detectedMode: SituationMode? = null,
     val monitoring: Boolean = false,
     val micGranted: Boolean = false,
     val simulated: Boolean = false,
@@ -195,7 +200,8 @@ object ExposureRepository {
             snoozeMinutes = p.snoozeMinutes,
             tonoEnabled = p.tonoEnabled,
             situationChoice = p.situationChoice,
-            mode = Situation.resolve(p.situationChoice),
+            detectedMode = if (p.situationChoice == SituationChoice.AUTO) it.detectedMode else null,
+            mode = Situation.resolve(p.situationChoice, it.detectedMode),
             concertStartedAtMs = p.concertStartedAtMs,
             weeklyFraction = if (it.sensitiveListener == p.sensitiveListener) it.weeklyFraction
             else it.weeklyFraction * budgetOf(it.sensitiveListener) / budgetOf(p.sensitiveListener),
@@ -219,7 +225,7 @@ object ExposureRepository {
                 calibrationOffsetDb = p.calibrationOffsetDb,
                 alertSettings = p.alertSettings,
                 situationChoice = p.situationChoice,
-                mode = Situation.resolve(p.situationChoice),
+                mode = Situation.resolve(p.situationChoice, it.detectedMode),
                 concertStartedAtMs = p.concertStartedAtMs,
                 sensitiveListener = p.sensitiveListener,
                 calibrations = p.calibrations,

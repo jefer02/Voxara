@@ -15,6 +15,8 @@ import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.calibration.REFERENCE_DB
 import com.example.voxara.core.calibration.dbfsOfRms
 import com.example.voxara.core.dose.energyAverage
+import com.example.voxara.core.scene.SceneFeatureExtractor
+import com.example.voxara.core.scene.SceneFeatures
 import java.io.Closeable
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -29,6 +31,9 @@ import kotlin.math.sqrt
  *  03  Per frame: A-weighting IIR biquad cascade -> RMS -> dBFS -> dBA via the source's offset.
  *  04  Energy-average frames into one Leq per burst; keep the max frame as Lmax and the raw
  *      peak for the impulse check.
+ *  04b Only when asked (Auto mode): the same unweighted frames feed a SceneFeatureExtractor, and
+ *      the burst carries its 54-number vectors (one per 0.98 s of audio; a continuous session
+ *      carries the partial vector over to the next read). Numbers only: PCM stays here.
  *  05  Release the mic (or keep the session open in continuous mode). PCM never leaves the
  *      process, never touches disk, never leaves the watch.
  */
@@ -37,6 +42,10 @@ class AudioBurstSampler(context: Context) {
     companion object {
         private const val TAG = "VoxaraSampler"
         const val SAMPLE_RATE = 48_000
+        init {
+            // The scene model was trained at this rate; the two must never drift apart.
+            check(SAMPLE_RATE == SceneFeatures.SAMPLE_RATE)
+        }
         private const val WARMUP_MS = 120
         private const val FRAME_MS = 100
 
@@ -59,6 +68,10 @@ class AudioBurstSampler(context: Context) {
         val dbfsA: Double,
         /** Unweighted level before any offset. */
         val dbfsZ: Double,
+        /** Scene feature vectors completed in this burst (empty unless asked for). Never stored. */
+        val sceneFeatures: List<DoubleArray> = emptyList(),
+        /** CPU time spent computing those vectors (ns), across reads in a continuous session. */
+        val sceneFeatureNanos: Long = 0L,
     )
 
     private val audioManager = context.getSystemService(AudioManager::class.java)
@@ -72,8 +85,12 @@ class AudioBurstSampler(context: Context) {
     }
 
     /** One self-contained burst: open, warm up, measure, release. */
-    fun capture(burstMs: Long, offsetFor: (MicSource) -> Double, source: MicSource? = null): Burst? =
-        open(source)?.use { it.read(burstMs, offsetFor(it.source)) }
+    fun capture(
+        burstMs: Long,
+        offsetFor: (MicSource) -> Double,
+        source: MicSource? = null,
+        sceneFeatures: Boolean = false,
+    ): Burst? = open(source)?.use { it.read(burstMs, offsetFor(it.source), sceneFeatures) }
 
     /**
      * Opens a session on [requested] (or the preferred source), falling back to
@@ -135,9 +152,18 @@ class AudioBurstSampler(context: Context) {
         private val effects: List<AudioEffect> = disableProcessing(record.audioSessionId)
         private var warmedUp = false
         private var started = false
+        /** Lives as long as the session, so 250 ms continuous reads still complete vectors. */
+        private var features: SceneFeatureExtractor? = null
+        /** Extraction time not yet attributed to a completed vector. */
+        private var featureNanos = 0L
 
-        /** Reads [burstMs] of audio. Null when nothing usable arrived or the client was silenced. */
-        fun read(burstMs: Long, offsetDb: Double): Burst? {
+        /**
+         * Reads [burstMs] of audio. Null when nothing usable arrived or the client was silenced.
+         * With [sceneFeatures] the burst also carries its scene feature vectors.
+         */
+        fun read(burstMs: Long, offsetDb: Double, sceneFeatures: Boolean = false): Burst? {
+            val extractor = if (sceneFeatures) features ?: SceneFeatureExtractor().also { features = it } else null
+            if (!sceneFeatures) { features = null; featureNanos = 0L }
             val frameSamples = SAMPLE_RATE * FRAME_MS / 1000
             val warmupSamples = if (warmedUp) 0 else SAMPLE_RATE * WARMUP_MS / 1000
             val totalSamples = (SAMPLE_RATE * burstMs / 1000).toInt() + warmupSamples
@@ -164,6 +190,13 @@ class AudioBurstSampler(context: Context) {
 
                     val frame = if (read == frameSamples) buf.copyOf() else buf.copyOf(read)
 
+                    // 04b - scene features see the unweighted frame (the filter below works in place).
+                    if (extractor != null) {
+                        val t0 = System.nanoTime()
+                        extractor.push(frame)
+                        featureNanos += System.nanoTime() - t0
+                    }
+
                     // The impulse check and the Z readout run on the UNWEIGHTED signal.
                     for (s in frame) {
                         val a = abs(s)
@@ -178,16 +211,24 @@ class AudioBurstSampler(context: Context) {
                 warmedUp = true
             } catch (t: Throwable) {
                 Log.w(TAG, "burst failed", t)
+                extractor?.reset()
+                featureNanos = 0L
                 return null
             }
 
             // Another client holds the mic (e.g. a voice turn): Android hands us zeros. Report
-            // "unmeasured" rather than a silent room.
+            // "unmeasured" rather than a silent room — and no scene from those zeros either.
             if (runCatching { record.activeRecordingConfiguration?.isClientSilenced }
                     .getOrNull() == true
-            ) return null
+            ) {
+                extractor?.reset()
+                featureNanos = 0L
+                return null
+            }
             if (frameDbfs.isEmpty() || rawCount == 0L) return null
 
+            val vectors = extractor?.takeVectors() ?: emptyList()
+            val vectorNanos = if (vectors.isEmpty()) 0L else featureNanos.also { featureNanos = 0L }
             val dbfsA = energyAverage(frameDbfs.toDoubleArray())
             val dbfsZ = dbfsOfRms(sqrt(rawSumSq / rawCount))
             val frames = DoubleArray(frameDbfs.size) {
@@ -202,6 +243,8 @@ class AudioBurstSampler(context: Context) {
                 source = source,
                 dbfsA = dbfsA,
                 dbfsZ = dbfsZ,
+                sceneFeatures = vectors,
+                sceneFeatureNanos = vectorNanos,
             )
         }
 
