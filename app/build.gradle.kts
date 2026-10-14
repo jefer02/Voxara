@@ -17,6 +17,16 @@ fun localProp(name: String, default: String = ""): String =
     (localProps.getProperty(name) ?: default).trim()
 fun quoted(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+/**
+ * SCENE MODEL LICENCE GATE. The Auto-mode scene model is trained on TUT Acoustic Scenes 2017,
+ * whose EULA forbids use in commercial products. Debug builds always run it; release builds only
+ * when local.properties says SCENE_MODEL_ENABLED=true. Shipping it while its weights are flagged
+ * non-commercial also needs ALLOW_NONCOMMERCIAL_MODEL=true (internal testing only): see
+ * checkSceneModelLicence below and SceneModelLicenceGateTest.
+ */
+val sceneModelInRelease = localProp("SCENE_MODEL_ENABLED", "false").toBoolean()
+val allowNoncommercialModel = localProp("ALLOW_NONCOMMERCIAL_MODEL", "false").toBoolean()
+
 android {
     namespace = "com.example.voxara"
     compileSdk {
@@ -34,13 +44,16 @@ android {
         buildConfigField("String", "AI_BASE_URL", quoted(localProp("AI_BASE_URL", "https://api.deepseek.com")))
         buildConfigField("String", "AI_MODEL", quoted(localProp("AI_MODEL", "deepseek-flash")))
         buildConfigField("String", "AI_API_KEY", quoted(""))
+        buildConfigField("boolean", "SCENE_MODEL_ENABLED", "false")
     }
 
     buildTypes {
         debug {
             buildConfigField("String", "AI_API_KEY", quoted(localProp("AI_API_KEY")))
+            buildConfigField("boolean", "SCENE_MODEL_ENABLED", "true")
         }
         release {
+            buildConfigField("boolean", "SCENE_MODEL_ENABLED", sceneModelInRelease.toString())
             optimization {
                 enable = false
             }
@@ -57,6 +70,9 @@ android {
             isIncludeAndroidResources = true
             all {
                 it.systemProperty("roborazzi.test.record", "true")
+                // What a release build would get, so the licence gate test can check it from any variant.
+                it.systemProperty("voxara.sceneModelInRelease", sceneModelInRelease.toString())
+                it.systemProperty("voxara.allowNoncommercialModel", allowNoncommercialModel.toString())
                 it.maxHeapSize = "2g"
             }
         }
@@ -66,6 +82,28 @@ android {
         buildConfig = true
     }
 }
+
+/**
+ * Fails any release build that would ship the non-commercial scene model without the explicit
+ * internal-testing opt-in. Reads the generated weights' licence flag from source.
+ */
+val checkSceneModelLicence by tasks.registering {
+    val weights = rootProject.file("shared/src/main/java/com/example/voxara/core/scene/SceneModelWeights.kt")
+    val enabled = sceneModelInRelease
+    val allow = allowNoncommercialModel
+    inputs.file(weights)
+    doLast {
+        val commercial = weights.readText().contains("COMMERCIAL_USE_ALLOWED = true")
+        if (enabled && !commercial && !allow) {
+            throw GradleException(
+                "SCENE_MODEL_ENABLED=true in a release build, but SceneModelWeights.COMMERCIAL_USE_ALLOWED " +
+                    "is false (TUT Acoustic Scenes EULA: non-commercial). Remove SCENE_MODEL_ENABLED from " +
+                    "local.properties, or set ALLOW_NONCOMMERCIAL_MODEL=true for internal testing only."
+            )
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkSceneModelLicence) }
 
 dependencies {
     implementation(project(":shared"))
