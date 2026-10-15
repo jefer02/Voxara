@@ -68,6 +68,9 @@ android {
     }
 }
 
+// Release APK must carry no scene model weights (same check as :app; :phone depends on :shared).
+apply(from = rootProject.file("gradle/scene-weights-check.gradle.kts"))
+
 dependencies {
     implementation(project(":shared"))
     implementation(project(":shared-ui"))
