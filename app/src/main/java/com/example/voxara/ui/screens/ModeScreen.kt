@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.wear.compose.material3.Text
 import com.example.voxara.BuildConfig
 import com.example.voxara.R
+import com.example.voxara.core.scene.SceneModel
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.designsystem.R as DsR
@@ -47,7 +48,7 @@ fun ModeScreen(env: UiEnv, actions: VoxaraActions) {
                     when {
                         detected != null -> stringResource(R.string.mode_auto_detected, stringResource(detected.labelRes()))
                         // Licence gate: no scene model in this build — Street, plus the Concert rule.
-                        !BuildConfig.SCENE_MODEL_ENABLED -> stringResource(R.string.mode_auto_unavailable)
+                        !BuildConfig.SCENE_MODEL_ENABLED || !SceneModel.available -> stringResource(R.string.mode_auto_unavailable)
                         else -> stringResource(R.string.mode_auto_listening, stringResource(s.mode.labelRes()))
                     },
                     color = VColor.TextSecondary,
