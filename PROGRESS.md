@@ -856,14 +856,18 @@ Full tables are in `C:\dataset_voxara\training\out\report.md`.
 
 ### Concert (no dataset has it): deterministic rule
 - Concert is entered when the last 3 minutes have a **median level ≥ 90 dBA**, **≥ 35% of the votes
-  music-like** (local tonality ≤ −3.19 dB, generated as `MUSIC_TONALITY_MAX_DB`), and **no headphones
+  music-like** (local tonality ≤ `MUSIC_TONALITY_MAX_DB`, now **−3.12 dB derived from freely
+  licensed music only**; see "Concert threshold re-derived" below), and **no headphones
   playing on the watch**, and all of this holds without a break for 2 minutes.
 - Entering skips the dwell, since it only adds protection. Leaving takes **20 min below 80 dBA**,
   the same rule as a manual Concert.
-- **Calibration and check:** the threshold is the 0.5th percentile of loud non-music TUT scenes
-  (vehicles, city centre), so about 0.5% of their votes are flagged. The worst TUT location reaches
+- **Calibration and check (SUPERSEDED, see "Concert threshold re-derived"):** the threshold was the
+  0.5th percentile of loud non-music TUT scenes (vehicles, city centre), so about 0.5% of their
+  votes were flagged. The worst TUT location reaches
   39% (a lakeside beach: waves and wind), but beaches and cars never sustain 90 dBA.
-- **Real music:** 10 live or concert recordings from Wikimedia Commons (CC BY, BY-SA, FAL or public
+- **Real music (CORRECTED later: the set had two accidental duplicates, so it was 8 distinct
+  files, 7 decodable; rebuilt with 13 verified clips in "Concert threshold re-derived"):** 10 live
+  or concert recordings from Wikimedia Commons (CC BY, BY-SA, FAL or public
   domain; evaluation only, never trained on or copied into the repo; `music_eval_clips.py`). With
   crowd noise at 10 dB SNR plus the watch-like chain, 34–84% of votes are music-like for 8 of 9
   usable clips. **Heavily distorted rock is missed** (3–7%). A peak-share measure was also tried; the
@@ -965,10 +969,9 @@ a feature, change `voxfeat.py` and `SceneFeatures.kt` together.
 `:phone:testDebugUnitTest` **31/31**; `:app:assembleDebug` and `:phone:assembleDebug` ✅.
 
 ### Limitations (honest)
-- **Licensing:** the shipped weights must not go to the Play Store (see Licence). Release builds
-  now keep the model off by default (see "Scene model licence gate" below), but the weight constants
-  are still compiled into the APK as unused code (R8 is off in this project); to keep them out of a
-  commercial APK entirely, enable R8 or move `SceneModelWeights` behind a debug-only source set.
+- **Licensing:** the weights must not go to the Play Store (see Licence). Release builds keep the
+  model off (see "Scene model licence gate" below) and, since "Scene model weights out of release",
+  do not contain the weights at all.
 - **Accuracy:** about 72% mode accuracy per 10 s on unseen locations. Quiet is often taken for Street
   (61% recall), and Work is weak (46%, and eval has only 6 office recordings). The detector's
   voting, dwell and level vetoes make a wrong mode rare and slow, not impossible.
@@ -1085,3 +1088,203 @@ Modified:
 `:app:assembleRelease` ✅ (scene model off). AGP 9 here has no `testReleaseUnitTest` task, so the
 release side of the gate is covered by the Gradle task and the system-property test. No git
 commands were used.
+
+---
+
+## Scene model weights out of release APKs ✅
+
+### Where the weights live, and why there
+In **`:shared`'s own variant source sets**, not in `:app`:
+- `:shared` is an Android library. `:app` debug consumes its debug variant and `:app` release
+  consumes its release variant, so `shared/src/debug` vs `shared/src/release` gives exactly
+  "debug has weights, release has none". No Gradle wiring is needed, and `:phone` gets the same
+  split automatically.
+- `SceneModel`, `AutoModeDetector` and their JVM tests (parity, model reference, detector) all live
+  in `:shared` and run as `:shared:testDebugUnitTest`, which sees the debug weights. Moving the
+  weights to `:app` would mean injecting them into `:shared` from the app and moving or duplicating
+  those tests.
+
+The layout follows the Bench / DebugTools twin pattern:
+
+| file | what it is |
+|---|---|
+| `shared/src/main/.../core/scene/SceneWeights.kt` (new) | interface with the weights' shape (`FEATURE_VERSION`, `TRAINING_DATA`, `COMMERCIAL_USE_ALLOWED`, `CLASSES`, `CLASS_MODE`, `MODE_WEIGHT`, `MEAN`, `SCALE`, `SIZES`, `WEIGHTS`, `BIASES`) |
+| `shared/src/debug/.../core/scene/SceneModelWeights.kt` (GENERATED, moved from `src/main`) | the real weights, `internal object SceneModelWeights : SceneWeights` |
+| `shared/src/debug/.../core/scene/SceneModelSource.kt` (GENERATED) | debug twin: `weights = SceneModelWeights`, `COMMERCIAL_USE_ALLOWED`, `MUSIC_TONALITY_MAX_DB` |
+| `shared/src/release/.../core/scene/SceneModelSource.kt` (GENERATED) | release twin, same API: `weights = null`, `COMMERCIAL_USE_ALLOWED = false`, `MUSIC_TONALITY_MAX_DB` |
+
+- **No weights class in release.** The release twin has a different body rather than an empty
+  `SceneModelWeights`, so the weights class does not exist in release at all.
+- **`SceneModel`** reads `SceneModelSource.weights`:
+  - `available` is false without weights, and the model refuses to run (`checkNotNull`);
+  - `classes` is empty, `trainingData` is "none (no scene model in this build)",
+    `commercialUseAllowed` is false, `multiplyAdds` is 0.
+- **`AutoModeDetector`** runs the model only when `Config.sceneModel && SceneModel.available`.
+  Otherwise it runs the Concert rule only (Auto = Street).
+- **ModeScreen** shows the "not available in this version" line when the flag is off OR the model
+  is absent.
+- **The Concert threshold** `MUSIC_TONALITY_MAX_DB` (−3.19 dB) is in both twins, because the Concert
+  rule runs in release. It is one summary number calibrated on TUT recordings (0.5th percentile of
+  loud non-music votes); see Limitations if even that should be re-derived before a commercial
+  release.
+- **Internal-testing opt-in** (unchanged meaning): with `SCENE_MODEL_ENABLED=true` and
+  `ALLOW_NONCOMMERCIAL_MODEL=true` in `local.properties`, `shared/build.gradle.kts` builds release
+  from `src/debug/java`, so the weights are included on purpose. `:app:checkSceneModelLicence` now
+  reads the licence flag from the new debug path.
+
+### Checks that release carries no weight data
+1. **`:app:verifyReleaseHasNoSceneWeights`** (Gradle, finalizes `assembleRelease`). It opens every
+   `classes*.dex` of the release APK and fails if it finds the descriptor
+   `Lcom/example/voxara/core/scene/SceneModelWeights;` or the training-data marker `Zenodo 400515`.
+   It is skipped only under the internal-testing opt-in (with a warning).
+   Output on this build: "app-release-unsigned.apk: 4 dex files, no scene model weights".
+2. **`shared/src/test/.../core/scene/SceneWeightsLayoutTest.kt`** (4 tests):
+   - `SceneModelWeights.kt` exists only in `src/debug`, and no file in `src/main` or `src/release`
+     defines or references the weights object;
+   - the release twin is `weights = null`, `COMMERCIAL_USE_ALLOWED = false`, with no arrays and no
+     dataset marker;
+   - both twins expose the same members;
+   - the debug test variant has the model.
+3. **Manual inspection** (SDK `cmdline-tools/latest/apkanalyzer dex packages --defined-only` and
+   `build-tools/36.0.0/dexdump` on the unzipped dex):
+   - **Release APK:** under `core.scene` only `SceneModel`, `SceneWeights` (interface) and
+     `SceneModelSource` (3 fields: `weights`, `COMMERCIAL_USE_ALLOWED`, `MUSIC_TONALITY_MAX_DB`), plus
+     the feature, hysteresis and scene classes. **No `SceneModelWeights`.**
+   - **Debug APK** (positive control): contains `SceneModelWeights`, with a 19,304-byte `<clinit>`,
+     i.e. the weight arrays.
+
+### Training kit (`C:\dataset_voxara\training`)
+- `export_kotlin.py` writes the weights to `shared/src/debug/.../SceneModelWeights.kt`
+  (`override val`s implementing `SceneWeights`). It writes both `SceneModelSource` twins
+  (`write_sources`) and deletes any stale `shared/src/main/.../SceneModelWeights.kt`. The current
+  weights were regenerated this way from `out/model.npz`, with identical numbers.
+- `train.py` docstring and `README.md` updated with the new paths.
+
+### Files
+New:
+- `shared/src/main/.../core/scene/SceneWeights.kt`
+- `shared/src/debug/.../core/scene/SceneModelSource.kt`
+- `shared/src/release/.../core/scene/SceneModelSource.kt`
+- `shared/src/test/.../core/scene/SceneWeightsLayoutTest.kt`
+
+Moved and regenerated: `SceneModelWeights.kt`, from `shared/src/main` to `shared/src/debug`.
+
+Modified:
+- `shared/.../core/scene/SceneModel.kt`
+- `shared/.../core/situation/AutoModeDetector.kt`
+- `shared/build.gradle.kts` (opt-in source swap)
+- `app/build.gradle.kts` (new path, `verifyReleaseHasNoSceneWeights`)
+- `app/.../ui/screens/ModeScreen.kt`
+- `C:\dataset_voxara\training\export_kotlin.py`, `train.py`, `README.md`
+
+### Results
+`:shared:testDebugUnitTest` **96/96**, `:app:testDebugUnitTest` **124/124**,
+`:phone:testDebugUnitTest` **31/31**, `:app:assembleDebug` ✅, `:phone:assembleDebug` ✅,
+`:app:assembleRelease` ✅ with `verifyReleaseHasNoSceneWeights` passing. No git commands were used.
+
+### Limitations
+- `MUSIC_TONALITY_MAX_DB` (one number) is still derived from TUT and ships in release with the
+  Concert rule. If legal review treats even a summary statistic as a derived work, re-derive it from
+  commercially usable recordings (`music_eval_clips.py` already runs on CC/PD music) and regenerate.
+- The APK check matches a class descriptor and a dataset marker. A future weights object under
+  another name would need adding to `markers` in `app/build.gradle.kts`; `SceneWeightsLayoutTest`
+  guards the source side.
+- `:phone` also depends on `:shared`. Its release variant gets the weightless twin the same way, but
+  only the watch APK is scanned.
+
+---
+
+## Concert threshold re-derived from freely licensed music + :phone release scan ✅
+
+### 1. The Concert threshold no longer comes from TUT
+`MUSIC_TONALITY_MAX_DB` ships in release, because the Concert rule runs without the scene model.
+It was the 0.5th percentile of loud TUT scenes, a value derived from non-commercial data. It is now
+derived **only from freely licensed live music**:
+- **Music set rebuilt.** The earlier set had two byte-identical duplicates, caused by a bug in my
+  previous download loop that wrote stale data after HTTP 429 errors: `PopMix.ogg` was the Marine
+  Band file, and `Sebkha_Chott….ogg` was Reggaetomix. So it held 8 distinct files, not 10. The new
+  `fetch_music.py`:
+  - records title, author, licence + licence URL, Commons page, SHA-256, length and whether the
+    file is partial;
+  - rejects duplicates and files that don't decode.
+  Result: **13 clips** (CC BY 3.0, CC BY-SA 3.0/4.0, Free Art License, public domain). One public-
+  domain file ("Festival concert people crowd") was rejected because it does not decode. Each
+  clip's licence and source is listed in `C:\dataset_voxara\training\README.md` (table) and
+  `C:\dataset_voxara\music_eval\manifest.json`.
+- **Derivation** (`derive_concert_threshold.py`, music only):
+  - every clip → the watch-like mic chain + crowd-like noise at 10 dB SNR;
+  - take each clip's **median** vote tonality;
+  - threshold = **median over clips** → **−3.12 dB** (old TUT value −3.19 dB).
+  - Leaving each clip out moves it only between −3.05 and −3.13 dB.
+- **Evaluation:** the full rule is simulated: a vote every 10 s, 3-min window, ≥ 6 votes, ≥ 35%
+  music-like, held 2 min, recordings looped to 6 min, level gate assumed passed (worst case).
+
+| | old −3.19 dB (TUT) | **new −3.12 dB (music only)** |
+|---|---|---|
+| clips → Concert, crowd at 20 dB SNR | 7/13 | **8/13** |
+| clips → Concert, crowd at 10 dB SNR (reference) | 6/13 | **8/13** (leave-one-out: 8/13) |
+| clips → Concert, crowd at 3 dB SNR | 2/13 | 2/13 |
+| **loud non-music → false Concert** (142 TUT recordings: metro station, train, tram, bus, car, city centre; dev + eval; clean + watch-like = 284 runs) | 0 | **0** |
+| share of those votes music-like | 0.76% | 0.97% |
+| worst recording (needs 35% to trigger) | 21.2% (car) | 24.7% (car), then train 16.7%, tram 8.5%; every metro station below 8.5% |
+
+- **Decision:** the new value is **better, not worse**. It catches 2 more clips at the reference
+  condition (Sebkha-Chott "Café La Main Verte" and "Illusions") and still gives no false Concert on
+  any loud transport recording; **the loud-metro case does not trigger**. So it replaces the old
+  value. TUT was used only to check, never to set it.
+- **Never detected, at any threshold:** heavily distorted rock (The Armed, 3 clips: 0–4%
+  music-like), the short, noisy bar recording (Tercer Tipo, 14%) and the brass march (39% overall
+  but never held for 2 minutes).
+- **Release source is free of TUT values:**
+  - `shared/src/release/…/SceneModelSource.kt` now holds only `weights = null`,
+    `COMMERCIAL_USE_ALLOWED = false` and `MUSIC_TONALITY_MAX_DB = -3.12`, with a comment stating the
+    music-only derivation. `grep` finds no TUT / Zenodo / −3.19 in `shared/src/main` or
+    `shared/src/release`.
+  - The detector KDoc was rewritten.
+  - The new `SceneWeightsLayoutTest` case fails if the release twin mentions TUT, Acoustic Scenes or
+    DCASE, lacks the music-derivation note, or differs from the debug twin's threshold.
+- **Pipeline:**
+  - `train.py` now takes the shipped threshold from `out/concert_threshold.json` and refuses to
+    export without it. Its TUT percentile stays in the report as "reference, not shipped".
+  - `export_kotlin.py` requires the value and writes its provenance into both twins.
+  - `derive_concert_threshold.py --write-sources` regenerates the twins without retraining.
+- **One design constant to note:** the rule's vote share **0.35** (and the other rule constants:
+  90 dBA, 3 min, 2 min) are hand-set design parameters, not fitted statistics. When 0.35 was chosen,
+  I looked at both the music results and TUT false-positive margins. Today's check shows the music
+  set alone supports it: caught clips sit at 40–84% music-like at 10 dB, and distorted rock near 0%.
+
+### 2. :phone release APK scanned too
+- The dex scan moved into one script plugin, `gradle/scene-weights-check.gradle.kts`, applied by
+  both `app/build.gradle.kts` and `phone/build.gradle.kts`. The inline copy in the app was removed.
+- Each module gets `verifyReleaseHasNoSceneWeights`, finalizing its own `assembleRelease`. The
+  markers and the internal-testing opt-in skip are the same as before.
+- Results: ":phone phone-release-unsigned.apk: 3 dex files, no scene model weights" and
+  ":app app-release-unsigned.apk: 4 dex files, no scene model weights".
+- **Positive control** (same byte scan in Python): **both debug APKs contain the markers**
+  (`classes4.dex`: `SceneModelWeights` and the dataset marker); **both release APKs are clean**.
+
+### Files
+- **New:** `gradle/scene-weights-check.gradle.kts`; `C:\dataset_voxara\training\fetch_music.py`,
+  `derive_concert_threshold.py`, `out/concert_threshold.json`;
+  `C:\dataset_voxara\music_eval\manifest.json` (clips re-downloaded).
+- **Modified:**
+  - `app/build.gradle.kts`, `phone/build.gradle.kts`
+  - `shared/src/{debug,release}/…/SceneModelSource.kt` (regenerated, −3.12)
+  - `shared/…/core/situation/AutoModeDetector.kt` (KDoc)
+  - `shared/src/test/…/core/scene/SceneWeightsLayoutTest.kt` (+1 test)
+  - `C:\dataset_voxara\training\train.py`, `export_kotlin.py`, `README.md`
+  - this file (earlier Concert section corrected)
+
+### Results
+- Unit tests: `:shared:testDebugUnitTest` **97/97**, `:app:testDebugUnitTest` **124/124**,
+  `:phone:testDebugUnitTest` **31/31**.
+- Builds: `:app:assembleDebug` ✅, `:phone:assembleDebug` ✅, `:app:assembleRelease` ✅,
+  `:phone:assembleRelease` ✅, both release scans pass.
+- No git commands were used.
+
+### Limitations
+- 13 clips is a small set, and 3 of them come from one distorted-rock band. With crowd noise at
+  3 dB SNR only 2/13 reach Concert, so in a very loud, chatty crowd the rule depends on the music
+  being clearly louder than the crowd.
+- The metro check uses TUT recordings (Finland, binaural, uncalibrated) with the level gate assumed
+  passed. A real loud metro on the watch is still untested.

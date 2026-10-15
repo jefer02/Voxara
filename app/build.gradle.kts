@@ -88,7 +88,7 @@ android {
  * internal-testing opt-in. Reads the generated weights' licence flag from source.
  */
 val checkSceneModelLicence by tasks.registering {
-    val weights = rootProject.file("shared/src/main/java/com/example/voxara/core/scene/SceneModelWeights.kt")
+    val weights = rootProject.file("shared/src/debug/java/com/example/voxara/core/scene/SceneModelWeights.kt")
     val enabled = sceneModelInRelease
     val allow = allowNoncommercialModel
     inputs.file(weights)
@@ -104,6 +104,9 @@ val checkSceneModelLicence by tasks.registering {
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkSceneModelLicence) }
+
+// THE RELEASE APK CARRIES NO SCENE WEIGHTS: verifyReleaseHasNoSceneWeights, shared with :phone.
+apply(from = rootProject.file("gradle/scene-weights-check.gradle.kts"))
 
 dependencies {
     implementation(project(":shared"))
