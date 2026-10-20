@@ -694,9 +694,10 @@ Result at that point: watch 116/116, shared 41/41, phone 31/31 ✅; both debug A
 - Unit tests: watch **116/116**, shared **43/43**, phone **31/31** ✅ (watch baseline before v2: 112, all still pass).
 - Release APKs: the API key is absent from both (checked against local.properties without printing it) and neither
   declares INTERNET. The debug APKs contain the key (debug-only by design, as before).
-- Lint: no NewApi errors in any module at minSdk (phone 28, watch 30). Pre-existing and unchanged: one WrongConstant
-  error in `phone/…/ListeningSampler.kt:46` (v1 code; the type is always an output type there) and InlinedApi
-  warnings in the watch's HapticConductor / MainActivity (guarded at runtime).
+- Lint: no NewApi errors in any module at minSdk (phone 28, watch 30). Pre-existing at the time: one WrongConstant
+  error in `phone/…/ListeningSampler.kt:46` (v1 code; the type is always an output type there; **fixed
+  later, see "Phone lint: WrongConstant fixed"**) and InlinedApi warnings in the watch's HapticConductor /
+  MainActivity (guarded at runtime).
 - Strings: every English string has a Spanish counterpart in all four modules.
 
 ### How to verify each change
@@ -1288,3 +1289,274 @@ derived **only from freely licensed live music**:
   being clearly louder than the crowd.
 - The metro check uses TUT recordings (Finland, binaural, uncalibrated) with the level gate assumed
   passed. A real loud metro on the watch is still untested.
+
+---
+
+## UI restyle (template style, both apps) ✅ (no watch or phone connected: renders only)
+
+Spec: **[docs/design/STYLE.md](docs/design/STYLE.md)** (written before coding). Source of the style:
+`docs/design/voxara_template.html`. Only its **style** was taken (colours, type, shapes, the look of
+its visuals). None of its features were copied: no VoxBuds / pairing sheet, no headphone limiter or
+"shield", no "−15 dB" buttons, no L/R balance, earbud battery, anti-fatigue EQ or rest timer, none of
+its dose math, 80/88 dB thresholds or "OMS" texts. Every number, zone and sentence still comes from
+`NoiseDoseEngine`, `RiskZone`, `AlertEngine`, the ledgers and the existing string resources. Screens
+still take (state, actions) only. No git commands that modify the repo were used.
+
+### What it looks like now
+- **Colour:** deep blue-black (`#090B10`, cards `#131722`) and paper-white (`#F3F5F9`, cards
+  `#FFFFFF`) neutrals with 1 dp borders; the watch stays pure black (AMOLED, dark only).
+- **Accent:** Purple by default (the watch is always Purple); on the phone the user picks Purple,
+  Turquoise, Blue or Emerald. Each has light/dark fill, ink and on-fill variants (STYLE.md §1),
+  contrast-tested for every accent × theme.
+- **Level-reactive accent:** OK and MODERATE use the accent, LOUD amber `#FFB800`, DANGEROUS crimson
+  `#FF2A6D`, animated (400 ms) between tiers, on Voxara's own boundaries (70/85/95 dBA, 50/80/100 %).
+  Words and icons still name every zone.
+- **Type:** Plus Jakarta Sans for words, JetBrains Mono (tabular) for every number. Inter removed.
+- **Watch:** 270° bezel arc with rounded caps and a glow stroke, harmonic wave rings and halo behind
+  the main number, glow number, source pill, editorial headers with a pulsing dot, page dots on
+  onboarding, icon-tile cards, hourly capsules, a round dark overlay with a crimson border for the
+  limit alert. Ambient: hairline bezel, outline number, no glow, no animation.
+- **Phone:** editorial large titles (pulsing-dot label over an extra-bold title), cards with borders
+  and soft shadows, a hero card with wave lines and a 26-capsule dose meter, icon tiles in every row,
+  the template switch, accent pill segmented controls, a metric triplet on Today, an accent-soft pill
+  in the bottom bar / rail, chart series in accent + secondary indigo.
+
+### New phone setting: Appearance (STEP 2)
+- Settings → **Appearance**: accent (4 round swatches, the selected one scaled with a ring; each a
+  radio button named for TalkBack) and theme **Light / Dark / Follow system**. Defaults: **Purple,
+  Light**.
+- Stored in `PhoneStore` (DataStore keys `accent`, `theme_mode`). Phone only: not in the synced
+  `SettingField` list, never sent to the watch, kept by "Delete all data".
+- Applied live through `VoxaraPhoneTheme` (CompositionLocals) without recreating the activity:
+  system bar icons (`enableEdgeToEdge` with a light/dark `SystemBarStyle`), the window background,
+  and on Android 12+ `UiModeManager.setApplicationNightMode`, so the next splash matches
+  (`configChanges="uiMode"` on `MainActivity`, so this does not restart it). The setup wizard is
+  inside the same theme. The Glance widget reads the same keys and is re-rendered on a change.
+
+### Files
+Created:
+- `docs/design/STYLE.md`, `docs/design/screenshots/{before,after}/…` (see below)
+- `shared-ui/src/main/java/com/example/voxara/ui/design/Visuals.kt` (VoxTone, level tone, wave clock,
+  WaveLines, HarmonicRings, capsules, PulseDot)
+- `shared-ui/src/main/res/font/plus_jakarta_sans.ttf`, `shared-ui/src/main/res/font/jetbrains_mono.ttf`
+  (variable fonts from github.com/google/fonts, `ofl/plusjakartasans`, `ofl/jetbrainsmono`)
+- `shared-ui/src/main/assets/licenses/PlusJakartaSans-OFL.txt`, `…/JetBrainsMono-OFL.txt`
+- `app/src/main/java/com/example/voxara/ui/design/WatchVisuals.kt` (LocalAnimate, WaveHalo, GlowNumber,
+  SourcePill, PageDots, CircularOverlay)
+- `phone/src/main/java/com/example/voxara/phone/ui/components/Template.kt` (EditorialLabel, IconTile,
+  VoxSwitch, HeroCard, CapsuleMeter, MetricTriplet, AccentSwatches)
+- `shared/src/test/java/com/example/voxara/core/design/AccentPaletteTest.kt` (6 tests)
+- `phone/src/test/java/com/example/voxara/phone/data/AppearanceStoreTest.kt` (5 tests)
+
+Deleted: `shared-ui/src/main/res/font/inter_variable.ttf` and `shared-ui/src/main/assets/licenses/Inter-OFL.txt`
+(nothing used Inter any more); `shared/src/test/…/core/design/LightPaletteTest.kt` (replaced by
+AccentPaletteTest, which covers every accent × theme with the same 4.5:1 / 3:1 thresholds).
+
+Modified:
+- `shared/…/core/design/Palette.kt` (rewritten: template neutrals, `Accent`, `Tone`, `level()`, `over()`)
+- `shared-ui/build.gradle.kts` (foundation + lifecycle-runtime-compose, `:shared` as api),
+  `shared-ui/…/ui/design/SharedDesign.kt` (`JakartaFamily`, `MonoFamily`, `TABULAR`)
+- Watch: `ui/design/Tokens.kt`, `Components.kt` (BezelArc, LevelBezel, Eyebrow, EditorialHeader,
+  IconTile, ZoneIconCircle; the ZoneGauge is replaced by the bezel), `Layout.kt` (token renames),
+  `ui/theme/VoxaraTheme.kt`; screens `HomeScreen`, `NowScreen`, `TodayWeekScreens` (DoseBezel, hourly
+  capsules), `HeadphonesScreen`, `AskScreen`, `ModeScreen`, `SettingsScreen`, `OnboardingScreen`,
+  `OverlayScreens`, `CalibrationScreen` and `CalibrationProbePanel` (colour roles);
+  `tile/VoxaraTileService.kt`, `tile/ListeningTileService.kt` (270° rounded ProtoLayout arcs, tier
+  colours); `complication/DoseComplicationService.kt`, `complication/ListeningComplicationService.kt`
+  (colour ramp)
+- Phone: `ui/theme/PhoneTheme.kt` (rewritten), `ui/components/Components.kt`, `ui/components/Charts.kt`,
+  `ui/PhoneApp.kt` (nav colours), `ui/PhoneUi.kt` + `ui/PhoneViewModel.kt` (appearance state and
+  actions), `MainActivity.kt` (live theme, bars, night mode), `data/PhoneStore.kt` (`ThemeMode`, keys),
+  every screen, `widget/DoseWidget.kt`, `AndroidManifest.xml` (`configChanges="uiMode"`),
+  `res/values{,-night}/colors.xml` (new window backgrounds)
+- Strings EN + ES: phone +14 (Appearance, accent and theme names, the hero capsule description); the
+  licence lines in both apps now name Plus Jakarta Sans and JetBrains Mono.
+- Tests: `app/src/test/…/core/DesignSystemTest.kt` (watch tokens and tiers on black and cards),
+  `app/src/test/…/ui/DesignSystemScreenshotTest.kt` (new components),
+  `phone/src/test/…/ui/PhoneScreenshotTest.kt` (Home in every accent, light and dark; dark Trends,
+  Settings and Home at 2.0; the Appearance section on a tall canvas)
+
+### Battery and accessibility rules (how they hold)
+- Free-running animation only while interactive and resumed: `LocalAnimate` (not ambient, animator
+  scale ≠ 0) and `animationsActive()` (lifecycle RESUMED). Otherwise the waves, rings and pulse dot
+  are drawn as a still frame. The wave phase is read in the draw phase only (no recomposition per
+  frame); Paths and Strokes are reused; the halo brush is rebuilt only on a colour change. No blur.
+- Touch targets ≥ 48 dp (swatches, steppers, segments); nothing below 12 sp; headings via
+  `heading()`; zones always word + icon.
+- Found and fixed while reviewing the renders: watch card labels breaking mid-word at 192 dp × 1.3
+  (compact card), capsule marks colliding at font 2.0 (placed by priority, overlaps dropped),
+  triplet labels breaking at 1.3 (stacks by cell width), capsules turning into circles on tablets
+  (max 10 dp wide), "120 min" and "Follow system" cut in segmented controls (smaller label for 4+
+  segments, two lines allowed, equal heights).
+- `AppearanceStoreTest` runs PhoneStore on an in-memory DataStore: the file-backed DataStore cannot
+  replace its file on the Windows JVM ("Unable to rename …"), a test-environment limit.
+
+### Screenshots
+`docs/design/screenshots/before/` and `after/`: watch Home, Now, Today (216 dp, 1.0×); phone Home,
+Trends, Settings, light and dark (360 dp, 1.0×). `after/accents/`: phone Home in all 4 accents ×
+light/dark; `after/phone_settings_appearance*.png`: the Appearance section. Full sets:
+`app/build/screenshots/` (96) and `phone/build/screenshots/` (all sizes, font scales 1.0/1.3/2.0,
+light/dark, accents) after `testDebugUnitTest`.
+
+### Could not apply the template style fully
+- **Tiles and complications:** ProtoLayout cannot animate, glow or load bundled fonts, so they get
+  the tier colours and the 270° rounded arc only, in the system font.
+- **Glance widget:** colours, radius and the accent label only (no waves, system font).
+- **Watch toggles:** the template switch was not ported to the watch; the Wear M3 pill buttons stay
+  (they carry the accent). The watch Calibration flow keeps its layout and takes the new tokens only.
+- **Splash on Android 9–11:** before the app's first frame the window follows the system's night
+  mode (`values-night`); from Android 12 the app night mode makes it match the chosen theme.
+- **Phone hero has no live level:** the phone never shows one, so its reactive colour comes from
+  today's dose zone.
+
+### Results
+- Unit tests: `:shared:testDebugUnitTest` **101/101** (97 before − 2 light-palette tests + 6
+  accent tests), `:app:testDebugUnitTest` **124/124**, `:phone:testDebugUnitTest` **37/37**
+  (31 + 5 appearance-store tests + 1 accent screenshot test).
+- Builds: `:app:assembleDebug` ✅, `:phone:assembleDebug` ✅.
+- Lint: `:app:lintDebug` ✅ 0 errors. `:phone:lintDebug` reported **1 error** at the end of the
+  restyle, the pre-existing WrongConstant at `phone/…/ListeningSampler.kt:46` (v1 sampling code,
+  recorded in "Final checks" above, not touched by the restyle); now fixed, see the next section. Warnings added by the restyle were fixed (non-lambda `offset`,
+  `UseKtx`); the 59 UnusedResources in the app are strings of screens deleted in Phase 6.
+
+### Still to check on a real Galaxy Watch 7 (and a phone)
+- Wave rings / halo frame cost and battery: the animation runs only on Now and Home while the screen
+  is on and resumed; measure with a Perfetto trace (frame time, CPU) and compare an hour with the
+  app open against the previous build.
+- Ambient: the hairline bezel and outline number on the real AMOLED panel (burn-in, < 5 % lit).
+- The bezel arc sits inside the 216 / 240 dp round display; check it does not collide with the
+  physical bezel or the time text at 40 mm.
+- Variable-font rendering (Plus Jakarta Sans, JetBrains Mono weights) on One UI Watch, and the
+  tile / complication colours on the real watch face.
+- Phone: live theme switch (system bar icons flip, no activity restart), the splash after choosing
+  Dark / Light on Android 12+, Follow system while toggling the system dark mode, and the widget
+  colours after changing the accent.
+
+---
+
+## Phone lint: WrongConstant fixed ✅
+
+`phone/src/main/java/com/example/voxara/phone/ListeningSampler.kt:46` passed `AudioDeviceInfo.getType()`
+straight into `AudioManager.getStreamVolumeDb(streamType, index, deviceType)`. `getType()` is typed
+as any device type (inputs included), but `deviceType` only accepts output types, so lint reported
+WrongConstant even though `outputKind()` had already narrowed the device to six headphone outputs.
+
+- Fix: a small `outputDeviceType(type)` maps the device to the same output constant through a
+  `when` (wired headphones / headset, USB headset, Bluetooth A2DP, BLE headset, BLE broadcast).
+  For every type `outputKind()` accepts it returns the number it was given, so the volume curve
+  the phone reads is unchanged. No WrongConstant suppression.
+- The two BLE constants (API 31 / 33, minSdk 28) are inlined compile-time ints that can only match
+  on devices reporting those types, so that one function carries `@SuppressLint("InlinedApi")` with
+  the reason in a comment (the same situation as the watch's inlined `TYPE_BLE_*` warnings).
+- Test: `phone/src/test/java/com/example/voxara/phone/ListeningSamplerTest.kt` (+1) checks the identity for
+  all six accepted types.
+- Results: `:phone:lintDebug` ✅ **0 errors**, 80 warnings (same count as before; none new);
+  `:phone:testDebugUnitTest` **38/38** ✅. No git commands that modify the repo were used.
+
+---
+
+## App icons ✅ (no watch or phone connected: renders only)
+
+Original icon system for both apps, drawn from scratch as vectors: no icon packs, no Material
+Symbols, no traced or third-party artwork, so there is no licence to track. No git commands that
+modify the repo were used.
+
+### Concept chosen: A, "Gauge V"
+Three concepts were drawn and compared (`docs/design/icons/concepts/`, `compare.png`, rationale in its
+`README.md`): **A Gauge V**, **B Quiet wave** (a loud wave meets a curved guard and leaves as a calm
+dot), **C Cochlea** (sound rings wound into the inner ear). **A was chosen**: the watch's 270° dose
+arc, open at the bottom, and a V whose point drops through the opening like a gauge needle. It
+carries the name, reuses the app's most recognisable visual (the bezel arc) and is the clearest
+silhouette at 24–48 px. A "V in a circle" can recall the vegan Ⓥ or the VW roundel; the open ring
+and the point leaving through the gap are what set it apart. That check was done from memory, not
+with a trademark or reverse-image search.
+
+Fixed while reviewing the renders: curled V arms read as the Aries ♈ glyph, then bowed arms as a
+"Y" (now straight); the 10 % wide-stroke glow showed as a hard ghost outline at 192–512 px and as a
+lilac rim on the light splash (removed; the glow is now the background's soft radial halo).
+
+### Design rules
+- Launcher layers 108 dp; the mark stays inside r ≈ 24 dp on the phone and ≈ 26 dp on the watch
+  (bigger, 8 % bolder strokes for the small round screen), well inside the 66 dp safe zone, so every
+  mask (circle, squircle, rounded square, teardrop) keeps a margin.
+- Background: `#090B10` lifted to `#1A1F33`, with a soft `#8B5CF6` halo. Mark: `#C4B5FD → #8B5CF6 →
+  #6366F1` gradient strokes with round caps.
+- Monochrome (themed icons, Android 13+): the same strokes in white (only alpha is used).
+- Notification / complication icon: 24 dp, white, no gradients, 2.4 dp strokes, gaps ≥ 1.2 dp.
+- The launcher foreground also serves as the splash icon: the mark sits inside the splash's visible 2/3
+  circle (phone 288 → 192 dp; watch core-splashscreen `values-watch` 90 → 60 dp).
+
+### Files
+Generator and sources (`docs/design/icons/`): `README.md`, `tools/final.py` (the generator),
+`tools/concepts.py`, `tools/render.js` (resvg); `concepts/` (3 concepts × 5 SVGs, `compare.png`,
+`README.md`); `final/` (`voxara-icon.svg`, `voxara-mark.svg`, `launcher-{background,foreground,
+monochrome}.svg`, `launcher-{foreground,monochrome}-watch.svg`, `notification.svg`, `preview.png`);
+`store/` (`play-icon-512.png`, `play-icon-wear-512.png`, `feature-graphic-1024x500.png`).
+
+Watch (`:app`):
+- Replaced: `res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml`,
+  `ic_voxara_status.xml` (notification small icon for the dosimeter, alerts and the watchdog
+  prompt, the ongoing-activity static icon, and both complications' icons),
+  `res/mipmap-anydpi/ic_launcher.xml` + `ic_launcher_round.xml` (now with a monochrome layer).
+- Created: `res/drawable/ic_launcher_monochrome.xml`; tile previews `res/drawable-nodpi/` and
+  `res/drawable-round-nodpi/` `tile_preview_dose.png`, `tile_preview_listening.png` (a drawn likeness
+  of each tile's real layout and copy; the old preview was the template's "Hello, Tile!").
+- Deleted: `res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher{,_round}.webp` (10 Android Studio robot
+  rasters, never used at minSdk 30), `res/drawable/splash_icon.xml` (Android robot),
+  `res/drawable/tile_preview.png`.
+- Modified: `AndroidManifest.xml` (`android:roundIcon`; each tile points at its own preview),
+  `res/values/styles.xml` (splash icon → `@drawable/ic_launcher_foreground`), `lint.xml` (removed the
+  IconLocation ignore for the deleted preview).
+
+Phone (`:phone`):
+- Created: `res/mipmap-anydpi/ic_launcher.xml` + `ic_launcher_round.xml` (adaptive with monochrome),
+  `res/drawable/ic_launcher_{background,foreground,monochrome}.xml`, `res/drawable/ic_voxara_status.xml`
+  (mirrored-alert notification), `res/values-v31/themes.xml` + `res/values-night-v31/themes.xml`
+  (Android 12+ splash: mark on `@color/vox_background`).
+- Deleted: `res/drawable/ic_voxara.xml` (a generic warning circle used as launcher and notification icon).
+- Modified: `AndroidManifest.xml` (`@mipmap/ic_launcher` + `roundIcon`), `MirroredAlerts.kt`
+  (`R.drawable.ic_voxara_status`).
+
+Not changed: `VoxIcons` (shared-ui) has no app-logo icon. `Waves` is the generic "sound" icon used
+across many screens, including the welcome steps, so the in-app set stays as it is. The Glance widget
+has no preview image; the picker shows the new app icon.
+
+### Deviations from the brief
+- Phone adaptive icons are in `mipmap-anydpi`, not `mipmap-anydpi-v26`: with minSdk 28 lint reports
+  the `-v26` folder as ObsoleteSdkInt (a new warning). The behaviour is identical on every supported
+  device.
+- One Play icon is enough: phone and watch share the applicationId, so they share one Play listing.
+  `play-icon-wear-512.png` (the watch's bigger mark) exists only in case a separate Wear listing is
+  ever made.
+- Splash and launcher foreground are the same drawable (one fewer resource to keep in sync).
+
+### How to regenerate
+```sh
+npm install --prefix <some-dir> @resvg/resvg-js         # once, outside the repo
+NODE_PATH=<some-dir>/node_modules python docs/design/icons/tools/final.py
+```
+It rewrites the source SVGs, every VectorDrawable and adaptive-icon XML above, the tile previews, the
+store PNGs and `final/preview.png`. The preview is rendered from the VectorDrawable XML that ships
+(parsed back into SVG), so it shows what is installed. Edit the generator, not the generated XML.
+After moving resource folders, run `./gradlew :phone:clean` (a stale incremental merge reported
+`mipmap/ic_launcher not found` once).
+
+### Results
+- Unit tests: `:shared` **101/101**, `:app` **124/124**, `:phone` **38/38** ✅.
+- `:app:assembleDebug` ✅, `:phone:assembleDebug` ✅.
+- `:app:lintDebug` ✅ 0 errors, 170 warnings (172 before: SquareAndRoundTilePreviews fixed, unused
+  `ic_launcher_round` fixed). `:phone:lintDebug` ✅ 0 errors, 80 warnings (same set as before). No
+  IconLauncherShape, IconMissingDensityFolder, MonochromeLauncherIcon or other icon warnings.
+
+### Still to check on a real Galaxy Watch 7 and a phone
+- One UI launcher masks (squircle) and One UI's own icon frame on the phone; Samsung's "icon frames"
+  setting can add a frame around adaptive icons.
+- Themed icons: One UI 6+/7 supports them via the monochrome layer; check the tint on the real
+  wallpaper colours.
+- Galaxy Watch app list (One UI Watch): the round mask and the size at 40 mm and 44 mm; the splash
+  through core-splashscreen on Wear OS 5 (API 34+ uses the platform splash with the same drawable).
+- Status bar and notification shade on both devices: the 24 dp silhouette at real density, and the
+  ongoing-activity chip on the watch face.
+- Complications: the monochrome image on a few watch faces (some draw it very small).
+- The tile picker: the previews are drawn likenesses with example values, not captures of the live
+  tile.
