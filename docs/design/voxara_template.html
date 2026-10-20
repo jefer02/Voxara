@@ -1,0 +1,1976 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxara — Salud Auditiva para Android y Wear OS</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tipografías: Plus Jakarta Sans (Editorial UI) + JetBrains Mono (Telemetría Tabular) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       VARIABLES DE DISEÑO: PRECISIÓN EDITORIAL + COLOR PRIMARIO BIO-REACTIVO
+       ========================================================================== */
+    :root {
+      /* Color Primario Insignia Seleccionable por el Usuario */
+      --brand-primary: #00E5BF;
+      --brand-primary-rgb: 0, 229, 191;
+      --brand-secondary: #6366F1;
+
+      /* Color Semántico Activo (Cambia automáticamente según el nivel de dB) */
+      --active-accent: #00E5BF;
+      --active-accent-soft: rgba(0, 229, 191, 0.14);
+      --active-accent-glow: rgba(0, 229, 191, 0.32);
+
+      /* Estados Acústicos OMS */
+      --color-warning: #FFB800;
+      --color-danger: #FF2A6D;
+
+      /* Tema Claro Editorial (Estilo Apple Health / Material You Clean) */
+      --studio-bg: #E6E8F0;
+      --studio-grid: rgba(15, 23, 42, 0.05);
+      --toolbar-bg: rgba(255, 255, 255, 0.86);
+      --toolbar-border: rgba(15, 23, 42, 0.08);
+
+      --app-bg: #F3F5F9;
+      --app-card: #FFFFFF;
+      --app-card-subtle: #EBF0F7;
+      --app-border: rgba(15, 23, 42, 0.07);
+      --app-text: #0F172A;
+      --app-text-muted: #64748B;
+      --app-nav: rgba(255, 255, 255, 0.90);
+      --capsule-inactive: rgba(15, 23, 42, 0.10);
+    }
+
+    html.dark {
+      /* Tema Oscuro OLED Premium */
+      --studio-bg: #07090E;
+      --studio-grid: rgba(255, 255, 255, 0.035);
+      --toolbar-bg: rgba(18, 22, 33, 0.84);
+      --toolbar-border: rgba(255, 255, 255, 0.10);
+
+      --app-bg: #090B10;
+      --app-card: #131722;
+      --app-card-subtle: #1B2030;
+      --app-border: rgba(255, 255, 255, 0.08);
+      --app-text: #F8FAFC;
+      --app-text-muted: #8A94A6;
+      --app-nav: rgba(16, 20, 30, 0.88);
+      --capsule-inactive: rgba(255, 255, 255, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--studio-bg);
+      background-image:
+        radial-gradient(circle at 50% 0%, var(--active-accent-soft), transparent 55%),
+        radial-gradient(var(--studio-grid) 1px, transparent 1px);
+      background-size: 100% 100%, 22px 22px;
+      color: var(--app-text);
+      min-height: 100vh;
+      transition: background-color 0.4s ease, color 0.35s ease;
+      overflow-x: hidden;
+    }
+
+    .tabular-nums {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    /* ==========================================================================
+       BARRA SUPERIOR DE SIMULACIÓN (STUDIO CONTROL BAR)
+       ========================================================================== */
+    .studio-toolbar {
+      background: var(--toolbar-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--toolbar-border);
+      box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.25);
+      transition: all 0.35s ease;
+    }
+
+    input[type="range"].db-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 130px;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-primary) 58%, #FFB800 76%, #FF2A6D 100%);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"].db-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      border: 2px solid var(--active-accent);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      cursor: grab;
+      transition: transform 0.15s ease, border-color 0.3s ease;
+    }
+
+    input[type="range"].db-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .preset-pill {
+      background: var(--app-card-subtle);
+      color: var(--app-text);
+      border: 1px solid var(--app-border);
+      transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .preset-pill:hover {
+      transform: translateY(-1px);
+    }
+
+    .preset-pill.active {
+      background: var(--active-accent);
+      color: #05080D;
+      border-color: transparent;
+      font-weight: 700;
+      box-shadow: 0 4px 14px var(--active-accent-glow);
+    }
+
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .color-swatch.active {
+      transform: scale(1.22);
+      border-color: #FFFFFF;
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    /* ==========================================================================
+       DISPOSITIVO 1: SMARTPHONE ANDROID PREMIUM (SIN DYNAMIC ISLAND)
+       ========================================================================== */
+    .android-chassis {
+      width: 392px;
+      height: 804px;
+      border-radius: 48px;
+      background: linear-gradient(145deg, #2D3242 0%, #141720 50%, #0D0F16 100%);
+      padding: 11px;
+      position: relative;
+      box-shadow:
+        0 35px 80px -15px rgba(0, 0, 0, 0.6),
+        0 0 45px var(--active-accent-soft),
+        inset 0 1px 2px rgba(255, 255, 255, 0.22);
+      flex-shrink: 0;
+      transition: box-shadow 0.5s ease;
+    }
+
+    /* Botones físicos laterales de Android (Derecha: Volumen y Encendido) */
+    .android-btn-vol {
+      position: absolute;
+      right: -3px;
+      top: 170px;
+      width: 3px;
+      height: 86px;
+      background: #3B4254;
+      border-radius: 0 3px 3px 0;
+    }
+
+    .android-btn-pwr {
+      position: absolute;
+      right: -3px;
+      top: 276px;
+      width: 3px;
+      height: 48px;
+      background: var(--active-accent);
+      border-radius: 0 3px 3px 0;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .android-screen {
+      width: 100%;
+      height: 100%;
+      border-radius: 38px;
+      background-color: var(--app-bg);
+      color: var(--app-text);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: background-color 0.35s ease, color 0.35s ease;
+    }
+
+    /* Tarjetas con precisión editorial */
+    .vox-card {
+      background-color: var(--app-card);
+      border: 1px solid var(--app-border);
+      border-radius: 22px;
+      box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.08);
+      transition: background-color 0.35s ease, border-color 0.35s ease;
+    }
+
+    /* Hero Card del Teléfono con Lienzo Canvas 60 FPS integrado */
+    .hero-acoustic-card {
+      position: relative;
+      overflow: hidden;
+      background: var(--app-card);
+      border: 1px solid var(--app-border);
+      border-radius: 26px;
+      box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.16);
+    }
+
+    #phoneWaveCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.85;
+    }
+
+    /* Cápsulas del Dosímetro Acústico */
+    .capsule-segment {
+      flex: 1;
+      border-radius: 999px;
+      background-color: var(--capsule-inactive);
+      transition: background-color 0.14s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Switch Fluido */
+    .vox-switch {
+      width: 48px;
+      height: 28px;
+      border-radius: 999px;
+      background-color: var(--capsule-inactive);
+      position: relative;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      flex-shrink: 0;
+    }
+
+    .vox-switch.on {
+      background-color: var(--active-accent);
+      box-shadow: 0 0 14px var(--active-accent-glow);
+    }
+
+    .vox-switch-Thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background-color: #FFFFFF;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .vox-switch.on .vox-switch-Thumb {
+      transform: translateX(20px);
+      background-color: #05080D;
+    }
+
+    /* Transiciones de Pestañas de la App de Android */
+    .android-tab-view {
+      position: absolute;
+      inset: 0;
+      padding: 4px 16px 20px 16px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+      pointer-events: none;
+      transition: opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1), transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .android-tab-view::-webkit-scrollbar {
+      display: none;
+    }
+
+    .android-tab-view.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    /* Barra de Navegación Inferior Android */
+    .android-bottom-nav {
+      background: var(--app-nav);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--app-border);
+      padding: 8px 14px 18px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      z-index: 30;
+    }
+
+    .nav-item-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--app-text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.25s ease;
+    }
+
+    .nav-pill-indicator {
+      padding: 4px 18px;
+      border-radius: 999px;
+      transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.2s ease;
+    }
+
+    .nav-item-btn.active {
+      color: var(--app-text);
+    }
+
+    .nav-item-btn.active .nav-pill-indicator {
+      background-color: var(--active-accent-soft);
+      color: var(--active-accent);
+    }
+
+    /* Hoja Inferior de Emparejamiento (VoxBuds Pro Sheet) */
+    .android-sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(4, 6, 12, 0.55);
+      backdrop-filter: blur(6px);
+      z-index: 40;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.32s ease;
+      display: flex;
+      align-items: flex-end;
+      padding: 12px;
+    }
+
+    .android-sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .android-sheet-modal {
+      width: 100%;
+      background: var(--app-card);
+      border: 1px solid var(--app-border);
+      border-radius: 30px;
+      padding: 20px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+      transform: translateY(110%);
+      transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .android-sheet-backdrop.open .android-sheet-modal {
+      transform: translateY(0);
+    }
+
+    /* ==========================================================================
+       DISPOSITIVO 2: SMARTWATCH WEAR OS CON MOTOR CANVAS 60 FPS MEJORADO
+       ========================================================================== */
+    .watch-showcase {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .watch-strap {
+      width: 164px;
+      height: 68px;
+      background: linear-gradient(90deg, #0E1017 0%, #1F2433 50%, #0E1017 100%);
+      position: relative;
+      z-index: 1;
+      box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.85);
+    }
+
+    .watch-strap.top {
+      border-radius: 26px 26px 0 0;
+      margin-bottom: -16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .watch-strap.bottom {
+      border-radius: 0 0 26px 26px;
+      margin-top: -16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .watch-case {
+      width: 376px;
+      height: 376px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #31374B, #12151F 70%, #080A0F 100%);
+      padding: 15px;
+      position: relative;
+      z-index: 2;
+      box-shadow:
+        0 30px 75px rgba(0, 0, 0, 0.75),
+        0 0 55px var(--active-accent-glow),
+        inset 0 2px 4px rgba(255, 255, 255, 0.22),
+        inset 0 -4px 8px rgba(0, 0, 0, 0.9);
+      transition: box-shadow 0.5s ease;
+    }
+
+    /* Corona Rotatoria Física */
+    .watch-crown {
+      position: absolute;
+      right: -13px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 15px;
+      height: 56px;
+      border-radius: 6px;
+      background: repeating-linear-gradient(
+        to bottom,
+        #454D66 0px,
+        #454D66 3px,
+        #191D28 3px,
+        #191D28 6px
+      );
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 4px 0 12px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+      transition: filter 0.2s ease, transform 0.15s ease;
+    }
+
+    .watch-crown:hover {
+      filter: brightness(1.25);
+    }
+
+    .watch-crown:active {
+      transform: translateY(-50%) scale(0.94);
+    }
+
+    .watch-side-btn {
+      position: absolute;
+      right: -8px;
+      top: 28%;
+      width: 9px;
+      height: 34px;
+      border-radius: 4px;
+      background: linear-gradient(to bottom, #363C50, #171A24);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      cursor: pointer;
+    }
+
+    /* Pantalla Circular AMOLED del Reloj */
+    .watch-screen {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #030407;
+      color: #FFFFFF;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 20px 18px;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.95);
+    }
+
+    /* Cristal Zafiro 2.5D */
+    .watch-screen::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0) 38%);
+      pointer-events: none;
+      z-index: 30;
+    }
+
+    /* Lienzo de Ondas Armónicas a 60 FPS en el Reloj */
+    #watchAcousticCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Anillo Perimetral SVG (Bezel Progress) */
+    .bezel-ring {
+      position: absolute;
+      inset: 6px;
+      width: calc(100% - 12px);
+      height: calc(100% - 12px);
+      transform: rotate(-225deg);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .bezel-track {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.07);
+      stroke-width: 5;
+      stroke-dasharray: 760;
+      stroke-dashoffset: 190;
+      stroke-linecap: round;
+    }
+
+    .bezel-progress {
+      fill: none;
+      stroke: var(--active-accent);
+      stroke-width: 5.5;
+      stroke-dasharray: 760;
+      stroke-dashoffset: 560;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 8px var(--active-accent));
+      transition: stroke-dashoffset 0.25s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.35s ease;
+    }
+
+    /* Vistas Internas del Reloj Wear OS */
+    .watch-view {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 46px 24px 36px;
+      opacity: 0;
+      transform: scale(0.88) translateY(10px);
+      pointer-events: none;
+      transition: all 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 10;
+    }
+
+    .watch-view.active {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;
+    }
+
+    /* Toast Circular con Blur Gaussiano del Reloj */
+    .watch-toast {
+      position: absolute;
+      inset: 12px;
+      border-radius: 50%;
+      background: rgba(7, 9, 16, 0.92);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      z-index: 28;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 26px;
+      text-align: center;
+      opacity: 0;
+      transform: scale(0.78);
+      pointer-events: none;
+      transition: all 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border: 1.5px solid var(--active-accent);
+    }
+
+    .watch-toast.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    @keyframes pulseDotAnim {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.45); opacity: 0.55; }
+    }
+
+    .pulse-dot {
+      animation: pulseDotAnim 1.6s infinite;
+    }
+  </style>
+</head>
+
+<body class="flex flex-col items-center justify-start py-4 px-3 md:px-6 gap-5">
+
+  <!-- ========================================================================
+       1. BARRA SUPERIOR DE SIMULACIÓN Y PERSONALIZACIÓN EN TIEMPO REAL
+       ======================================================================== -->
+  <header class="studio-toolbar rounded-2xl lg:rounded-full px-4 py-2.5 flex flex-wrap items-center justify-center gap-3 md:gap-4 max-w-6xl w-full z-50">
+    <!-- Marca -->
+    <div class="flex items-center gap-2 pr-3 border-r border-slate-500/20">
+      <div id="brandLogoBadge" class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-950 font-extrabold shadow-sm"
+           style="background: var(--brand-primary); box-shadow: 0 0 14px var(--active-accent-glow);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>
+        </svg>
+      </div>
+      <div>
+        <span class="text-xs font-extrabold tracking-tight block leading-none">VOXARA</span>
+        <span class="text-[9px] font-semibold opacity-60 uppercase tracking-wider">Android + Wear OS</span>
+      </div>
+    </div>
+
+    <!-- Slider de Presión Acústica -->
+    <div class="flex items-center gap-2">
+      <span class="text-[11px] font-semibold opacity-75">Entrada:</span>
+      <input type="range" id="dbSlider" class="db-slider" min="30" max="110" value="62" />
+      <span id="sliderDbReadout" class="tabular-nums text-xs font-bold w-12 text-right">62 dB</span>
+    </div>
+
+    <!-- Escenarios Rápidos -->
+    <div class="flex items-center gap-1.5">
+      <button onclick="setScenario(42, this)" class="preset-pill px-2.5 py-1 rounded-full text-[11px] font-semibold">
+        Biblioteca 42dB
+      </button>
+      <button onclick="setScenario(62, this)" class="preset-pill active px-2.5 py-1 rounded-full text-[11px] font-semibold">
+        Cafetería 62dB
+      </button>
+      <button onclick="setScenario(84, this)" class="preset-pill px-2.5 py-1 rounded-full text-[11px] font-semibold">
+        Tráfico 84dB
+      </button>
+      <button onclick="setScenario(96, this)" class="preset-pill px-2.5 py-1 rounded-full text-[11px] font-semibold">
+        Concierto 96dB
+      </button>
+    </div>
+
+    <!-- Selector de Color Primario Insignia (4 Colores) -->
+    <div class="flex items-center gap-1.5 px-2.5 border-l border-r border-slate-500/20" title="Cambiar Color Primario">
+      <span class="text-[10px] font-semibold opacity-70 mr-0.5">Color:</span>
+      <button onclick="setPrimaryBrandColor('#00E5BF', '0, 229, 191', this)"
+              class="color-swatch active" style="background-color: #00E5BF; color: #00E5BF;" title="Bio-Turquesa"></button>
+      <button onclick="setPrimaryBrandColor('#3B82F6', '59, 130, 246', this)"
+              class="color-swatch" style="background-color: #3B82F6; color: #3B82F6;" title="Azul Cobalto Real"></button>
+      <button onclick="setPrimaryBrandColor('#8B5CF6', '139, 92, 246', this)"
+              class="color-swatch" style="background-color: #8B5CF6; color: #8B5CF6;" title="Índigo Eléctrico"></button>
+      <button onclick="setPrimaryBrandColor('#10B981', '16, 185, 129', this)"
+              class="color-swatch" style="background-color: #10B981; color: #10B981;" title="Esmeralda Puro"></button>
+    </div>
+
+    <!-- Controles de Audífonos, Micrófono Real y Tema Claro/Oscuro -->
+    <div class="flex items-center gap-2">
+      <button id="topHeadphoneBtn" onclick="toggleHeadphones()"
+              class="px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95"
+              style="background: var(--active-accent); color: #05080D; box-shadow: 0 4px 14px var(--active-accent-glow);">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>
+        <span id="topHeadphoneBtnText">Conectar VoxBuds Pro</span>
+      </button>
+
+      <button id="topMicBtn" onclick="toggleRealMic()"
+              class="preset-pill px-3 py-1.5 rounded-full text-[11px] font-semibold flex items-center gap-1.5">
+        <span id="micDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+        <span id="topMicBtnText">Micrófono Real</span>
+      </button>
+
+      <button onclick="toggleThemeMode()"
+              class="preset-pill w-8 h-8 rounded-full flex items-center justify-center"
+              title="Alternar Modo Oscuro OLED / Modo Claro Editorial">
+        <svg id="iconSun" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg id="iconMoon" class="hidden w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       2. ESCENARIO DUAL SINCRONIZADO: APP ANDROID + RELOJ WEAR OS
+       ======================================================================== -->
+  <main class="flex flex-col lg:flex-row items-center justify-center gap-10 xl:gap-16 w-full max-w-6xl pb-6">
+
+    <!-- ======================================================================
+         DISPOSITIVO 1: SMARTPHONE ANDROID (SIN DYNAMIC ISLAND, BARRA LIMPIA)
+         ====================================================================== -->
+    <div class="android-chassis">
+      <div class="android-btn-vol"></div>
+      <div class="android-btn-pwr" title="Conectar / Desconectar VoxBuds Pro" onclick="toggleHeadphones()"></div>
+
+      <div class="android-screen">
+
+        <!-- BARRA DE ESTADO SUPERIOR LIMPIA DE ANDROID (SIN DYNAMIC ISLAND) -->
+        <div class="w-full pt-3.5 pb-2 px-6 flex items-center justify-between text-xs font-semibold z-20">
+          <span id="androidClock" class="tabular-nums font-bold tracking-tight">09:41</span>
+          <div class="flex items-center gap-1.5 opacity-85">
+            <!-- Icono Bluetooth cuando los audífonos están activos -->
+            <svg id="statusBtIcon" class="hidden w-3.5 h-3.5 text-[#6366F1]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
+            </svg>
+            <!-- Wi-Fi -->
+            <svg width="14" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/>
+            </svg>
+            <!-- Señal 5G -->
+            <svg width="14" height="11" viewBox="0 0 17 11" fill="currentColor">
+              <rect x="0" y="7" width="3" height="4" rx="1"/>
+              <rect x="4.5" y="5" width="3" height="6" rx="1"/>
+              <rect x="9" y="2.5" width="3" height="8.5" rx="1"/>
+              <rect x="13.5" y="0" width="3" height="11" rx="1"/>
+            </svg>
+            <!-- Batería -->
+            <div class="w-[21px] h-[11px] rounded-[3px] border border-current p-[1.5px] flex items-center">
+              <div class="w-full h-full bg-current rounded-[1px]"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CABECERA EDITORIAL DE LA APP ANDROID -->
+        <div class="px-5 pt-1 pb-2.5 flex items-center justify-between z-20">
+          <div>
+            <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest" style="color: var(--active-accent);">
+              <span class="w-1.5 h-1.5 rounded-full pulse-dot" style="background: var(--active-accent);"></span>
+              <span>Voxara • Wear OS Sync</span>
+            </div>
+            <h1 id="androidHeaderTitle" class="text-2xl font-extrabold tracking-tight leading-tight mt-0.5">
+              Monitor Acústico
+            </h1>
+          </div>
+
+          <!-- Píldora Interactiva de Fuente (Entorno vs VoxBuds Pro) -->
+          <button id="androidSourcePill" onclick="toggleHeadphones()"
+                  class="px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border transition active:scale-95"
+                  style="background-color: var(--app-card-subtle); border-color: var(--app-border);">
+            <span id="androidSourceDot" class="w-2 h-2 rounded-full" style="background-color: var(--active-accent);"></span>
+            <span id="androidSourceLabel">Entorno</span>
+          </button>
+        </div>
+
+        <!-- ==================================================================
+             CONTENEDOR CENTRAL DE LAS 3 PANTALLAS DE LA APP ANDROID
+             ================================================================== -->
+        <div class="relative flex-1 w-full overflow-hidden">
+
+          <!-- ================================================================
+               PANTALLA 1: MONITOR ACÚSTICO EN VIVO (CON CANVAS 60 FPS)
+               ================================================================ -->
+          <section id="androidTab0" class="android-tab-view active">
+
+            <!-- HERO CARD: Lienzo de Ondas Armónicas a 60 FPS + Cápsulas Segmentadas -->
+            <div class="hero-acoustic-card p-4 flex flex-col gap-3">
+              <!-- Canvas Reactivo de Fondo en la Tarjeta Principal -->
+              <canvas id="phoneWaveCanvas" width="340" height="210"></canvas>
+
+              <div class="relative z-10 flex items-start justify-between">
+                <div>
+                  <span id="phoneHeroSubtitle" class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--app-text-muted);">
+                    Presión Sonora Ambiental
+                  </span>
+                  <div class="flex items-baseline gap-1.5 mt-0.5">
+                    <span id="phoneMainDb" class="tabular-nums text-[46px] font-extrabold tracking-tight leading-none">
+                      62
+                    </span>
+                    <span class="text-base font-bold" style="color: var(--app-text-muted);">dB</span>
+                  </div>
+                </div>
+
+                <!-- Insignia Semántica de Estado -->
+                <div id="phoneSafetyBadge"
+                     class="px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border"
+                     style="background-color: var(--active-accent-soft); color: var(--active-accent); border-color: var(--active-accent);">
+                  <span id="phoneSafetyText">Entorno Seguro</span>
+                </div>
+              </div>
+
+              <!-- Medidor de 26 Cápsulas Segmentadas con Física Elástica -->
+              <div class="relative z-10 flex flex-col gap-1.5 pt-1">
+                <div id="phoneCapsulesRow" class="h-10 w-full flex items-center justify-between gap-[4px]">
+                  <!-- Generado dinámicamente (26 cápsulas) -->
+                </div>
+                <div class="flex justify-between text-[10px] font-semibold tabular-nums" style="color: var(--app-text-muted);">
+                  <span>30 dB</span>
+                  <span>60 dB</span>
+                  <span>80 dB (Umbral OMS)</span>
+                  <span>110 dB</span>
+                </div>
+              </div>
+
+              <!-- Pie de Tarjeta Hero: Tiempo Máximo de Exposición -->
+              <div class="relative z-10 pt-2 border-t flex items-center justify-between text-xs" style="border-color: var(--app-border);">
+                <span style="color: var(--app-text-muted);">Exposición máxima OMS:</span>
+                <strong id="phoneMaxTimeText" class="tabular-nums font-bold">Ilimitada</strong>
+              </div>
+            </div>
+
+            <!-- BANNER DE PROTECCIÓN ACTIVA (Visible cuando el Escudo atenúa un pico en audífonos) -->
+            <div id="attenuationBanner" class="hidden vox-card p-3.5 border flex flex-col gap-2"
+                 style="background-color: var(--active-accent-soft); border-color: var(--active-accent);">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-950 font-bold"
+                       style="background-color: var(--active-accent);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-extrabold">Escudo de Audífonos Activo</h4>
+                    <p class="text-[11px]" style="color: var(--app-text-muted);">Pico peligroso interceptado en tiempo real</p>
+                  </div>
+                </div>
+                <span id="attenuationDeltaBadge" class="tabular-nums text-xs font-extrabold px-2.5 py-1 rounded-full text-slate-950"
+                      style="background-color: var(--active-accent);">
+                  -18 dB Atenuados
+                </span>
+              </div>
+              <div class="flex items-center justify-between text-[11px] pt-1 border-t border-white/10">
+                <span style="color: var(--app-text-muted);">Señal original: <strong id="rawDbReadout" class="tabular-nums">96 dB</strong></span>
+                <span class="font-bold" style="color: var(--active-accent);">En tu tímpano: <strong id="protectedDbReadout" class="tabular-nums">78 dB</strong></span>
+              </div>
+            </div>
+
+            <!-- Métricas de Precisión (LAeq, Pico Máximo, Balance L/R) -->
+            <div class="grid grid-cols-3 gap-2.5">
+              <div class="vox-card p-3 flex flex-col justify-between">
+                <span class="text-[10px] font-bold uppercase" style="color: var(--app-text-muted);">Promedio LAeq</span>
+                <div class="flex items-baseline gap-1 mt-1">
+                  <strong id="phoneLaeqVal" class="tabular-nums text-lg font-extrabold">60</strong>
+                  <span class="text-[11px] font-semibold" style="color: var(--app-text-muted);">dB</span>
+                </div>
+                <span class="text-[10px] text-emerald-400 font-semibold mt-0.5">Óptimo hoy</span>
+              </div>
+
+              <div class="vox-card p-3 flex flex-col justify-between">
+                <span class="text-[10px] font-bold uppercase" style="color: var(--app-text-muted);">Pico Máx.</span>
+                <div class="flex items-baseline gap-1 mt-1">
+                  <strong id="phonePeakVal" class="tabular-nums text-lg font-extrabold">74</strong>
+                  <span class="text-[11px] font-semibold" style="color: var(--app-text-muted);">dB</span>
+                </div>
+                <span class="text-[10px] font-semibold mt-0.5" style="color: var(--app-text-muted);">Registrado</span>
+              </div>
+
+              <div class="vox-card p-3 flex flex-col justify-between">
+                <span class="text-[10px] font-bold uppercase" style="color: var(--app-text-muted);">Balance L/R</span>
+                <div class="flex items-baseline gap-1 mt-1">
+                  <strong id="phoneQuickBalance" class="tabular-nums text-sm font-extrabold">61 / 62</strong>
+                </div>
+                <span class="text-[10px] font-semibold mt-0.5" style="color: var(--active-accent);">Simétrico</span>
+              </div>
+            </div>
+
+            <!-- Control Rápido: Escudo Acústico Automático -->
+            <div class="vox-card p-3.5 flex items-center justify-between">
+              <div class="flex items-center gap-3 pr-2">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center"
+                     style="background-color: var(--active-accent-soft); color: var(--active-accent);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="text-xs font-bold">Escudo Acústico Automático</div>
+                  <div class="text-[11px]" style="color: var(--app-text-muted);">
+                    Protege el oído limitando los audífonos a <span id="quickShieldLimitLabel" class="tabular-nums font-semibold">78 dB</span>
+                  </div>
+                </div>
+              </div>
+              <div id="phoneShieldSwitch" class="vox-switch on" onclick="toggleAutoShield()">
+                <div class="vox-switch-Thumb"></div>
+              </div>
+            </div>
+
+            <!-- Equivalencia Acústica en el Mundo Real -->
+            <div class="vox-card p-3.5 flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold">Referencia acústica actual</div>
+                <div id="phoneContextDesc" class="text-[11px] mt-0.5" style="color: var(--app-text-muted);">
+                  Conversación normal o cafetería tranquila
+                </div>
+              </div>
+              <button onclick="capVolumeInstant()"
+                      class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition active:scale-95"
+                      style="background-color: var(--app-card-subtle); color: var(--active-accent);">
+                Atenuar -15dB
+              </button>
+            </div>
+          </section>
+
+          <!-- ================================================================
+               PANTALLA 2: AUDÍFONOS (VOXBUDS PRO, BALANCE L/R & EQ ANTI-FATIGA)
+               ================================================================ -->
+          <section id="androidTab1" class="android-tab-view">
+
+            <!-- Tarjeta de Estado de VoxBuds Pro -->
+            <div class="vox-card p-4 flex flex-col gap-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-2xl flex items-center justify-center"
+                       style="background-color: var(--active-accent-soft); color: var(--active-accent);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+                      <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-sm font-extrabold">VoxBuds Pro</h3>
+                      <span id="tabHpConnBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            style="background-color: var(--app-card-subtle); color: var(--app-text-muted);">
+                        En espera
+                      </span>
+                    </div>
+                    <p id="tabHpSubtitle" class="text-[11px] mt-0.5" style="color: var(--app-text-muted);">
+                      Conecta para monitoreo intrauricular binaural
+                    </p>
+                  </div>
+                </div>
+
+                <button id="tabHpActionBtn" onclick="toggleHeadphones()"
+                        class="px-3 py-1.5 rounded-full text-xs font-bold text-slate-950 transition active:scale-95"
+                        style="background-color: var(--active-accent);">
+                  Conectar
+                </button>
+              </div>
+
+              <!-- Telemetría de Batería Individual (L / R / Estuche) -->
+              <div class="grid grid-cols-3 gap-2 pt-1">
+                <div class="p-2.5 rounded-xl text-center" style="background-color: var(--app-card-subtle);">
+                  <span class="text-[10px] font-bold block" style="color: var(--app-text-muted);">OÍDO IZQ (L)</span>
+                  <strong class="tabular-nums text-xs font-extrabold mt-0.5 block">94%</strong>
+                </div>
+                <div class="p-2.5 rounded-xl text-center" style="background-color: var(--app-card-subtle);">
+                  <span class="text-[10px] font-bold block" style="color: var(--app-text-muted);">OÍDO DER (R)</span>
+                  <strong class="tabular-nums text-xs font-extrabold mt-0.5 block">92%</strong>
+                </div>
+                <div class="p-2.5 rounded-xl text-center" style="background-color: var(--app-card-subtle);">
+                  <span class="text-[10px] font-bold block" style="color: var(--app-text-muted);">ESTUCHE</span>
+                  <strong class="tabular-nums text-xs font-extrabold mt-0.5 block">100%</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Balance de Presión Intrauricular Izquierdo vs Derecho -->
+            <div class="vox-card p-4 flex flex-col gap-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold">Presión Acústica Intrauricular (L / R)</span>
+                <span class="text-[10px] font-bold uppercase" style="color: var(--active-accent);">Binaural</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div class="p-3 rounded-xl" style="background-color: var(--app-card-subtle);">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-semibold" style="color: var(--app-text-muted);">Canal Izq.</span>
+                    <strong id="tabLeftEarDb" class="tabular-nums font-extrabold">61 dB</strong>
+                  </div>
+                  <div class="w-full h-1.5 rounded-full bg-slate-500/20 mt-2 overflow-hidden">
+                    <div id="tabLeftEarBar" class="h-full rounded-full transition-all duration-200"
+                         style="width: 45%; background-color: var(--active-accent);"></div>
+                  </div>
+                </div>
+
+                <div class="p-3 rounded-xl" style="background-color: var(--app-card-subtle);">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-semibold" style="color: var(--app-text-muted);">Canal Der.</span>
+                    <strong id="tabRightEarDb" class="tabular-nums font-extrabold">62 dB</strong>
+                  </div>
+                  <div class="w-full h-1.5 rounded-full bg-slate-500/20 mt-2 overflow-hidden">
+                    <div id="tabRightEarBar" class="h-full rounded-full transition-all duration-200"
+                         style="width: 47%; background-color: var(--active-accent);"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selector de Techo del Limitador Inteligente (75, 78, 82 dB) -->
+            <div class="vox-card p-4 flex flex-col gap-2.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold">Techo del Limitador Inteligente</div>
+                  <div class="text-[11px]" style="color: var(--app-text-muted);">Máximo permitido en tus audífonos</div>
+                </div>
+                <span id="selectedCeilingLabel" class="tabular-nums text-xs font-extrabold" style="color: var(--active-accent);">78 dB</span>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2">
+                <button onclick="setLimiterCeiling(75, this)" class="ceiling-btn py-2 rounded-xl text-xs font-bold tabular-nums transition"
+                        style="background-color: var(--app-card-subtle);">
+                  75 dB (Suave)
+                </button>
+                <button onclick="setLimiterCeiling(78, this)" class="ceiling-btn py-2 rounded-xl text-xs font-bold tabular-nums text-slate-950 transition"
+                        style="background-color: var(--active-accent);">
+                  78 dB (OMS)
+                </button>
+                <button onclick="setLimiterCeiling(82, this)" class="ceiling-btn py-2 rounded-xl text-xs font-bold tabular-nums transition"
+                        style="background-color: var(--app-card-subtle);">
+                  82 dB (Estándar)
+                </button>
+              </div>
+            </div>
+
+            <!-- Ecualizador Anti-Fatiga de Agudos (3kHz–6kHz) -->
+            <div class="vox-card p-4 flex flex-col gap-2.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold">Filtro Anti-Fatiga Coclear (3–6 kHz)</div>
+                  <div class="text-[11px]" style="color: var(--app-text-muted);">Suaviza frecuencias estridentes en audífonos</div>
+                </div>
+                <button id="eqToggleBtn" onclick="toggleAntiFatigueEq()"
+                        class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase transition"
+                        style="background-color: var(--active-accent-soft); color: var(--active-accent);">
+                  Activo
+                </button>
+              </div>
+
+              <!-- 8 Bandas Interactivas de Frecuencia -->
+              <div id="eqBandsContainer" class="h-14 flex items-end justify-between gap-2 pt-2 px-1">
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar w-full rounded-t-md transition-all duration-300" style="height: 24px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums opacity-60">125</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar w-full rounded-t-md transition-all duration-300" style="height: 28px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums opacity-60">250</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar w-full rounded-t-md transition-all duration-300" style="height: 30px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums opacity-60">500</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar w-full rounded-t-md transition-all duration-300" style="height: 26px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums opacity-60">1k</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar eq-treble w-full rounded-t-md transition-all duration-300" style="height: 16px; background-color: var(--brand-secondary);"></div>
+                  <span class="text-[9px] tabular-nums font-bold">3k</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar eq-treble w-full rounded-t-md transition-all duration-300" style="height: 14px; background-color: var(--brand-secondary);"></div>
+                  <span class="text-[9px] tabular-nums font-bold">4k</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar eq-treble w-full rounded-t-md transition-all duration-300" style="height: 16px; background-color: var(--brand-secondary);"></div>
+                  <span class="text-[9px] tabular-nums font-bold">6k</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="eq-bar w-full rounded-t-md transition-all duration-300" style="height: 24px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums opacity-60">12k</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+               PANTALLA 3: DOSIS OMS, HISTORIAL WEAR OS Y DESCANSO AUDITIVO
+               ================================================================ -->
+          <section id="androidTab2" class="android-tab-view">
+
+            <!-- Anillo de Dosis Acústica Diaria OMS -->
+            <div class="vox-card p-4 flex items-center justify-between gap-4">
+              <div class="relative w-20 h-20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(148, 163, 184, 0.16)" stroke-width="10" />
+                  <circle id="phoneDoseRing" cx="50" cy="50" r="40" fill="none" stroke="var(--active-accent)"
+                          stroke-width="10" stroke-linecap="round"
+                          stroke-dasharray="251.32" stroke-dashoffset="180"
+                          class="transition-all duration-300" />
+                </svg>
+                <span id="phoneDosePct" class="absolute tabular-nums text-base font-extrabold">28%</span>
+              </div>
+
+              <div class="flex-1">
+                <span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--active-accent);">Presupuesto Diario OMS</span>
+                <h3 class="text-sm font-extrabold mt-0.5">Salud Coclear Protegida</h3>
+                <p id="phoneDoseSummaryText" class="text-[11px] mt-1 leading-snug" style="color: var(--app-text-muted);">
+                  Has consumido solo el 28% de tu presupuesto seguro de ruido hoy.
+                </p>
+              </div>
+            </div>
+
+            <!-- Gráfico por Horas Sincronizado con el Reloj Wear OS -->
+            <div class="vox-card p-4 flex flex-col gap-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--app-text-muted);">
+                    Historial Sincronizado • Toca una barra
+                  </span>
+                  <h4 id="hourlySelectedTitle" class="tabular-nums text-sm font-extrabold mt-0.5">
+                    14:00 – 15:00 • 76 dB Promedio
+                  </h4>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style="background-color: var(--app-card-subtle); color: var(--active-accent);">
+                  Wear OS Sync
+                </span>
+              </div>
+
+              <div class="h-24 flex items-end justify-between gap-2.5 pt-2 px-1 border-b" style="border-color: var(--app-border);">
+                <div onclick="selectHourlyBar('08:00 – 09:00', '46 dB (Biblioteca • Reloj)')" class="flex-1 h-full flex flex-col justify-end items-center gap-1 cursor-pointer group">
+                  <div class="w-full rounded-t-md opacity-70 group-hover:opacity-100 transition-all" style="height: 30%; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums" style="color: var(--app-text-muted);">08h</span>
+                </div>
+                <div onclick="selectHourlyBar('10:00 – 11:00', '64 dB (VoxBuds Pro)')" class="flex-1 h-full flex flex-col justify-end items-center gap-1 cursor-pointer group">
+                  <div class="w-full rounded-t-md opacity-75 group-hover:opacity-100 transition-all" style="height: 48%; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums" style="color: var(--app-text-muted);">10h</span>
+                </div>
+                <div onclick="selectHourlyBar('12:00 – 13:00', '58 dB (Oficina • Reloj)')" class="flex-1 h-full flex flex-col justify-end items-center gap-1 cursor-pointer group">
+                  <div class="w-full rounded-t-md opacity-75 group-hover:opacity-100 transition-all" style="height: 40%; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums" style="color: var(--app-text-muted);">12h</span>
+                </div>
+                <div onclick="selectHourlyBar('14:00 – 15:00', '82 dB (Tráfico • Reloj)')" class="flex-1 h-full flex flex-col justify-end items-center gap-1 cursor-pointer group">
+                  <div class="w-full rounded-t-md opacity-90 group-hover:opacity-100 transition-all" style="height: 75%; background-color: #FFB800;"></div>
+                  <span class="text-[9px] tabular-nums" style="color: var(--app-text-muted);">14h</span>
+                </div>
+                <div onclick="selectHourlyBar('Ahora en vivo', `${state.effectiveDb} dB (${state.headphonesConnected ? 'VoxBuds Pro' : 'Wear OS'})`)" class="flex-1 h-full flex flex-col justify-end items-center gap-1 cursor-pointer group">
+                  <div id="phoneLiveHistoryBar" class="w-full rounded-t-md transition-all" style="height: 52%; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] font-bold" style="color: var(--active-accent);">Hoy</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Temporizador Funcional de Descanso Auditivo (15:00) -->
+            <div class="vox-card p-4 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--app-text-muted);">Recuperación Timpánica</span>
+                <div id="restTimerDisplay" class="tabular-nums text-2xl font-extrabold mt-0.5">15:00</div>
+                <span class="text-[11px]" style="color: var(--app-text-muted);">Pausa silenciosa recomendada</span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button id="restTimerBtn" onclick="toggleRestTimer()"
+                        class="px-3.5 py-2 rounded-xl text-xs font-extrabold text-slate-950 transition active:scale-95"
+                        style="background-color: var(--active-accent);">
+                  Iniciar
+                </button>
+                <button onclick="resetRestTimer()"
+                        class="p-2 rounded-xl text-xs font-bold transition"
+                        style="background-color: var(--app-card-subtle); color: var(--app-text-muted);"
+                        title="Reiniciar temporizador">
+                  ↺
+                </button>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- ==================================================================
+             HOJA DE EMPAREJAMIENTO ANDROID (CUANDO SE CONECTAN LOS AUDÍFONOS)
+             ================================================================== -->
+        <div id="androidPairSheet" class="android-sheet-backdrop" onclick="closeAndroidSheet()">
+          <div class="android-sheet-modal flex flex-col items-center text-center" onclick="event.stopPropagation()">
+            <div class="w-10 h-1 rounded-full bg-slate-500/30 mb-3"></div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest" style="color: var(--active-accent);">
+              Audio Intrauricular Detectado
+            </span>
+            <h3 class="text-lg font-extrabold mt-0.5">VoxBuds Pro</h3>
+
+            <div class="my-3.5 w-16 h-16 rounded-2xl flex items-center justify-center relative"
+                 style="background-color: var(--active-accent-soft); color: var(--active-accent);">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+              </svg>
+            </div>
+
+            <div class="w-full rounded-2xl p-3 text-left flex flex-col gap-1.5 mb-4 text-xs"
+                 style="background-color: var(--app-card-subtle);">
+              <div class="flex justify-between">
+                <span style="color: var(--app-text-muted);">Protección de oído</span>
+                <strong id="sheetProtStatus" class="font-bold" style="color: var(--active-accent);">Escudo Activo (78 dB máx.)</strong>
+              </div>
+              <div class="flex justify-between">
+                <span style="color: var(--app-text-muted);">Sincronización</span>
+                <strong class="font-bold">Android + Reloj Wear OS</strong>
+              </div>
+            </div>
+
+            <button onclick="closeAndroidSheet()"
+                    class="w-full py-2.5 rounded-xl text-xs font-extrabold text-slate-950 transition active:scale-95"
+                    style="background-color: var(--active-accent);">
+              Listo
+            </button>
+          </div>
+        </div>
+
+        <!-- BARRA DE NAVEGACIÓN INFERIOR ANDROID -->
+        <nav class="android-bottom-nav">
+          <div id="androidNav0" class="nav-item-btn active" onclick="switchAndroidTab(0)">
+            <div class="nav-pill-indicator">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>
+              </svg>
+            </div>
+            <span>Monitor</span>
+          </div>
+
+          <div id="androidNav1" class="nav-item-btn" onclick="switchAndroidTab(1)">
+            <div class="nav-pill-indicator">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+              </svg>
+            </div>
+            <span>Audífonos</span>
+          </div>
+
+          <div id="androidNav2" class="nav-item-btn" onclick="switchAndroidTab(2)">
+            <div class="nav-pill-indicator">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <span>Dosis y Salud</span>
+          </div>
+        </nav>
+
+        <!-- Barra Gestual Inferior de Android -->
+        <div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full bg-current opacity-25 z-30 pointer-events-none"></div>
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         DISPOSITIVO 2: SMARTWATCH WEAR OS (ANIMACIÓN CANVAS 60 FPS MEJORADA)
+         ====================================================================== -->
+    <div class="watch-showcase">
+      <div class="watch-strap top"></div>
+
+      <div class="watch-case" id="watchCase">
+        <!-- Corona Rotatoria Física y Botón Lateral -->
+        <div class="watch-crown" title="Haz clic para cambiar de pantalla en el reloj" onclick="nextWatchView()"></div>
+        <div class="watch-side-btn" title="Simular conexión de audífonos" onclick="toggleHeadphones()"></div>
+
+        <div class="watch-screen" id="watchScreen">
+          <!-- MOTOR CANVAS 60 FPS: Halo Respiratorio + 4 Anillos Armónicos Sinusoidales -->
+          <canvas id="watchAcousticCanvas" width="346" height="346"></canvas>
+
+          <!-- Anillo Perimetral SVG (Bezel Progress) -->
+          <svg class="bezel-ring" viewBox="0 0 340 340">
+            <circle class="bezel-track" cx="170" cy="170" r="158"></circle>
+            <circle class="bezel-progress" id="watchBezelProgress" cx="170" cy="170" r="158"></circle>
+          </svg>
+
+          <!-- Toast Circular con Blur Gaussiano del Reloj -->
+          <div class="watch-toast" id="watchToast">
+            <div id="watchToastIcon" class="w-11 h-11 rounded-full flex items-center justify-center mb-2"
+                 style="background-color: var(--active-accent-soft); color: var(--active-accent);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+              </svg>
+            </div>
+            <div id="watchToastTitle" class="text-sm font-extrabold text-white">VoxBuds Pro</div>
+            <div id="watchToastDesc" class="text-[11px] text-slate-300 mt-1 leading-snug">
+              Escudo binaural e inteligente activado
+            </div>
+          </div>
+
+          <!-- Cabecera Superior del Reloj Wear OS -->
+          <div class="relative z-20 flex flex-col items-center gap-1 mt-0.5">
+            <span id="watchClock" class="tabular-nums text-[11px] font-bold text-slate-400 tracking-wider">09:41</span>
+            <button id="watchSourcePill" onclick="toggleHeadphones()"
+                    class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[10px] font-extrabold tracking-wide transition active:scale-95">
+              <span id="watchPulseDot" class="w-1.5 h-1.5 rounded-full pulse-dot" style="background-color: var(--active-accent);"></span>
+              <span id="watchSourceText">ENTORNO</span>
+            </button>
+          </div>
+
+          <!-- VISTA 0 DEL RELOJ: MONITOR ACÚSTICO EN VIVO -->
+          <section id="watchView0" class="watch-view active">
+            <div class="text-center flex flex-col items-center">
+              <div id="watchDbDisplay" class="tabular-nums text-[62px] font-bold leading-none tracking-tighter"
+                   style="text-shadow: 0 0 28px var(--active-accent-glow);">
+                62
+              </div>
+              <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                Decibelios (dB)
+              </div>
+              <div id="watchSafetyBadge"
+                   class="mt-2.5 px-3.5 py-1 rounded-full text-xs font-bold border transition-all"
+                   style="background-color: var(--active-accent-soft); color: var(--active-accent); border-color: var(--active-accent);">
+                Entorno Seguro
+              </div>
+              <div class="mt-2 text-[11px] text-slate-400 font-medium">
+                Exposición máx: <strong id="watchSafeTime" class="tabular-nums text-white">Ilimitada</strong>
+              </div>
+            </div>
+          </section>
+
+          <!-- VISTA 1 DEL RELOJ: ESCUDO DE AUDÍFONOS Y BALANCE L/R -->
+          <section id="watchView1" class="watch-view">
+            <div class="w-[86%] bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-3 flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <div class="text-left">
+                  <div id="watchHpName" class="text-xs font-extrabold text-white">Micrófono Ambiental</div>
+                  <div id="watchHpSub" class="text-[10px] text-slate-400">Escaneo acústico 360°</div>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--active-accent)" stroke-width="2.2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div class="bg-black/45 rounded-xl p-2 text-center border border-white/5">
+                  <span class="text-[9px] text-slate-400 block">OÍDO IZQ (L)</span>
+                  <strong id="watchLeftDb" class="tabular-nums text-xs font-bold" style="color: var(--active-accent);">61 dB</strong>
+                </div>
+                <div class="bg-black/45 rounded-xl p-2 text-center border border-white/5">
+                  <span class="text-[9px] text-slate-400 block">OÍDO DER (R)</span>
+                  <strong id="watchRightDb" class="tabular-nums text-xs font-bold" style="color: var(--active-accent);">62 dB</strong>
+                </div>
+              </div>
+
+              <button onclick="capVolumeInstant()"
+                      class="w-full py-1.5 rounded-xl text-[11px] font-extrabold text-slate-950 transition active:scale-95"
+                      style="background-color: var(--active-accent); box-shadow: 0 4px 12px var(--active-accent-glow);">
+                Atenuación Suave (-15 dB)
+              </button>
+            </div>
+          </section>
+
+          <!-- VISTA 2 DEL RELOJ: DOSIS ACÚSTICA DIARIA -->
+          <section id="watchView2" class="watch-view">
+            <div class="w-[82%] flex flex-col items-center gap-2 text-center">
+              <div class="text-xs font-extrabold text-white">Dosis Acústica Diaria</div>
+              <div class="w-full h-14 flex items-end justify-center gap-2 px-2 py-1">
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full rounded-md" style="height: 18px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums text-slate-400">08h</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full rounded-md" style="height: 28px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums text-slate-400">10h</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full rounded-md" style="height: 20px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] tabular-nums text-slate-400">12h</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div class="w-full rounded-md" style="height: 40px; background-color: #FFB800;"></div>
+                  <span class="text-[9px] tabular-nums text-slate-400">14h</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1">
+                  <div id="watchLiveDoseBar" class="w-full rounded-md transition-all" style="height: 26px; background-color: var(--active-accent);"></div>
+                  <span class="text-[9px] font-bold text-white">Hoy</span>
+                </div>
+              </div>
+              <div id="watchDoseText" class="text-[11px] font-semibold text-slate-300">
+                Fatiga timpánica: 28% (Óptimo)
+              </div>
+            </div>
+          </section>
+
+          <!-- Puntos de Paginación Inferiores del Reloj -->
+          <div class="relative z-20 flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-full mb-0.5">
+            <button id="watchDot0" onclick="switchWatchView(0)" class="w-4 h-1.5 rounded-full transition-all" style="background-color: var(--active-accent);"></button>
+            <button id="watchDot1" onclick="switchWatchView(1)" class="w-1.5 h-1.5 rounded-full bg-white/30 transition-all"></button>
+            <button id="watchDot2" onclick="switchWatchView(2)" class="w-1.5 h-1.5 rounded-full bg-white/30 transition-all"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="watch-strap bottom"></div>
+
+      <span class="mt-2.5 text-[11px] font-medium" style="color: var(--app-text-muted);">
+        Haz clic en la Corona Digital o usa la rueda del ratón sobre el reloj
+      </span>
+    </div>
+
+  </main>
+
+  <!-- ========================================================================
+       MOTOR JAVASCRIPT: SINCRONIZACIÓN DUAL + ONDAS ARMÓNICAS 60 FPS
+       ======================================================================== -->
+  <script>
+    // Estado Global Sincronizado entre la App Android y el Reloj Wear OS
+    const state = {
+      rawInputDb: 62,
+      effectiveDb: 62,
+      laeqDb: 60,
+      peakDb: 74,
+      headphonesConnected: false,
+      autoShield: true,
+      limiterCeilingDb: 78,
+      antiFatigueEq: true,
+      androidTab: 0,
+      watchView: 0,
+      darkMode: true,
+      brandPrimaryHex: '#00E5BF',
+      brandPrimaryRgb: '0, 229, 191',
+      activeAccentHex: '#00E5BF',
+      phase: 0,
+      usingRealMic: false,
+      audioCtx: null,
+      analyser: null,
+      micStream: null,
+      restSeconds: 900,
+      restRunning: false,
+      restInterval: null
+    };
+
+    const PHONE_CAPSULES = 26;
+
+    // Lienzos HTML5 Canvas (Reloj Wear OS + Tarjeta Hero Android)
+    const watchCanvas = document.getElementById('watchAcousticCanvas');
+    const watchCtx = watchCanvas.getContext('2d');
+    const phoneCanvas = document.getElementById('phoneWaveCanvas');
+    const phoneCtx = phoneCanvas.getContext('2d');
+
+    // 1. Inicializar Cápsulas Segmentadas en la Tarjeta Principal de Android
+    function initPhoneCapsules() {
+      const container = document.getElementById('phoneCapsulesRow');
+      container.innerHTML = '';
+      for (let i = 0; i < PHONE_CAPSULES; i++) {
+        const cap = document.createElement('div');
+        cap.className = 'capsule-segment h-7';
+        container.appendChild(cap);
+      }
+    }
+
+    // 2. Actualizar Relojes del Sistema
+    function updateClocks() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('androidClock').textContent = `${hh}:${mm}`;
+      document.getElementById('watchClock').textContent = `${hh}:${mm}`;
+    }
+
+    // 3. Cambiar el Color Primario Insignia desde la Barra Superior
+    function setPrimaryBrandColor(hexColor, rgbString, btnEl) {
+      state.brandPrimaryHex = hexColor;
+      state.brandPrimaryRgb = rgbString;
+      document.documentElement.style.setProperty('--brand-primary', hexColor);
+      document.documentElement.style.setProperty('--brand-primary-rgb', rgbString);
+
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+
+      evaluateAcousticState();
+    }
+
+    // 4. Evaluar Estado Acústico, Limitador de Audífonos y Semántica Visual
+    function evaluateAcousticState() {
+      const raw = state.rawInputDb;
+      let effective = raw;
+      let isAttenuating = false;
+
+      // Si los audífonos están conectados y el Escudo Automático está activo, limitar a limiterCeilingDb (ej. 78 dB)
+      if (state.headphonesConnected && state.autoShield && raw > state.limiterCeilingDb) {
+        effective = state.limiterCeilingDb;
+        isAttenuating = true;
+      }
+
+      state.effectiveDb = effective;
+      if (effective > state.peakDb) state.peakDb = effective;
+      state.laeqDb = Math.round(state.laeqDb * 0.88 + effective * 0.12);
+
+      // Determinar Color Activo Semántico:
+      // < 80 dB -> Color Primario Insignia elegido por el usuario (o Índigo cuando hay audífonos si se desea, pero priorizamos el Primario vibrante)
+      // 80 - 87 dB -> Ámbar (#FFB800)
+      // >= 88 dB -> Carmesí Neón (#FF2A6D)
+      let accentHex = state.brandPrimaryHex;
+      let accentSoft = `rgba(${state.brandPrimaryRgb}, 0.15)`;
+      let accentGlow = `rgba(${state.brandPrimaryRgb}, 0.34)`;
+      let statusLabel = state.headphonesConnected ? 'Audio Binaural Seguro' : 'Entorno Seguro';
+      let maxTimeStr = 'Ilimitada';
+      let contextText = 'Conversación normal o cafetería tranquila';
+
+      if (effective < 50) {
+        contextText = 'Biblioteca silenciosa o habitación en calma';
+      } else if (effective >= 80 && effective < 88) {
+        accentHex = '#FFB800';
+        accentSoft = 'rgba(255, 184, 0, 0.16)';
+        accentGlow = 'rgba(255, 184, 0, 0.35)';
+        statusLabel = 'Precaución Auditiva';
+        maxTimeStr = effective > 83 ? 'Máx 2h 30m' : 'Máx 5h 30m';
+        contextText = 'Tráfico urbano intenso o restaurante ruidoso';
+      } else if (effective >= 88) {
+        accentHex = '#FF2A6D';
+        accentSoft = 'rgba(255, 42, 109, 0.18)';
+        accentGlow = 'rgba(255, 42, 109, 0.42)';
+        statusLabel = '¡Peligro Acústico!';
+        maxTimeStr = effective > 98 ? '¡Menos de 6 min!' : 'Máx 20 min';
+        contextText = 'Concierto en vivo, sirena o maquinaria pesada';
+      }
+
+      state.activeAccentHex = accentHex;
+      const root = document.documentElement;
+      root.style.setProperty('--active-accent', accentHex);
+      root.style.setProperty('--active-accent-soft', accentSoft);
+      root.style.setProperty('--active-accent-glow', accentGlow);
+
+      // Actualizar Barra de Simulación
+      document.getElementById('sliderDbReadout').textContent = `${raw} dB`;
+
+      // Actualizar App de Android (Pantalla 1)
+      document.getElementById('phoneMainDb').textContent = effective;
+      document.getElementById('phoneSafetyText').textContent = isAttenuating
+        ? `Escudo Activo (${effective} dB)`
+        : statusLabel;
+      document.getElementById('phoneMaxTimeText').textContent = maxTimeStr;
+      document.getElementById('phoneLaeqVal').textContent = state.laeqDb;
+      document.getElementById('phonePeakVal').textContent = state.peakDb;
+      document.getElementById('phoneContextDesc').textContent = contextText;
+
+      const leftDb = Math.max(30, effective - 1);
+      const rightDb = effective;
+      document.getElementById('phoneQuickBalance').textContent = `${leftDb} / ${rightDb}`;
+
+      // Mostrar / Ocultar Banner de Atenuación en Android
+      const attBanner = document.getElementById('attenuationBanner');
+      if (isAttenuating) {
+        attBanner.classList.remove('hidden');
+        document.getElementById('attenuationDeltaBadge').textContent = `-${raw - effective} dB Atenuados`;
+        document.getElementById('rawDbReadout').textContent = `${raw} dB`;
+        document.getElementById('protectedDbReadout').textContent = `${effective} dB`;
+      } else {
+        attBanner.classList.add('hidden');
+      }
+
+      // Actualizar App de Android (Pantalla 2: Audífonos)
+      document.getElementById('tabLeftEarDb').textContent = `${leftDb} dB`;
+      document.getElementById('tabRightEarDb').textContent = `${rightDb} dB`;
+      const leftPct = Math.min(100, Math.max(12, ((leftDb - 30) / 80) * 100));
+      const rightPct = Math.min(100, Math.max(12, ((rightDb - 30) / 80) * 100));
+      document.getElementById('tabLeftEarBar').style.width = `${leftPct}%`;
+      document.getElementById('tabRightEarBar').style.width = `${rightPct}%`;
+
+      // Actualizar App de Android (Pantalla 3: Dosis OMS)
+      const dosePct = Math.min(100, Math.max(10, Math.round(((effective - 30) / 80) * 90)));
+      const circumference = 251.32;
+      document.getElementById('phoneDoseRing').style.strokeDashoffset = circumference - (dosePct / 100) * circumference;
+      document.getElementById('phoneDosePct').textContent = `${dosePct}%`;
+      document.getElementById('phoneLiveHistoryBar').style.height = `${Math.max(20, dosePct * 0.85)}%`;
+      document.getElementById('phoneDoseSummaryText').textContent =
+        `Carga timpánica actual del ${dosePct}% (${effective < 80 ? 'Dentro del margen seguro OMS' : 'Exposición elevada'}).`;
+
+      // Actualizar Reloj Wear OS
+      document.getElementById('watchDbDisplay').textContent = effective;
+      document.getElementById('watchSafetyBadge').textContent = isAttenuating
+        ? `Protegido (${effective} dB)`
+        : statusLabel;
+      document.getElementById('watchSafeTime').textContent = maxTimeStr;
+      document.getElementById('watchLeftDb').textContent = `${leftDb} dB`;
+      document.getElementById('watchRightDb').textContent = `${rightDb} dB`;
+      document.getElementById('watchLiveDoseBar').style.height = `${Math.max(12, dosePct * 0.48)}px`;
+      document.getElementById('watchDoseText').textContent =
+        `Fatiga timpánica: ${dosePct}% (${effective < 80 ? 'Óptimo' : effective < 88 ? 'Moderado' : 'Crítico'})`;
+
+      // Actualizar Anillo SVG Perimetral del Reloj (rango 30 a 110 dB -> arco de 570 unidades)
+      const ratio = Math.min(1, Math.max(0, (effective - 30) / 80));
+      const dashOffset = 760 - ratio * 570;
+      document.getElementById('watchBezelProgress').style.strokeDashoffset = dashOffset;
+
+      // Pintar Cápsulas Segmentadas en Android
+      paintPhoneCapsules(ratio, accentHex);
+    }
+
+    // 5. Pintar las 26 Cápsulas Segmentadas con Física Elástica
+    function paintPhoneCapsules(ratio, activeColor) {
+      const caps = document.getElementById('phoneCapsulesRow').children;
+      const activeCount = Math.round(ratio * PHONE_CAPSULES);
+      for (let i = 0; i < PHONE_CAPSULES; i++) {
+        const cap = caps[i];
+        if (i < activeCount) {
+          let c = activeColor;
+          if (i >= 20) c = '#FF2A6D';
+          else if (i >= 16) c = '#FFB800';
+          cap.style.backgroundColor = c;
+          cap.style.transform = i === activeCount - 1 ? 'scaleY(1.16)' : 'scaleY(1)';
+        } else {
+          cap.style.backgroundColor = 'var(--capsule-inactive)';
+          cap.style.transform = 'scaleY(0.86)';
+        }
+      }
+    }
+
+    // 6. MOTOR GRÁFICO CANVAS 60 FPS: ONDAS ARMÓNICAS EN RELOJ Y TELÉFONO
+    function renderAcousticWaves() {
+      // Avanzar fase angular según la intensidad acústica actual
+      const intensity = Math.min(1, Math.max(0.05, (state.effectiveDb - 30) / 80));
+      state.phase += 0.032 + intensity * 0.055;
+
+      // ----------------------------------------------------------------------
+      // A. DIBUJAR EN EL RELOJ WEAR OS (Halo Radial + 4 Anillos Armónicos)
+      // ----------------------------------------------------------------------
+      watchCtx.clearRect(0, 0, watchCanvas.width, watchCanvas.height);
+      const cx = watchCanvas.width / 2;
+      const cy = watchCanvas.height / 2;
+
+      // Halo respiratorio central
+      const grad = watchCtx.createRadialGradient(cx, cy, 12, cx, cy, 156);
+      grad.addColorStop(0, `${state.activeAccentHex}28`);
+      grad.addColorStop(0.65, `${state.activeAccentHex}0A`);
+      grad.addColorStop(1, 'transparent');
+      watchCtx.fillStyle = grad;
+      watchCtx.beginPath();
+      watchCtx.arc(cx, cy, 156, 0, Math.PI * 2);
+      watchCtx.fill();
+
+      // 4 Anillos Orgánicos Deformados por Armónicos Sinusoidales Superpuestos
+      const ringCount = state.headphonesConnected ? 4 : 3;
+      for (let r = 0; r < ringCount; r++) {
+        watchCtx.beginPath();
+        const baseRadius = 86 + r * 14;
+        const amp = (4.5 + intensity * 22) * (1 - r * 0.18);
+        const freq = state.headphonesConnected ? 6 + r * 2 : 4 + r;
+
+        for (let angle = 0; angle <= Math.PI * 2; angle += 0.045) {
+          const wave1 = Math.sin(angle * freq + state.phase + r) * amp;
+          const wave2 = Math.cos(angle * (freq - 2) - state.phase * 1.3) * (amp * 0.45);
+          const radius = baseRadius + wave1 + wave2;
+
+          const x = cx + Math.cos(angle) * radius;
+          const y = cy + Math.sin(angle) * radius;
+
+          if (angle === 0) watchCtx.moveTo(x, y);
+          else watchCtx.lineTo(x, y);
+        }
+
+        watchCtx.closePath();
+        watchCtx.strokeStyle = r === 0 ? `${state.activeAccentHex}95` : `${state.activeAccentHex}38`;
+        watchCtx.lineWidth = r === 0 ? 2.2 : 1.25;
+        watchCtx.stroke();
+      }
+
+      // ----------------------------------------------------------------------
+      // B. DIBUJAR EN LA HERO CARD DE ANDROID (Ondas Armónicas Horizontales)
+      // ----------------------------------------------------------------------
+      phoneCtx.clearRect(0, 0, phoneCanvas.width, phoneCanvas.height);
+      const pw = phoneCanvas.width;
+      const ph = phoneCanvas.height;
+
+      for (let w = 0; w < 3; w++) {
+        phoneCtx.beginPath();
+        const waveAmp = (6 + intensity * 24) * (1 - w * 0.22);
+        const waveFreq = state.headphonesConnected ? 0.028 : 0.018;
+
+        for (let x = 0; x <= pw; x += 6) {
+          const env = Math.sin((x / pw) * Math.PI); // Envolvente suave en los bordes
+          const yOffset =
+            Math.sin(x * waveFreq + state.phase * (1 + w * 0.25)) * waveAmp * env +
+            Math.cos(x * (waveFreq * 1.6) - state.phase) * (waveAmp * 0.4) * env;
+          const y = ph * 0.56 + yOffset + w * 6;
+
+          if (x === 0) phoneCtx.moveTo(x, y);
+          else phoneCtx.lineTo(x, y);
+        }
+
+        phoneCtx.strokeStyle = w === 0 ? `${state.activeAccentHex}45` : `${state.activeAccentHex}20`;
+        phoneCtx.lineWidth = w === 0 ? 2 : 1.2;
+        phoneCtx.stroke();
+      }
+
+      requestAnimationFrame(renderAcousticWaves);
+    }
+
+    // 7. Eventos del Deslizador y Escenarios Rápidos
+    document.getElementById('dbSlider').addEventListener('input', (e) => {
+      state.rawInputDb = parseInt(e.target.value, 10);
+      document.querySelectorAll('header .preset-pill').forEach(b => {
+        if (b.textContent.includes('dB')) b.classList.remove('active');
+      });
+      evaluateAcousticState();
+    });
+
+    function setScenario(dbValue, btnEl) {
+      state.rawInputDb = dbValue;
+      document.getElementById('dbSlider').value = dbValue;
+      document.querySelectorAll('header .preset-pill').forEach(b => {
+        if (b.textContent.includes('dB')) b.classList.remove('active');
+      });
+      if (btnEl) btnEl.classList.add('active');
+
+      // Si los audífonos están conectados y el escenario supera el límite, avisar en el reloj
+      if (state.headphonesConnected && state.autoShield && dbValue > state.limiterCeilingDb) {
+        showWatchToast(
+          'Escudo Acústico Activo',
+          `Pico de ${dbValue} dB reducido a ${state.limiterCeilingDb} dB en tus oídos`
+        );
+      }
+
+      evaluateAcousticState();
+    }
+
+    // 8. Conectar / Desconectar Audífonos (VoxBuds Pro)
+    function toggleHeadphones() {
+      state.headphonesConnected = !state.headphonesConnected;
+
+      const topBtnText = document.getElementById('topHeadphoneBtnText');
+      const statusBtIcon = document.getElementById('statusBtIcon');
+      const androidSourceLabel = document.getElementById('androidSourceLabel');
+      const phoneHeroSubtitle = document.getElementById('phoneHeroSubtitle');
+      const tabHpConnBadge = document.getElementById('tabHpConnBadge');
+      const tabHpSubtitle = document.getElementById('tabHpSubtitle');
+      const tabHpActionBtn = document.getElementById('tabHpActionBtn');
+      const watchSourceText = document.getElementById('watchSourceText');
+      const watchHpName = document.getElementById('watchHpName');
+      const watchHpSub = document.getElementById('watchHpSub');
+
+      if (state.headphonesConnected) {
+        topBtnText.textContent = 'VoxBuds Pro Activos';
+        statusBtIcon.classList.remove('hidden');
+        androidSourceLabel.textContent = 'VoxBuds Pro';
+        phoneHeroSubtitle.textContent = 'Presión Intrauricular (Audífonos)';
+        tabHpConnBadge.textContent = 'Conectados • AAC';
+        tabHpConnBadge.style.color = 'var(--active-accent)';
+        tabHpSubtitle.textContent = 'Cancelación adaptativa + Escudo activo';
+        tabHpActionBtn.textContent = 'Desconectar';
+
+        watchSourceText.textContent = 'AUDÍFONOS • ANC';
+        watchHpName.textContent = 'VoxBuds Pro (AAC)';
+        watchHpSub.textContent = `Limitador activo (${state.limiterCeilingDb} dB máx.)`;
+
+        // Abrir hoja de emparejamiento en Android y Toast circular en el Reloj
+        document.getElementById('sheetProtStatus').textContent = state.autoShield
+          ? `Escudo Activo (${state.limiterCeilingDb} dB máx.)`
+          : 'Monitoreo sin límite';
+        document.getElementById('androidPairSheet').classList.add('open');
+
+        showWatchToast(
+          'VoxBuds Pro Detectados',
+          'Protección binaural e inteligente activada'
+        );
+      } else {
+        topBtnText.textContent = 'Conectar VoxBuds Pro';
+        statusBtIcon.classList.add('hidden');
+        androidSourceLabel.textContent = 'Entorno';
+        phoneHeroSubtitle.textContent = 'Presión Sonora Ambiental';
+        tabHpConnBadge.textContent = 'En espera';
+        tabHpConnBadge.style.color = 'var(--app-text-muted)';
+        tabHpSubtitle.textContent = 'Conecta para monitoreo intrauricular binaural';
+        tabHpActionBtn.textContent = 'Conectar';
+
+        watchSourceText.textContent = 'ENTORNO';
+        watchHpName.textContent = 'Micrófono Ambiental';
+        watchHpSub.textContent = 'Escaneo acústico 360°';
+
+        closeAndroidSheet();
+        showWatchToast('Modo Ambiental', 'Midiendo el ruido exterior con el micrófono del reloj');
+      }
+
+      evaluateAcousticState();
+    }
+
+    function closeAndroidSheet() {
+      document.getElementById('androidPairSheet').classList.remove('open');
+    }
+
+    // 9. Controles de Protección Auditiva (Escudo, Techo dB, Atenuación Instantánea, EQ)
+    function toggleAutoShield() {
+      state.autoShield = !state.autoShield;
+      document.getElementById('phoneShieldSwitch').classList.toggle('on', state.autoShield);
+      evaluateAcousticState();
+    }
+
+    function setLimiterCeiling(dbLimit, btnEl) {
+      state.limiterCeilingDb = dbLimit;
+      document.getElementById('selectedCeilingLabel').textContent = `${dbLimit} dB`;
+      document.getElementById('quickShieldLimitLabel').textContent = `${dbLimit} dB`;
+
+      document.querySelectorAll('.ceiling-btn').forEach(b => {
+        b.classList.remove('text-slate-950');
+        b.style.backgroundColor = 'var(--app-card-subtle)';
+        b.style.color = 'var(--app-text)';
+      });
+      btnEl.style.backgroundColor = 'var(--active-accent)';
+      btnEl.style.color = '#05080D';
+
+      evaluateAcousticState();
+    }
+
+    function capVolumeInstant() {
+      state.rawInputDb = Math.max(42, state.effectiveDb - 15);
+      document.getElementById('dbSlider').value = state.rawInputDb;
+      evaluateAcousticState();
+      showWatchToast('Atenuación Aplicada', `Nivel reducido a ${state.rawInputDb} dB para descanso auditivo`);
+    }
+
+    function toggleAntiFatigueEq() {
+      state.antiFatigueEq = !state.antiFatigueEq;
+      const btn = document.getElementById('eqToggleBtn');
+      const trebleBars = document.querySelectorAll('.eq-treble');
+
+      if (state.antiFatigueEq) {
+        btn.textContent = 'Activo';
+        btn.style.color = 'var(--active-accent)';
+        trebleBars.forEach(b => { b.style.height = '15px'; });
+      } else {
+        btn.textContent = 'Plano';
+        btn.style.color = 'var(--app-text-muted)';
+        trebleBars.forEach(b => { b.style.height = '32px'; });
+      }
+    }
+
+    // 10. Historial por Horas y Temporizador de Descanso Auditivo (Pantalla 3 Android)
+    function selectHourlyBar(hourLabel, statsLabel) {
+      document.getElementById('hourlySelectedTitle').textContent = `${hourLabel} • ${statsLabel}`;
+    }
+
+    function toggleRestTimer() {
+      const btn = document.getElementById('restTimerBtn');
+      if (state.restRunning) {
+        state.restRunning = false;
+        clearInterval(state.restInterval);
+        btn.textContent = 'Reanudar';
+      } else {
+        state.restRunning = true;
+        btn.textContent = 'Pausar';
+        state.restInterval = setInterval(() => {
+          if (state.restSeconds > 0) {
+            state.restSeconds--;
+            const m = String(Math.floor(state.restSeconds / 60)).padStart(2, '0');
+            const s = String(state.restSeconds % 60).padStart(2, '0');
+            document.getElementById('restTimerDisplay').textContent = `${m}:${s}`;
+          } else {
+            resetRestTimer();
+          }
+        }, 1000);
+      }
+    }
+
+    function resetRestTimer() {
+      state.restRunning = false;
+      clearInterval(state.restInterval);
+      state.restSeconds = 900;
+      document.getElementById('restTimerDisplay').textContent = '15:00';
+      document.getElementById('restTimerBtn').textContent = 'Iniciar';
+    }
+
+    // 11. Navegación de Pestañas en Android y Pantallas en el Reloj Wear OS
+    function switchAndroidTab(index) {
+      state.androidTab = index;
+      const titles = ['Monitor Acústico', 'Audífonos y Escudo', 'Dosis y Salud OMS'];
+      document.getElementById('androidHeaderTitle').textContent = titles[index];
+
+      [0, 1, 2].forEach(i => {
+        document.getElementById(`androidTab${i}`).classList.toggle('active', i === index);
+        document.getElementById(`androidNav${i}`).classList.toggle('active', i === index);
+      });
+    }
+
+    function switchWatchView(index) {
+      state.watchView = index;
+      [0, 1, 2].forEach(i => {
+        document.getElementById(`watchView${i}`).classList.toggle('active', i === index);
+        const dot = document.getElementById(`watchDot${i}`);
+        if (i === index) {
+          dot.className = 'w-4 h-1.5 rounded-full transition-all';
+          dot.style.backgroundColor = 'var(--active-accent)';
+        } else {
+          dot.className = 'w-1.5 h-1.5 rounded-full bg-white/30 transition-all';
+          dot.style.backgroundColor = '';
+        }
+      });
+    }
+
+    function nextWatchView() {
+      switchWatchView((state.watchView + 1) % 3);
+    }
+
+    // Girar la rueda del ratón sobre el reloj cambia de vista como una Corona Rotatoria
+    document.getElementById('watchScreen').addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY > 0) switchWatchView((state.watchView + 1) % 3);
+      else switchWatchView((state.watchView + 2) % 3);
+    }, { passive: false });
+
+    // Mostrar Toast Circular en el Reloj Wear OS
+    let toastTimer = null;
+    function showWatchToast(title, desc) {
+      const toast = document.getElementById('watchToast');
+      document.getElementById('watchToastTitle').textContent = title;
+      document.getElementById('watchToastDesc').textContent = desc;
+      toast.classList.add('show');
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2300);
+    }
+
+    // 12. Alternar Modo Oscuro OLED / Modo Claro Editorial
+    function toggleThemeMode() {
+      state.darkMode = !state.darkMode;
+      const htmlEl = document.documentElement;
+      htmlEl.classList.toggle('dark', state.darkMode);
+      htmlEl.classList.toggle('light', !state.darkMode);
+
+      document.getElementById('iconSun').classList.toggle('hidden', !state.darkMode);
+      document.getElementById('iconMoon').classList.toggle('hidden', state.darkMode);
+      evaluateAcousticState();
+    }
+
+    // 13. Micrófono Real del Dispositivo (Web Audio API)
+    async function toggleRealMic() {
+      const btnText = document.getElementById('topMicBtnText');
+      const dot = document.getElementById('micDot');
+
+      if (state.usingRealMic) {
+        state.usingRealMic = false;
+        if (state.micStream) state.micStream.getTracks().forEach(t => t.stop());
+        btnText.textContent = 'Micrófono Real';
+        dot.className = 'w-2 h-2 rounded-full bg-slate-400';
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        state.micStream = stream;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        state.audioCtx = new AudioContextClass();
+        const source = state.audioCtx.createMediaStreamSource(stream);
+        state.analyser = state.audioCtx.createAnalyser();
+        state.analyser.fftSize = 256;
+        source.connect(state.analyser);
+
+        state.usingRealMic = true;
+        btnText.textContent = 'Detener Mic';
+        dot.className = 'w-2 h-2 rounded-full bg-[#FF2A6D] animate-ping';
+        sampleRealMicLoop();
+      } catch (err) {
+        showWatchToast('Simulador Activo', 'Usa el deslizador superior para probar niveles de dB');
+      }
+    }
+
+    function sampleRealMicLoop() {
+      if (!state.usingRealMic || !state.analyser) return;
+      const data = new Uint8Array(state.analyser.frequencyBinCount);
+      state.analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length;
+      const mappedDb = Math.min(106, Math.max(35, Math.round(35 + (avg / 128) * 70)));
+      state.rawInputDb = mappedDb;
+      document.getElementById('dbSlider').value = mappedDb;
+      evaluateAcousticState();
+      setTimeout(sampleRealMicLoop, 140);
+    }
+
+    // 14. Micro-fluctuación realista cada 360ms
+    setInterval(() => {
+      if (!state.usingRealMic) {
+        const jitter = Math.floor(Math.random() * 3) - 1;
+        const base = parseInt(document.getElementById('dbSlider').value, 10);
+        state.rawInputDb = Math.max(30, Math.min(110, base + jitter));
+        evaluateAcousticState();
+      }
+    }, 360);
+
+    // Iniciar todo al cargar la ventana
+    window.onload = function () {
+      initPhoneCapsules();
+      updateClocks();
+      setInterval(updateClocks, 15000);
+      evaluateAcousticState();
+      renderAcousticWaves();
+    };
+  </script>
+</body>
+</html>
