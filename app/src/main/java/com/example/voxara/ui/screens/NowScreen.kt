@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -12,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
 import com.example.voxara.R
 import com.example.voxara.core.dose.DOSE_THRESHOLD_DBA
@@ -33,13 +33,20 @@ import com.example.voxara.ui.design.VType
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.VoxList
 import com.example.voxara.ui.design.ZoneBadge
-import com.example.voxara.ui.design.ZoneGauge
+import com.example.voxara.ui.design.GlowNumber
+import com.example.voxara.ui.design.LevelBezel
+import com.example.voxara.ui.design.SourcePill
+import com.example.voxara.ui.design.WaveHalo
+import com.example.voxara.ui.design.animateTone
+import com.example.voxara.ui.design.gaugeFraction
+import com.example.voxara.ui.theme.LocalReduceMotion
 import com.example.voxara.ui.design.zoneWord
 import kotlin.math.roundToInt
 
 /**
- * NOW — the room around you. One hero element: the zone gauge with the level inside it. The zone
- * is also said in words with its own icon, so it never depends on colour.
+ * NOW — the room around you. One hero element: the bezel arc with the level inside it, harmonic
+ * wave rings and a halo in the level's tier colour (accent, amber, crimson). The zone is also said
+ * in words with its own icon, so it never depends on colour.
  */
 @Composable
 fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {}) {
@@ -49,20 +56,28 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
     val spoken = stringResource(R.string.cd_now, s.dba.roundToInt(), word, s.dosePercent.roundToInt())
     val concert = s.mode == SituationMode.CONCERT
 
+    val tone = animateTone(VColor.tone(zone), instant = LocalReduceMotion.current)
+    val level = s.dba.toFloat().takeIf { s.dba > 0.0 }
+
     VoxList {
+        // The scene or level band, as the template's source pill.
+        item { SourcePill(stringResource(sceneOrBandLabelRes(s.scene, s.dba)), dot = tone.fill) }
         item {
             BoxWithConstraints(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = spoken }) {
                 val side = maxWidth * 0.92f
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Box(Modifier.size(side), contentAlignment = Alignment.Center) {
-                        ZoneGauge(dba = s.dba.toFloat().takeIf { s.dba > 0.0 }, modifier = Modifier.fillMaxSize())
+                        WaveHalo(
+                            intensity = level?.let(::gaugeFraction) ?: 0f, color = tone.fill,
+                            modifier = Modifier.fillMaxSize().padding(side * 0.06f),
+                            listening = s.headphoneListening,
+                        )
+                        LevelBezel(dba = level, modifier = Modifier.fillMaxSize())
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            GlowNumber(text = level?.roundToInt()?.toString() ?: "—", glow = tone.fill)
                             Text(
-                                text = if (s.dba > 0.0) s.dba.roundToInt().toString() else "—",
-                                style = VType.Hero,
-                                color = VColor.Text,
+                                stringResource(R.string.unit_dba).uppercase(), style = VType.Eyebrow, color = VColor.TextTertiary,
                             )
-                            Text(stringResource(R.string.unit_dba), style = VType.Caption, color = VColor.TextSecondary)
                         }
                     }
                 }
@@ -70,16 +85,13 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
         }
         item { ZoneBadge(zone, label = word) }
         item {
-            SectionLabel(stringResource(sceneOrBandLabelRes(s.scene, s.dba)))
-        }
-        item {
             BodyText(
                 if (s.dba < DOSE_THRESHOLD_DBA) stringResource(R.string.now_not_accruing, s.dosePercent.roundToInt())
                 else stringResource(R.string.now_accruing, formatHeadroom(s.headroomMinutes), s.dosePercent.roundToInt()),
                 color = VColor.Text,
             )
         }
-        if (s.simulated) item { SectionLabel(stringResource(R.string.bench_source), color = VColor.BrandStart) }
+        if (s.simulated) item { SectionLabel(stringResource(R.string.bench_source), color = VColor.AccentInk) }
         if (!s.calibrated && !s.simulated) {
             item { SectionLabel(stringResource(R.string.uncalibrated_badge), color = VColor.TextSecondary) }
         }

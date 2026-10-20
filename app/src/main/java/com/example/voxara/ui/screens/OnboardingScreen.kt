@@ -1,6 +1,9 @@
 package com.example.voxara.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -10,15 +13,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material3.Icon
 import com.example.voxara.R
 import com.example.voxara.core.alerts.AlertDefaults
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
+import com.example.voxara.ui.design.VSpace
+import com.example.voxara.ui.design.PageDots
 import com.example.voxara.ui.design.ChoiceList
 import com.example.voxara.ui.design.HeroStatus
+import com.example.voxara.ui.design.IconTile
 import com.example.voxara.ui.design.Panel
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
@@ -44,20 +48,26 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
     val a = env.state.alertSettings
 
     VoxList {
-        item { SectionLabel(stringResource(R.string.onb_progress, index + 1, steps.size)) }
+        item {
+            // Dots for the eye, the "Step n of m" words for TalkBack and for anyone who reads them.
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(VSpace.xs)) {
+                PageDots(steps.size, index)
+                SectionLabel(stringResource(R.string.onb_progress, index + 1, steps.size))
+            }
+        }
         when (step) {
             OnbStep.WELCOME -> {
-                item { Icon(VoxIcons.Waves, contentDescription = null, tint = VColor.BrandStart, modifier = Modifier.size(32.dp)) }
+                item { IconTile(VoxIcons.Waves, VColor.AccentInk) }
                 item { HeroStatus(stringResource(R.string.onb_welcome_title), modifier = Modifier.semantics { heading() }) }
                 item { BodyText(stringResource(R.string.onb_welcome_body, name), color = VColor.Text) }
             }
             OnbStep.PRIVACY -> {
-                item { Icon(VoxIcons.Shield, contentDescription = null, tint = VColor.BrandStart, modifier = Modifier.size(32.dp)) }
+                item { IconTile(VoxIcons.Shield, VColor.AccentInk) }
                 item { HeroStatus(stringResource(R.string.onb_privacy_title), modifier = Modifier.semantics { heading() }) }
                 item { BodyText(stringResource(R.string.onb_privacy_body), color = VColor.Text) }
             }
             OnbStep.ESTIMATES -> {
-                item { Icon(VoxIcons.Info, contentDescription = null, tint = VColor.BrandStart, modifier = Modifier.size(32.dp)) }
+                item { IconTile(VoxIcons.Info, VColor.AccentInk) }
                 item { HeroStatus(stringResource(R.string.onb_estimates_title), modifier = Modifier.semantics { heading() }) }
                 item { BodyText(stringResource(R.string.onb_estimates_body), color = VColor.Text) }
             }
@@ -107,7 +117,7 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
                 }
             }
             OnbStep.TONO -> {
-                item { Icon(VoxIcons.Sparkle, contentDescription = null, tint = VColor.BrandStart, modifier = Modifier.size(32.dp)) }
+                item { IconTile(VoxIcons.Sparkle, VColor.AccentInk) }
                 item { HeroStatus(stringResource(R.string.onb_tono_title, name), modifier = Modifier.semantics { heading() }) }
                 item { BodyText(stringResource(R.string.tono_consent_body, name), color = VColor.Text) }
                 item {
