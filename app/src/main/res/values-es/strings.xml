@@ -411,7 +411,7 @@
     <string name="set_alert_level">NIVEL DE ALERTA</string>
     <string name="set_debug">HERRAMIENTAS DE DEPURACIÓN</string>
     <string name="set_fine_trim">AJUSTE FINO (dB)</string>
-    <string name="set_licenses">Tipografía Inter © The Inter Project Authors, SIL Open Font License 1.1.</string>
+    <string name="set_licenses">Plus Jakarta Sans © The Plus Jakarta Sans Project Authors y JetBrains Mono © The JetBrains Mono Project Authors, SIL Open Font License 1.1.</string>
     <string name="set_monitoring">MONITOREO</string>
     <string name="set_privacy">PRIVACIDAD</string>
     <string name="set_privacy_body">Guardado solo en este reloj: niveles de sonido por minuto (35 días), tus ajustes y la calibración. Nunca audio, nombres de canciones o apps, nombres de dispositivos ni ubicación.</string>
