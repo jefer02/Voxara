@@ -1,7 +1,9 @@
 package com.example.voxara.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -10,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,7 +33,13 @@ import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.MetricCard
-import com.example.voxara.ui.design.ProgressRing
+import com.example.voxara.ui.design.BezelArc
+import com.example.voxara.ui.design.EditorialHeader
+import com.example.voxara.ui.design.Eyebrow
+import com.example.voxara.ui.design.WaveHalo
+import com.example.voxara.ui.design.animateTone
+import com.example.voxara.ui.design.gaugeFraction
+import com.example.voxara.ui.theme.LocalReduceMotion
 import com.example.voxara.ui.design.SectionLabel
 import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VSpace
@@ -43,8 +50,9 @@ import com.example.voxara.ui.design.zoneWord
 import kotlin.math.roundToInt
 
 /**
- * HOME — Tono is the hero. One plain-language status line, the Hearing Care Score, then one
- * card per area. Ask is the edge button: one tap from the root.
+ * HOME — Tono is the hero. An editorial header, one plain-language status line, the Hearing Care
+ * Score on the bezel arc (with the live level's halo behind it), then one card per area. Ask is
+ * the edge button: one tap from the root.
  */
 @Composable
 fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
@@ -61,6 +69,8 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
     // With Tono off the hero is Voxara's own line, never a (stale) Tono reply.
     val status = env.coach.reply?.status?.takeIf { tono } ?: stringResource(R.string.home_status_fallback)
 
+    val liveTone = animateTone(VColor.tone(RiskZone.of(s.dba)), instant = LocalReduceMotion.current)
+
     VoxList(
         edgeButton = {
             EdgeButton(onClick = { navigate(Routes.ASK) }) {
@@ -73,14 +83,9 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
         },
     ) {
         // The brand is always Voxara; Tono is only the voice of the status line under it.
-        item {
-            SectionLabel(
-                stringResource(R.string.app_name).uppercase(),
-                color = VColor.BrandStart, modifier = Modifier.semantics { heading() },
-            )
-        }
+        item { EditorialHeader(stringResource(R.string.app_name)) }
         if (tono) {
-            item { SectionLabel(stringResource(R.string.tono_says, name).uppercase(), color = VColor.TextTertiary) }
+            item { Eyebrow(stringResource(R.string.tono_says, name), color = VColor.TextTertiary) }
         }
         item { HeroStatus(status) }
         if (tono && env.coach.source == ReplySource.CLOUD_AI) {
@@ -93,7 +98,7 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
                     icon = VoxIcons.Play,
                     label = stringResource(R.string.paused_label),
                     value = stringResource(R.string.action_resume),
-                    accent = VColor.zone(RiskZone.MODERATE),
+                    accent = VColor.Caution,
                     onClick = actions.onResume,
                 )
             }
@@ -107,8 +112,14 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(VSpace.xs),
             ) {
-                ProgressRing(score / 100f, Modifier.size(64.dp), color = VColor.BrandStart, stroke = 8.dp) {
-                    Text("$score", style = VType.Numeral, color = VColor.Text)
+                // The score on the bezel arc; the halo behind it follows the live level's tier.
+                Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
+                    WaveHalo(
+                        intensity = gaugeFraction(s.dba.toFloat()), color = liveTone.fill,
+                        modifier = Modifier.fillMaxSize(), listening = s.headphoneListening,
+                    )
+                    BezelArc(score / 100f, color = VColor.accent.fill, modifier = Modifier.fillMaxSize())
+                    Text("$score", style = VType.Display, color = VColor.Text)
                 }
                 Text(stringResource(R.string.score_title), style = VType.Label, color = VColor.Text, textAlign = TextAlign.Center)
                 Text(stringResource(R.string.score_sub), style = VType.Caption, color = VColor.TextSecondary, textAlign = TextAlign.Center)
