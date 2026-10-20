@@ -10,16 +10,20 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,15 +43,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonColors
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -61,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -74,6 +81,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -81,9 +89,12 @@ import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.phone.R
 import com.example.voxara.phone.model.Freshness
 import com.example.voxara.phone.ui.freshnessText
+import com.example.voxara.phone.ui.theme.EyebrowStyle
 import com.example.voxara.phone.ui.theme.LocalReduceMotion
+import com.example.voxara.phone.ui.theme.VoxNum
 import com.example.voxara.phone.ui.theme.Vox
 import com.example.voxara.ui.design.VoxIcons
+import com.example.voxara.ui.design.animateTone
 import com.example.voxara.ui.design.wordRes
 
 /** Readable line length on tablets and unfolded foldables. */
@@ -94,14 +105,16 @@ val TouchTarget = 48.dp
 // ------------------------------------------------------------------------------------ screen
 
 /**
- * A screen with an iOS-like large title that collapses as the list scrolls, pull to refresh,
- * and content centered to a readable width on large screens.
+ * A screen with an editorial large title (uppercase [eyebrow] with a pulsing dot over an
+ * extra-bold title) that collapses as the list scrolls, pull to refresh, and content centered to a
+ * readable width on large screens.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoxScreen(
     title: String,
     onBack: (() -> Unit)? = null,
+    eyebrow: String? = stringResource(R.string.home_title),
     refreshing: Boolean = false,
     onRefresh: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
@@ -117,7 +130,12 @@ fun VoxScreen(
         topBar = {
             LargeTopAppBar(
                 title = {
-                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+                    // The template's editorial header: a small uppercase label with a pulsing dot
+                    // above the extra-bold title. The label goes away once the bar collapses.
+                    Column {
+                        if (eyebrow != null && scroll.state.collapsedFraction < 0.5f) EditorialLabel(eyebrow)
+                        Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+                    }
                 },
                 navigationIcon = {
                     if (onBack != null) {
@@ -164,21 +182,26 @@ fun Modifier.contentWidth(): Modifier = this.widthIn(max = ContentMaxWidth).fill
 
 // ------------------------------------------------------------------------------------ cards
 
+/** The template card: 22 dp radius, 1 dp border, a soft shadow (light theme). */
 @Composable
 fun VoxCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    padding: Dp = 20.dp,
+    padding: Dp = 16.dp,
+    shape: Shape = MaterialTheme.shapes.large,
+    elevation: Dp = 2.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Vox.colors
     val body = @Composable {
         Column(Modifier.padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
+    val border = BorderStroke(1.dp, c.outline)
+    val shadow = if (c.dark) 0.dp else elevation
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = modifier, shape = MaterialTheme.shapes.large, color = c.surface, contentColor = c.text) { body() }
+        Surface(onClick = onClick, modifier = modifier, shape = shape, color = c.surface, contentColor = c.text, border = border, shadowElevation = shadow) { body() }
     } else {
-        Surface(modifier = modifier, shape = MaterialTheme.shapes.large, color = c.surface, contentColor = c.text) { body() }
+        Surface(modifier = modifier, shape = shape, color = c.surface, contentColor = c.text, border = border, shadowElevation = shadow) { body() }
     }
 }
 
@@ -187,22 +210,26 @@ fun VoxCard(
 fun GroupHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = Vox.colors.text2,
-        modifier = modifier.padding(start = 16.dp, top = 12.dp, bottom = 0.dp).semantics { heading() },
+        style = EyebrowStyle,
+        color = Vox.colors.text3,
+        modifier = modifier.padding(start = 4.dp, top = 12.dp, bottom = 0.dp).semantics { heading() },
     )
 }
 
 /** A rounded inset group of rows separated by hairlines. */
 @Composable
 fun Group(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = modifier, shape = MaterialTheme.shapes.medium, color = Vox.colors.surface, contentColor = Vox.colors.text) {
+    val c = Vox.colors
+    Surface(
+        modifier = modifier, shape = MaterialTheme.shapes.medium, color = c.surface, contentColor = c.text,
+        border = BorderStroke(1.dp, c.outline), shadowElevation = if (c.dark) 0.dp else 2.dp,
+    ) {
         Column(content = content)
     }
 }
 
 @Composable
-fun GroupDivider() = HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 0.5.dp, color = Vox.colors.outline)
+fun GroupDivider() = HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 1.dp, color = Vox.colors.outline)
 
 /** A footnote under a group. */
 @Composable
@@ -215,7 +242,7 @@ fun PendingTag() {
     Text(
         stringResource(R.string.pending_sync),
         style = MaterialTheme.typography.labelSmall,
-        color = Vox.colors.zoneInk(RiskZone.MODERATE),
+        color = Vox.colors.caution,
         modifier = Modifier
             .clip(CircleShape)
             .background(Vox.colors.surface2)
@@ -226,7 +253,7 @@ fun PendingTag() {
 @Composable
 private fun RowLabels(title: String, subtitle: String?, pending: Boolean, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = Vox.colors.text)
+        Text(title, style = MaterialTheme.typography.titleSmall, color = Vox.colors.text)
         if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2)
         if (pending) PendingTag()
     }
@@ -235,8 +262,8 @@ private fun RowLabels(title: String, subtitle: String?, pending: Boolean, modifi
 @Composable
 private fun RowIcon(icon: ImageVector?, tint: Color?) {
     if (icon != null) {
-        Icon(icon, contentDescription = null, tint = tint ?: Vox.colors.brand, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(14.dp))
+        IconTile(icon, tint ?: Vox.colors.brand)
+        Spacer(Modifier.width(12.dp))
     }
 }
 
@@ -290,7 +317,7 @@ fun SwitchRow(
         RowIcon(icon, null)
         RowLabels(title, subtitle, pending, Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        VoxSwitch(checked = checked)
     }
 }
 
@@ -312,18 +339,21 @@ fun StepperRow(
         RowLabels(title, subtitle, pending, Modifier.padding(end = 8.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.weight(1f))
-            IconButton(
+            val buttons = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = Vox.colors.surface2, contentColor = Vox.colors.brand,
+            )
+            FilledTonalIconButton(
                 onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onMinus() },
-                enabled = canMinus, modifier = Modifier.size(TouchTarget),
+                enabled = canMinus, modifier = Modifier.size(TouchTarget), colors = buttons,
             ) { Icon(VoxIcons.Minus, contentDescription = stringResource(R.string.action_decrease, title)) }
             Text(
-                value, style = MaterialTheme.typography.titleMedium, color = Vox.colors.text,
-                modifier = Modifier.widthIn(min = 64.dp).semantics { stateDescription = value },
+                value, style = VoxNum.medium, color = Vox.colors.text, textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(min = 80.dp).semantics { stateDescription = value },
                 maxLines = 1,
             )
-            IconButton(
+            FilledTonalIconButton(
                 onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onPlus() },
-                enabled = canPlus, modifier = Modifier.size(TouchTarget),
+                enabled = canPlus, modifier = Modifier.size(TouchTarget), colors = buttons,
             ) { Icon(VoxIcons.Plus, contentDescription = stringResource(R.string.action_increase, title)) }
         }
     }
@@ -342,18 +372,37 @@ fun <T> ChoiceRow(
     val haptics = LocalHapticFeedback.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (title != null) RowLabels(title, subtitle, pending)
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             options.forEachIndexed { i, (value, label) ->
                 SegmentedButton(
                     selected = value == selected,
                     onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onSelect(value) },
                     shape = SegmentedButtonDefaults.itemShape(i, options.size),
-                    modifier = Modifier.heightIn(min = TouchTarget),
-                    label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    colors = segmentColors(),
+                    icon = {},
+                    modifier = Modifier.heightIn(min = TouchTarget).fillMaxHeight(),
+                    // Four or more segments get the smaller label, so "120 min" keeps its unit at 360 dp;
+                    // a long label ("Follow system", large fonts) wraps to a second line instead of cutting.
+                    label = {
+                        Text(
+                            label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                            style = if (options.size >= 4) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                        )
+                    },
                 )
             }
         }
     }
+}
+
+/** The template's preset pills: the active one in the accent fill with dark text. */
+@Composable
+private fun segmentColors(): SegmentedButtonColors {
+    val c = Vox.colors
+    return SegmentedButtonDefaults.colors(
+        activeContainerColor = c.accent.fill, activeContentColor = c.accent.onFill, activeBorderColor = c.accent.fill,
+        inactiveContainerColor = c.surface2, inactiveContentColor = c.text, inactiveBorderColor = c.outline,
+    )
 }
 
 // ------------------------------------------------------------------------------------ buttons
@@ -372,12 +421,17 @@ fun PillButton(
         Text(text, style = MaterialTheme.typography.labelLarge)
     }
     val m = modifier.heightIn(min = 52.dp)
+    val c = Vox.colors
     if (tonal) {
-        FilledTonalButton(onClick = onClick, modifier = m, enabled = enabled, shape = CircleShape, content = content)
+        FilledTonalButton(
+            onClick = onClick, modifier = m, enabled = enabled, shape = CircleShape,
+            colors = ButtonDefaults.filledTonalButtonColors(containerColor = c.surface2, contentColor = c.brand),
+            content = content,
+        )
     } else {
         Button(
             onClick = onClick, modifier = m, enabled = enabled, shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(containerColor = Vox.colors.brand, contentColor = if (Vox.colors.dark) Color.Black else Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = c.accent.fill, contentColor = c.accent.onFill),
             content = content,
         )
     }
@@ -392,14 +446,16 @@ fun LinkButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
 
 // ------------------------------------------------------------------------------------ zones
 
-/** Icon + word: a zone is readable without colour. */
+/** The template status badge: icon + word in the tier ink on its soft tint. A zone is readable without colour. */
 @Composable
 fun ZoneBadge(zone: RiskZone, modifier: Modifier = Modifier) {
-    val ink = Vox.colors.zoneInk(zone)
+    val tone = animateTone(Vox.colors.level(zone), instant = LocalReduceMotion.current)
+    val ink = tone.ink
     Row(
         modifier
             .clip(CircleShape)
-            .background(Vox.colors.surface2)
+            .background(tone.soft)
+            .border(1.dp, ink.copy(alpha = 0.7f), CircleShape)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -428,7 +484,7 @@ fun RingGauge(
         animationSpec = if (reduce) snap() else spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
         label = "ring",
     )
-    val track = Vox.colors.surface2
+    val track = Vox.colors.track
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = stroke.toPx()
@@ -448,7 +504,7 @@ fun RingGauge(
 fun FreshnessLine(atMs: Long?, nowMs: Long, modifier: Modifier = Modifier) {
     val f = Freshness.of(atMs, nowMs)
     val c = Vox.colors
-    val tint = if (f == Freshness.STALE) c.zoneInk(RiskZone.MODERATE) else c.text2
+    val tint = if (f == Freshness.STALE) c.caution else c.text2
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Icon(VoxIcons.Clock, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
         Text(freshnessText(atMs, nowMs), style = MaterialTheme.typography.labelSmall, color = tint)
@@ -486,7 +542,7 @@ fun EmptyState(
     onAction: (() -> Unit)? = null,
 ) {
     VoxCard(modifier) {
-        Icon(icon, contentDescription = null, tint = Vox.colors.brand, modifier = Modifier.size(32.dp))
+        IconTile(icon, Vox.colors.brand)
         Text(title, style = MaterialTheme.typography.titleMedium, color = Vox.colors.text)
         Text(body, style = MaterialTheme.typography.bodyMedium, color = Vox.colors.text2)
         if (action != null && onAction != null) PillButton(action, onAction, tonal = true)
@@ -506,7 +562,7 @@ fun Banner(
 ) {
     VoxCard(modifier, padding = 16.dp) {
         Row(verticalAlignment = Alignment.Top) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+            IconTile(icon, tint)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, color = Vox.colors.text)
@@ -535,9 +591,9 @@ fun StatCard(
     val cd = stringResource(R.string.stat_cd, label, percent, stringResource(zone.wordRes()), freshnessText(asOfMs, nowMs))
     VoxCard(modifier.semantics(mergeDescendants = true) { contentDescription = cd }, onClick = onClick, padding = 16.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = c.brand, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, color = c.text2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            IconTile(icon, c.brand, size = 28.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(label.uppercase(), style = EyebrowStyle, color = c.text3, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             RingGauge(percent / 100f, c.zoneFill(zone), size = 52.dp, stroke = 7.dp)

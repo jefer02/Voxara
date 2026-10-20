@@ -33,6 +33,7 @@ import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.phone.R
 import com.example.voxara.phone.model.ZoneSegment
 import com.example.voxara.phone.ui.theme.Vox
+import com.example.voxara.phone.ui.theme.VoxNum
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.wordRes
 import kotlin.math.roundToInt
@@ -68,7 +69,7 @@ fun ZoneStrip(segments: List<ZoneSegment>, nowMinute: Int, description: String, 
             val w = size.width
             val h = size.height
             fun x(m: Int) = w * m / 1440f
-            drawRoundRect(c.surface2, Offset(0f, h - 3.dp.toPx()), Size(w, 3.dp.toPx()), CornerRadius(2.dp.toPx()))
+            drawRoundRect(c.track, Offset(0f, h - 3.dp.toPx()), Size(w, 3.dp.toPx()), CornerRadius(2.dp.toPx()))
             for (s in segments) {
                 val z = s.zone ?: continue
                 val bh = h * zoneHeight(z)
@@ -82,7 +83,7 @@ fun ZoneStrip(segments: List<ZoneSegment>, nowMinute: Int, description: String, 
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             listOf("0", "6", "12", "18", "24").forEach {
-                Text(it, style = MaterialTheme.typography.labelSmall, color = c.text3)
+                Text(it, style = VoxNum.small, color = c.text3)
             }
         }
         ZoneLegend(segments.mapNotNull { it.zone }.toSet())
@@ -104,7 +105,7 @@ fun HourlyChart(hourly: List<Float>, currentHour: Int?, description: String, mod
                 val v = hourly.getOrElse(h) { 0f }
                 val x = h * (bw + gap)
                 if (v <= 0f) {
-                    drawRoundRect(c.surface2, Offset(x, size.height - 4.dp.toPx()), Size(bw, 4.dp.toPx()), CornerRadius(2.dp.toPx()))
+                    drawRoundRect(c.track, Offset(x, size.height - 4.dp.toPx()), Size(bw, 4.dp.toPx()), CornerRadius(2.dp.toPx()))
                     continue
                 }
                 val frac = ((v - floor) / (top - floor)).coerceIn(0.04f, 1f)
@@ -119,10 +120,10 @@ fun HourlyChart(hourly: List<Float>, currentHour: Int?, description: String, mod
             }
             // 85 dBA guide: the level the daily limit is built on.
             val y85 = size.height * (1f - (85f - floor) / (top - floor))
-            drawLine(c.text3, Offset(0f, y85), Offset(size.width, y85), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)))
+            drawLine(c.text3.copy(alpha = 0.6f), Offset(0f, y85), Offset(size.width, y85), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            listOf("0", "6", "12", "18", "23").forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = c.text3) }
+            listOf("0", "6", "12", "18", "23").forEach { Text(it, style = VoxNum.small, color = c.text3) }
         }
         ZoneLegend(hourly.filter { it > 0f }.map { RiskZone.of(it.toDouble()) }.toSet())
     }
@@ -144,7 +145,7 @@ fun DoseBars(values: List<Double>, labels: List<String>, description: String, mo
             values.forEachIndexed { i, v ->
                 val x = i * (bw + gap)
                 val bh = (size.height * (v / maxV)).toFloat().coerceAtLeast(if (v > 0) 3.dp.toPx() else 2.dp.toPx())
-                val color = if (v > 0) c.zoneFill(RiskZone.ofPercent(v)) else c.surface2
+                val color = if (v > 0) c.zoneFill(RiskZone.ofPercent(v)) else c.track
                 drawRoundRect(color, Offset(x, size.height - bh), Size(bw, bh), CornerRadius(minOf(bw / 2, 6.dp.toPx())))
             }
             val y100 = (size.height * (1 - 100 / maxV)).toFloat()
@@ -152,7 +153,7 @@ fun DoseBars(values: List<Double>, labels: List<String>, description: String, mo
         }
         if (labels.isNotEmpty()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                labels.forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = c.text3) }
+                labels.forEach { Text(it, style = VoxNum.small, color = c.text3) }
             }
         }
         Text(stringResource(R.string.trends_limit_line), style = MaterialTheme.typography.labelSmall, color = c.text2)
@@ -176,8 +177,8 @@ fun BudgetLine(values: List<Double>, description: String, modifier: Modifier = M
         val area = Path().apply {
             addPath(line); lineTo(size.width, size.height); lineTo(0f, size.height); close()
         }
-        drawPath(area, c.brand.copy(alpha = 0.12f))
-        drawPath(line, c.brand, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(area, c.accent.soft)
+        drawPath(line, c.accent.fill, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
         val y100 = y(100.0)
         drawLine(c.text2, Offset(0f, y100), Offset(size.width, y100), 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
         val last = values.last()
@@ -194,8 +195,9 @@ fun SplitBar(headphoneShare: Double, modifier: Modifier = Modifier) {
         Box(Modifier.fillMaxWidth().height(14.dp).clip(CircleShape)) {
             Canvas(Modifier.fillMaxWidth().height(14.dp).clearAndSetSemantics { }) {
                 val split = size.width * (1 - hp / 100f)
-                drawRect(c.brand, Offset.Zero, Size(split, size.height))
-                drawRect(c.zoneFill(RiskZone.MODERATE), Offset(split, 0f), Size(size.width - split, size.height))
+                // The template's two series: the accent and the fixed secondary indigo.
+                drawRect(c.accent.fill, Offset.Zero, Size(split, size.height))
+                drawRect(c.secondary, Offset(split, 0f), Size(size.width - split, size.height))
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -204,7 +206,7 @@ fun SplitBar(headphoneShare: Double, modifier: Modifier = Modifier) {
                 Text(stringResource(R.string.split_ambient, 100 - hp), style = MaterialTheme.typography.labelMedium, color = c.text)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(VoxIcons.Headphones, null, tint = c.zoneInk(RiskZone.MODERATE), modifier = Modifier.size(16.dp))
+                Icon(VoxIcons.Headphones, null, tint = c.secondary, modifier = Modifier.size(16.dp))
                 Text(stringResource(R.string.split_headphones, hp), style = MaterialTheme.typography.labelMedium, color = c.text)
             }
         }
