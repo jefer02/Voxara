@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import com.example.voxara.ai.CoachUi
 import com.example.voxara.ai.ReplySource
 import com.example.voxara.core.ai.CoachReply
+import com.example.voxara.core.design.Accent
+import com.example.voxara.phone.data.ThemeMode
 import com.example.voxara.core.alerts.AlertKind
 import com.example.voxara.core.alerts.AlertRecord
 import com.example.voxara.core.ledger.DaySummary
@@ -40,7 +42,7 @@ import java.io.File
 
 /**
  * The key phone screens at phone / foldable / tablet widths and font scales 1.0 and 1.3 (2.0 for
- * Home and Settings), light and dark, rendered on the JVM into phone/build/screenshots/ for
+ * Home and Settings), light and dark, every accent on Home, rendered on the JVM into phone/build/screenshots/ for
  * review. Fake data only; nothing touches the network or the Data Layer.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -55,15 +57,20 @@ class PhoneScreenshotTest {
     private val foldable = Size("foldable", "w673dp-h841dp", "xhdpi")
     private val tablet = Size("tablet", "w1280dp-h800dp-land", "xhdpi")
     private val sizes = listOf(phone, foldable, tablet)
+    private val tall = Size("tall", "w360dp-h3200dp", "xhdpi")
 
     private val outDir by lazy { File(System.getProperty("user.dir"), "build/screenshots").apply { mkdirs() } }
 
-    private fun capture(name: String, size: Size, scale: Float, dark: Boolean = false, content: @Composable () -> Unit) {
+    private fun capture(
+        name: String, size: Size, scale: Float, dark: Boolean = false, accent: Accent? = null,
+        content: @Composable () -> Unit,
+    ) {
         RuntimeEnvironment.setQualifiers("${size.screen}-${if (dark) "night" else "notnight"}-${size.density}")
         RuntimeEnvironment.setFontScale(scale)
-        val file = File(outDir, "${name}_${size.name}_x$scale${if (dark) "_dark" else ""}.png")
+        val tag = accent?.let { "_" + it.name.lowercase() } ?: ""
+        val file = File(outDir, "${name}_${size.name}_x$scale$tag${if (dark) "_dark" else ""}.png")
         captureRoboImage(file.path) {
-            VoxaraPhoneTheme(darkTheme = dark, reduceMotion = true) { content() }
+            VoxaraPhoneTheme(darkTheme = dark, accent = accent ?: Accent.DEFAULT, reduceMotion = true) { content() }
         }
     }
 
@@ -127,6 +134,15 @@ class PhoneScreenshotTest {
         all("home") { HomeScreen(state, actions) {} }
         capture("home", phone, 2.0f) { HomeScreen(state, actions) {} }
         capture("home", phone, 1.0f, dark = true) { HomeScreen(state, actions) {} }
+        capture("home", phone, 2.0f, dark = true) { HomeScreen(state, actions) {} }
+    }
+
+    /** Settings → Appearance: Home in every accent, light and dark (a calm day, so the hero shows the accent). */
+    @Test fun homeAccents() {
+        val calm = state.copy(status = status.copy(dosePercent = 34.0))
+        for (accent in Accent.entries) for (dark in listOf(false, true)) {
+            capture("home_accent", phone, 1.0f, dark = dark, accent = accent) { HomeScreen(calm, actions) {} }
+        }
     }
 
     @Test fun homeStates() {
@@ -147,7 +163,10 @@ class PhoneScreenshotTest {
     }
 
     @Test fun today() = all("today") { TodayScreen(state, {}, {}) }
-    @Test fun trends() = all("trends") { TrendsScreen(state, {}) }
+    @Test fun trends() {
+        all("trends") { TrendsScreen(state, {}) }
+        capture("trends", phone, 1.0f, dark = true) { TrendsScreen(state, {}) }
+    }
     @Test fun alerts() = all("alerts") { AlertsScreen(state, {}, {}) }
     @Test fun headphones() = all("headphones") { HeadphonesScreen(state, actions, {}) }
 
@@ -170,6 +189,12 @@ class PhoneScreenshotTest {
     @Test fun settings() {
         all("settings") { SettingsScreen(state, actions) {} }
         capture("settings", phone, 2.0f) { SettingsScreen(state, actions) {} }
+        capture("settings", phone, 1.0f, dark = true) { SettingsScreen(state, actions) {} }
+        // A tall canvas, so the whole list (Appearance included) is in one image.
+        capture("settings_appearance", tall, 1.0f, accent = Accent.TURQUOISE) {
+            SettingsScreen(state.copy(accent = Accent.TURQUOISE, themeMode = ThemeMode.SYSTEM), actions) {}
+        }
+        capture("settings_appearance", tall, 1.0f, dark = true) { SettingsScreen(state.copy(themeMode = ThemeMode.DARK), actions) {} }
     }
 
     @Test fun setup() {
