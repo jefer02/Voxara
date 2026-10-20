@@ -7,13 +7,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Typography
-import com.example.voxara.core.risk.RiskZone
-import com.example.voxara.ui.design.InterFamily
+import com.example.voxara.core.design.Palette
+import com.example.voxara.ui.design.JakartaFamily
+import com.example.voxara.ui.design.LocalAnimate
 import com.example.voxara.ui.design.VColor
 
 /**
- * THEME — Material 3 for Wear OS on top of the Voxara design tokens (ui/design/Tokens.kt).
- * Colour is state, never decoration; zone colours are never used as Material roles.
+ * THEME — Material 3 for Wear OS on top of the Voxara design tokens (ui/design/Tokens.kt,
+ * docs/design/STYLE.md): pure black, dark cards, Purple as the accent. Tier colours (caution,
+ * danger) are never Material roles: they belong to the level-reactive accent.
  */
 
 /** Ambient (always-on): no fills, no glow, hairline geometry, no animation. */
@@ -25,36 +27,40 @@ val LocalAmbient = staticCompositionLocalOf { false }
  */
 val LocalReduceMotion = staticCompositionLocalOf { false }
 
+/** Accent soft over the card, as an opaque colour (Material containers must be opaque). */
+private val accentContainer = Color(Palette.over(Palette.accent(com.example.voxara.core.design.Accent.PURPLE, true).fill, 0.22f, Palette.DARK_CARD))
+
 /**
- * Material 3 colour roles mapped onto the tokens: true-black background, tonal surfaces, brand
- * cyan as primary.
+ * Material 3 colour roles mapped onto the tokens: black background, dark cards, the accent fill
+ * with dark text on it as primary (the template's filled buttons).
  */
 private val VoxColorScheme = ColorScheme(
-    primary = VColor.BrandStart,
-    onPrimary = VColor.Black,
-    primaryContainer = Color(0xFF0C3440),
+    primary = VColor.accent.fill,
+    primaryDim = VColor.accent.fill,
+    onPrimary = VColor.accent.onFill,
+    primaryContainer = accentContainer,
     onPrimaryContainer = VColor.Text,
-    secondary = VColor.BrandEnd,
-    onSecondary = VColor.Black,
-    secondaryContainer = VColor.Surface3,
+    secondary = VColor.Secondary,
+    onSecondary = VColor.accent.onFill,
+    secondaryContainer = VColor.CardSubtle,
     onSecondaryContainer = VColor.Text,
-    tertiary = VColor.BrandEnd,
-    onTertiary = VColor.Black,
-    error = VColor.zone(RiskZone.DANGEROUS),
-    onError = VColor.Black,
+    tertiary = VColor.AccentInk,
+    onTertiary = VColor.accent.onFill,
+    error = VColor.Danger,
+    onError = VColor.accent.onFill,
     background = VColor.Black,
     onBackground = VColor.Text,
-    surfaceContainerLow = VColor.Surface1,
-    surfaceContainer = VColor.Surface2,
-    surfaceContainerHigh = VColor.Surface3,
+    surfaceContainerLow = VColor.Card,
+    surfaceContainer = VColor.Card,
+    surfaceContainerHigh = VColor.CardSubtle,
     onSurface = VColor.Text,
     onSurfaceVariant = VColor.TextSecondary,
-    outline = VColor.Outline,
-    outlineVariant = VColor.Surface3,
+    outline = Color(0xFF3A4152),
+    outlineVariant = VColor.CardSubtle,
 )
 
-/** Inter everywhere Material 3 draws text (buttons, time text, dialogs). */
-private val VoxM3Typography = Typography(InterFamily)
+/** Plus Jakarta Sans everywhere Material 3 draws text (buttons, time text, dialogs). */
+private val VoxM3Typography = Typography(JakartaFamily)
 
 @Composable
 fun VoxaraTheme(
@@ -65,6 +71,8 @@ fun VoxaraTheme(
     CompositionLocalProvider(
         LocalAmbient provides ambient,
         LocalReduceMotion provides reduceMotion,
+        // Free-running animation only while interactive and allowed (the lifecycle gate is in animationsActive).
+        LocalAnimate provides (!ambient && !reduceMotion),
     ) {
         MaterialTheme(colorScheme = VoxColorScheme, typography = VoxM3Typography, content = content)
     }

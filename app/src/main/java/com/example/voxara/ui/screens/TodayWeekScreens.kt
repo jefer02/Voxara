@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,7 +39,10 @@ import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
-import com.example.voxara.ui.design.ProgressRing
+import com.example.voxara.ui.design.BezelArc
+import com.example.voxara.ui.design.EditorialHeader
+import com.example.voxara.ui.design.animateTone
+import com.example.voxara.ui.theme.LocalReduceMotion
 import com.example.voxara.ui.design.SectionLabel
 import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VType
@@ -49,26 +54,17 @@ import java.text.DateFormatSymbols
 import java.util.Calendar
 import kotlin.math.roundToInt
 
-/** TODAY — the daily dose ring, 24 hourly bars coloured AND sized by level, and coverage. */
+/** TODAY — the daily dose on the bezel arc, 24 hourly capsules coloured AND sized by level, and coverage. */
 @Composable
 fun TodayScreen(env: UiEnv) {
     val s = env.state
     val today = s.days.firstOrNull()
     val zone = RiskZone.ofPercent(s.dosePercent)
     VoxList {
-        item { SectionLabel(stringResource(R.string.card_today).uppercase()) }
+        item { EditorialHeader(stringResource(R.string.card_today), color = VColor.zone(zone)) }
         item {
             val cd = stringResource(R.string.cd_today, s.dosePercent.roundToInt(), zoneWord(zone))
-            ProgressRing(
-                (s.dosePercent / 100).toFloat(),
-                Modifier.size(112.dp).semantics(mergeDescendants = true) { contentDescription = cd },
-                color = VColor.zone(zone),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${s.dosePercent.roundToInt()}%", style = VType.Numeral, color = VColor.Text)
-                    Text(stringResource(R.string.today_ring_sub), style = VType.Caption, color = VColor.TextSecondary)
-                }
-            }
+            DoseBezel(s.dosePercent, stringResource(R.string.today_ring_sub), cd)
         }
         item {
             BodyText(
@@ -90,7 +86,26 @@ fun TodayScreen(env: UiEnv) {
     }
 }
 
-/** 24 slim bars: height by level (40-110 dBA), colour by zone, empty hours as dots. */
+/**
+ * A dose or budget [percent] on the bezel arc, in its tier colour, with the number in Mono inside.
+ * Spoken as [description].
+ */
+@Composable
+internal fun DoseBezel(percent: Double, sub: String, description: String, size: Dp = 120.dp) {
+    val tone = animateTone(VColor.tone(RiskZone.ofPercent(percent)), instant = LocalReduceMotion.current)
+    Box(Modifier.size(size).semantics(mergeDescendants = true) { contentDescription = description }, contentAlignment = Alignment.Center) {
+        BezelArc((percent / 100).toFloat(), color = tone.fill, modifier = Modifier.fillMaxSize())
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${percent.roundToInt()}%", style = VType.Display, color = VColor.Text, maxLines = 1)
+            Text(sub, style = VType.Caption, color = VColor.TextSecondary, maxLines = 2)
+        }
+    }
+}
+
+/**
+ * 24 rounded capsule bars, the template's history bars: height by level (40-110 dBA), colour by
+ * the level's tier, unmeasured hours as low grey capsules.
+ */
 @Composable
 private fun HourBars(hourly: List<Float>) {
     val loud = hourly.count { it >= 85f }
@@ -99,25 +114,24 @@ private fun HourBars(hourly: List<Float>) {
         Modifier.fillMaxWidth().semantics { contentDescription = cd },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(
-            Modifier.fillMaxWidth().height(56.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            hourly.forEach { v ->
-                val f = if (v <= 0f) 0.05f else ((v - 40f) / 70f).coerceIn(0.08f, 1f)
-                Box(Modifier.weight(1f).fillMaxHeight(f)) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        drawRoundRect(
-                            color = if (v <= 0f) VColor.Surface3 else VColor.zone(RiskZone.of(v.toDouble())),
-                            cornerRadius = CornerRadius(2.dp.toPx()),
-                        )
-                    }
-                }
+        Canvas(Modifier.fillMaxWidth().height(56.dp)) {
+            val n = 24
+            val gap = 2.dp.toPx()
+            val bw = (size.width - gap * (n - 1)) / n
+            for (h in 0 until n) {
+                val v = hourly.getOrElse(h) { 0f }
+                val f = if (v <= 0f) 0.08f else ((v - 40f) / 70f).coerceIn(0.12f, 1f)
+                val bh = size.height * f
+                drawRoundRect(
+                    color = if (v <= 0f) VColor.Track else VColor.zone(RiskZone.of(v.toDouble())),
+                    topLeft = Offset(h * (bw + gap), size.height - bh),
+                    size = Size(bw, bh),
+                    cornerRadius = CornerRadius(bw / 2),
+                )
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            listOf("0", "6", "12", "18", "24").forEach { Text(it, style = VType.Caption, color = VColor.TextTertiary) }
+            listOf("0", "6", "12", "18", "24").forEach { Text(it, style = VType.Value, color = VColor.TextTertiary) }
         }
     }
 }
@@ -144,19 +158,10 @@ fun WeekScreen(env: UiEnv, actions: VoxaraActions) {
     val name = stringResource(R.string.ai_name)
 
     VoxList {
-        item { SectionLabel(stringResource(R.string.card_week).uppercase()) }
+        item { EditorialHeader(stringResource(R.string.card_week), color = VColor.zone(zone)) }
         item {
             val cd = stringResource(R.string.cd_week, ambient.roundToInt(), listening.roundToInt())
-            ProgressRing(
-                (worst / 100).toFloat(),
-                Modifier.size(112.dp).semantics(mergeDescendants = true) { contentDescription = cd },
-                color = VColor.zone(zone),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${worst.roundToInt()}%", style = VType.Numeral, color = VColor.Text)
-                    Text(stringResource(R.string.week_ring_sub), style = VType.Caption, color = VColor.TextSecondary)
-                }
-            }
+            DoseBezel(worst, stringResource(R.string.week_ring_sub), cd)
         }
         item {
             MetricCard(VoxIcons.Waves, stringResource(R.string.week_ambient), "${ambient.roundToInt()}%", accent = VColor.zone(RiskZone.ofPercent(ambient)))
@@ -196,7 +201,7 @@ fun WeekScreen(env: UiEnv, actions: VoxaraActions) {
             }
             env.coach.reply?.let { r ->
                 item { HeroStatus(r.insight, maxLines = 4) }
-                item { BodyText(r.suggestion, color = VColor.BrandStart) }
+                item { BodyText(r.suggestion, color = VColor.AccentInk) }
             }
         }
     }
