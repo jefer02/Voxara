@@ -292,7 +292,7 @@
     <string name="sec_about">About</string>
     <string name="how_it_works">How Voxara works</string>
     <string name="version">Version %1$s</string>
-    <string name="licences">Inter font: SIL Open Font License 1.1</string>
+    <string name="licences">Plus Jakarta Sans and JetBrains Mono fonts: SIL Open Font License 1.1</string>
     <string name="setup_again">Run setup again</string>
     <string name="sync_failed_toast">Sync didn\'t complete. See Watch for help.</string>
     <string name="sync_done_toast">Synced.</string>
@@ -351,4 +351,19 @@
     <string name="mode_selected_cd">Selected</string>
     <string name="watch_mode">Mode on the watch: %1$s</string>
     <string name="watch_mode_auto">Auto · %1$s</string>
+    <!-- Settings → Appearance (phone only, never synced to the watch) -->
+    <string name="sec_appearance">Appearance</string>
+    <string name="set_accent">Accent colour</string>
+    <string name="set_accent_note">Buttons, switches and highlights use it. Levels and doses still turn amber or crimson when they get loud.</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_turquoise">Turquoise</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_emerald">Emerald</string>
+    <string name="set_theme">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">Follow system</string>
+    <string name="set_appearance_note">Only on this phone. Your watch keeps its own look.</string>
+    <!-- Home hero: the capsule meter of today's dose, spoken -->
+    <string name="hero_dose_cd">Today\'s dose %1$d%%, %2$s</string>
 </resources>
