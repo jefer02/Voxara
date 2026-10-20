@@ -3,6 +3,9 @@ package com.example.voxara.phone.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -16,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -67,6 +71,18 @@ fun PhoneApp(state: PhoneUiState, actions: PhoneActions, snackbar: SnackbarHostS
     val go: (String) -> Unit = { nav.navigate(it) }
     val back: () -> Unit = { nav.popBackStack() }
     val c = Vox.colors
+    // The template's bottom nav: muted items, the selected one with an accent-soft pill and accent icon.
+    val pill = c.accent.soft.compositeOver(c.surface)
+    val itemColors = NavigationSuiteDefaults.itemColors(
+        navigationBarItemColors = NavigationBarItemDefaults.colors(
+            selectedIconColor = c.brand, selectedTextColor = c.text, indicatorColor = pill,
+            unselectedIconColor = c.text3, unselectedTextColor = c.text3,
+        ),
+        navigationRailItemColors = NavigationRailItemDefaults.colors(
+            selectedIconColor = c.brand, selectedTextColor = c.text, indicatorColor = pill,
+            unselectedIconColor = c.text3, unselectedTextColor = c.text3,
+        ),
+    )
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -81,7 +97,8 @@ fun PhoneApp(state: PhoneUiState, actions: PhoneActions, snackbar: SnackbarHostS
                         }
                     },
                     icon = { Icon(tab.icon, contentDescription = null) },
-                    label = { Text(stringResource(tab.label)) },
+                    label = { Text(stringResource(tab.label), style = MaterialTheme.typography.labelMedium) },
+                    colors = itemColors,
                 )
             }
         },
