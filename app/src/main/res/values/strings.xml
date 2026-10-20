@@ -413,7 +413,7 @@
     <string name="set_alert_level">ALERT LEVEL</string>
     <string name="set_debug">DEBUG TOOLS</string>
     <string name="set_fine_trim">FINE TRIM (dB)</string>
-    <string name="set_licenses">Inter typeface © The Inter Project Authors, SIL Open Font License 1.1.</string>
+    <string name="set_licenses">Plus Jakarta Sans © The Plus Jakarta Sans Project Authors and JetBrains Mono © The JetBrains Mono Project Authors, SIL Open Font License 1.1.</string>
     <string name="set_monitoring">MONITORING</string>
     <string name="set_privacy">PRIVACY</string>
     <string name="set_privacy_body">Stored on this watch only: sound levels per minute (35 days), your settings and calibration. Never audio, song or app names, device names or location.</string>
