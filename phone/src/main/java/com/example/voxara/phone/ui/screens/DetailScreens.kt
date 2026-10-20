@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +30,9 @@ import com.example.voxara.phone.ui.components.Group
 import com.example.voxara.phone.ui.components.GroupDivider
 import com.example.voxara.phone.ui.components.GroupHeader
 import com.example.voxara.phone.ui.components.HourlyChart
+import com.example.voxara.phone.ui.components.IconTile
+import com.example.voxara.phone.ui.components.Metric
+import com.example.voxara.phone.ui.components.MetricTriplet
 import com.example.voxara.phone.ui.components.SkeletonCard
 import com.example.voxara.phone.ui.components.VoxCard
 import com.example.voxara.phone.ui.components.VoxScreen
@@ -40,9 +41,11 @@ import com.example.voxara.phone.ui.dateText
 import com.example.voxara.phone.ui.isLevel
 import com.example.voxara.phone.ui.labelRes
 import com.example.voxara.phone.ui.theme.Vox
+import com.example.voxara.phone.ui.theme.VoxNum
 import com.example.voxara.phone.ui.timeText
 import com.example.voxara.phone.ui.titleRes
 import com.example.voxara.ui.design.VoxIcons
+import com.example.voxara.ui.design.wordRes
 import java.util.Calendar
 import kotlin.math.roundToInt
 
@@ -79,16 +82,21 @@ fun TodayScreen(s: PhoneUiState, onBack: () -> Unit, onRefresh: () -> Unit) {
                 }
             }
             item {
-                Group(Modifier.contentWidth()) {
-                    Metric(stringResource(R.string.today_dose), stringResource(R.string.value_percent, s.head.dosePercent.roundToInt()))
-                    GroupDivider()
-                    Metric(stringResource(R.string.today_avg), today.averageDba()?.let { stringResource(R.string.value_dba, it.roundToInt()) } ?: stringResource(R.string.value_none))
-                    GroupDivider()
-                    Metric(stringResource(R.string.today_loudest), s.history.todayMinutes.loudestMinuteDba()?.let { stringResource(R.string.value_dba, it.roundToInt()) } ?: stringResource(R.string.value_none))
-                    GroupDivider()
-                    Metric(stringResource(R.string.today_measured), formatClock(today.measuredMinutes))
-                }
+                // The template's metric triplet (stacks itself when the cells get too narrow).
+                val doseZone = RiskZone.ofPercent(s.head.dosePercent)
+                MetricTriplet(
+                    listOf(
+                        Metric(
+                            stringResource(R.string.today_dose), stringResource(R.string.value_percent, s.head.dosePercent.roundToInt()),
+                            caption = stringResource(doseZone.wordRes()), captionColor = Vox.colors.zoneInk(doseZone),
+                        ),
+                        Metric(stringResource(R.string.today_avg), today.averageDba()?.let { stringResource(R.string.value_dba, it.roundToInt()) } ?: stringResource(R.string.value_none)),
+                        Metric(stringResource(R.string.today_loudest), s.history.todayMinutes.loudestMinuteDba()?.let { stringResource(R.string.value_dba, it.roundToInt()) } ?: stringResource(R.string.value_none)),
+                    ),
+                    Modifier.contentWidth(),
+                )
             }
+            item { Group(Modifier.contentWidth()) { MetricRow(stringResource(R.string.today_measured), formatClock(today.measuredMinutes)) } }
         }
         val todays = s.history.alerts.filter { it.atMs >= s.history.todayStartMinute * 60_000L }
         item { GroupHeader(stringResource(R.string.today_alerts), Modifier.contentWidth()) }
@@ -101,10 +109,10 @@ fun TodayScreen(s: PhoneUiState, onBack: () -> Unit, onRefresh: () -> Unit) {
 }
 
 @Composable
-private fun Metric(label: String, value: String) {
+private fun MetricRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = Vox.colors.text, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.titleMedium, color = Vox.colors.text)
+        Text(label, style = MaterialTheme.typography.titleSmall, color = Vox.colors.text, modifier = Modifier.weight(1f))
+        Text(value, style = VoxNum.medium, color = Vox.colors.text)
     }
 }
 
@@ -131,14 +139,14 @@ fun AlertRow(a: AlertRecord) {
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).clearAndSetSemantics { contentDescription = cd },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(VoxIcons.zone(zone), contentDescription = null, tint = c.zoneInk(zone), modifier = Modifier.size(22.dp))
+        IconTile(VoxIcons.zone(zone), c.zoneInk(zone))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = c.text)
             Text("$tier · $time · $state", style = MaterialTheme.typography.bodySmall, color = c.text2)
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(value, style = MaterialTheme.typography.titleMedium, color = c.text)
+            Text(value, style = VoxNum.medium, color = c.text)
             if (a.level > 0) Text(stringResource(R.string.alert_level, a.level), style = MaterialTheme.typography.labelSmall, color = c.text2)
         }
     }

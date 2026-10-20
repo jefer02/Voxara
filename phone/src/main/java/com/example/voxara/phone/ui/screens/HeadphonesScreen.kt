@@ -59,7 +59,7 @@ fun HeadphonesScreen(s: PhoneUiState, actions: PhoneActions, onBack: () -> Unit)
             item {
                 Banner(
                     VoxIcons.Headphones, stringResource(R.string.hp_sampling), stringResource(R.string.hp_bt_needed),
-                    tint = Vox.colors.zoneInk(RiskZone.MODERATE), modifier = Modifier.contentWidth(),
+                    tint = Vox.colors.caution, modifier = Modifier.contentWidth(),
                     action = stringResource(R.string.action_allow), onAction = actions.onRequestBluetooth,
                 )
             }
