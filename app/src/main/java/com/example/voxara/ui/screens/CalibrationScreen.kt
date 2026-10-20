@@ -52,7 +52,6 @@ import com.example.voxara.core.calibration.compareOffsets
 import com.example.voxara.core.calibration.snapReference
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.ExposureState
-import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.SectionLabel
@@ -209,13 +208,13 @@ fun CalibrationScreen(
                 SectionLabel(
                     text = if (existing != null) stringResource(R.string.cal_status_calibrated, formatDate(existing.calibratedAtMs))
                     else stringResource(R.string.cal_status_uncalibrated),
-                    color = if (existing != null) VColor.zone(RiskZone.OK) else VColor.zone(RiskZone.MODERATE),
+                    color = if (existing != null) VColor.AccentInk else VColor.Caution,
                 )
             }
 
             when (step) {
                 Step.INTRO -> {
-                    captureProblem?.let { item { BodyText(stringResource(it), color = VColor.zone(RiskZone.MODERATE)) } }
+                    captureProblem?.let { item { BodyText(stringResource(it), color = VColor.Caution) } }
                     item { BodyText(stringResource(R.string.cal_step_1), color = VColor.Text, maxLines = 6) }
                     item { BodyText(stringResource(R.string.cal_step_2), color = VColor.Text, maxLines = 6) }
                     item { BodyText(stringResource(R.string.cal_step_3), color = VColor.Text, maxLines = 6) }
@@ -314,9 +313,9 @@ fun CalibrationScreen(
                         LaunchedEffect(Unit) { runCatching { dialFocus.requestFocus() } }
                     }
                     if (checkReference(reference) == ReferenceCheck.LouderThanAdvised) {
-                        item { BodyText(stringResource(R.string.cal_louder_than_advised), color = VColor.zone(RiskZone.MODERATE)) }
+                        item { BodyText(stringResource(R.string.cal_louder_than_advised), color = VColor.Caution) }
                     }
-                    referenceProblem?.let { item { BodyText(stringResource(it), color = VColor.zone(RiskZone.DANGEROUS)) } }
+                    referenceProblem?.let { item { BodyText(stringResource(it), color = VColor.Danger) } }
                     item {
                         Button(onClick = { confirmReference() }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.cal_confirm))
@@ -375,7 +374,7 @@ fun CalibrationScreen(
                     }
                     when (val cmp = comparison) {
                         is Consistency.Consistent -> {
-                            item { BodyText(stringResource(R.string.cal_consistent, cmp.differenceDb), color = VColor.zone(RiskZone.OK)) }
+                            item { BodyText(stringResource(R.string.cal_consistent, cmp.differenceDb), color = VColor.AccentInk) }
                             item {
                                 Button(onClick = { save(cmp.offsetDb, b.offsetDb) }, modifier = Modifier.fillMaxWidth()) {
                                     Text(stringResource(R.string.cal_save))
@@ -383,7 +382,7 @@ fun CalibrationScreen(
                             }
                         }
                         is Consistency.Inconsistent -> {
-                            item { BodyText(stringResource(R.string.cal_inconsistent, cmp.differenceDb), color = VColor.zone(RiskZone.DANGEROUS), maxLines = 6) }
+                            item { BodyText(stringResource(R.string.cal_inconsistent, cmp.differenceDb), color = VColor.Danger, maxLines = 6) }
                             item {
                                 FilledTonalButton(onClick = { save(cmp.averageDb, b.offsetDb) }, modifier = Modifier.fillMaxWidth()) {
                                     Text(stringResource(R.string.cal_save_average))
@@ -404,7 +403,7 @@ fun CalibrationScreen(
                     item {
                         BodyText(
                             stringResource(R.string.cal_saved, formatDate(savedAt)),
-                            color = VColor.zone(RiskZone.OK),
+                            color = VColor.AccentInk,
                             maxLines = 4,
                         )
                     }

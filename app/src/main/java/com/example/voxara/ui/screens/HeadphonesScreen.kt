@@ -8,10 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
 import com.example.voxara.R
@@ -25,11 +22,11 @@ import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
+import com.example.voxara.ui.design.EditorialHeader
 import com.example.voxara.ui.design.EmptyState
 import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
-import com.example.voxara.ui.design.ProgressRing
 import com.example.voxara.ui.design.SectionLabel
 import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VType
@@ -55,7 +52,7 @@ fun HeadphonesScreen(env: UiEnv, actions: VoxaraActions) {
     val weekZone = RiskZone.ofPercent(weeklyPercent.toDouble())
 
     VoxList {
-        item { SectionLabel(stringResource(R.string.hp_title)) }
+        item { EditorialHeader(stringResource(R.string.hp_title), color = VColor.zone(weekZone)) }
         item {
             val status = when {
                 s.headphoneCategory == null -> stringResource(R.string.hp_not_connected)
@@ -69,7 +66,7 @@ fun HeadphonesScreen(env: UiEnv, actions: VoxaraActions) {
                 val zone = RiskZone.of(estimate.dba)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("≈ ${estimate.dba.roundToInt()}", style = VType.Display, color = VColor.Text)
-                    Text(stringResource(R.string.unit_dba), style = VType.Caption, color = VColor.TextSecondary)
+                    Text(stringResource(R.string.unit_dba).uppercase(), style = VType.Eyebrow, color = VColor.TextTertiary)
                     ZoneBadge(zone)
                 }
             }
@@ -86,16 +83,7 @@ fun HeadphonesScreen(env: UiEnv, actions: VoxaraActions) {
         }
         item {
             val cd = stringResource(R.string.cd_headphones_week, weeklyPercent)
-            ProgressRing(
-                s.headphoneWeeklyFraction.toFloat(),
-                Modifier.size(104.dp).semantics(mergeDescendants = true) { contentDescription = cd },
-                color = VColor.zone(weekZone),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$weeklyPercent%", style = VType.Numeral, color = VColor.Text)
-                    Text(stringResource(R.string.hp_week_label), style = VType.Caption, color = VColor.TextSecondary)
-                }
-            }
+            DoseBezel(s.headphoneWeeklyFraction * 100, stringResource(R.string.hp_week_label), cd, size = 112.dp)
         }
         left?.let {
             item {
