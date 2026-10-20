@@ -1,8 +1,12 @@
 package com.example.voxara.phone.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -14,16 +18,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.voxara.core.alerts.AlertDefaults
+import com.example.voxara.core.design.Accent
 import com.example.voxara.core.alerts.AlertPolicy
 import com.example.voxara.core.alerts.HapticStrength
-import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.designsystem.R as DsR
 import com.example.voxara.phone.R
 import com.example.voxara.phone.data.PhoneStoreState
+import com.example.voxara.phone.data.ThemeMode
 import com.example.voxara.phone.ui.PhoneActions
 import com.example.voxara.phone.ui.PhoneRoutes
 import com.example.voxara.phone.ui.PhoneUiState
+import com.example.voxara.phone.ui.components.AccentSwatches
 import com.example.voxara.phone.ui.components.Banner
 import com.example.voxara.phone.ui.components.ChoiceRow
 import com.example.voxara.phone.ui.components.Group
@@ -56,7 +62,7 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
             item {
                 Banner(
                     VoxIcons.Refresh, stringResource(R.string.pending_sync), stringResource(R.string.settings_pending_note),
-                    tint = Vox.colors.zoneInk(RiskZone.MODERATE), modifier = Modifier.contentWidth(),
+                    tint = Vox.colors.caution, modifier = Modifier.contentWidth(),
                 )
             }
         }
@@ -193,6 +199,39 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
         item { GroupNote(stringResource(R.string.privacy_numbers) + "\n\n" + stringResource(R.string.privacy_backup), Modifier.contentWidth()) }
 
+        // ------------------------------------------------------------------ appearance (phone only)
+        item { GroupHeader(stringResource(R.string.sec_appearance), Modifier.contentWidth()) }
+        item {
+            Group(Modifier.contentWidth()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.set_accent), style = MaterialTheme.typography.titleSmall, color = Vox.colors.text)
+                    Text(stringResource(R.string.set_accent_note), style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2)
+                    AccentSwatches(
+                        selected = s.accent,
+                        onSelect = actions.onAccent,
+                        names = mapOf(
+                            Accent.PURPLE to stringResource(R.string.accent_purple),
+                            Accent.TURQUOISE to stringResource(R.string.accent_turquoise),
+                            Accent.BLUE to stringResource(R.string.accent_blue),
+                            Accent.EMERALD to stringResource(R.string.accent_emerald),
+                        ),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                GroupDivider()
+                ChoiceRow(
+                    stringResource(R.string.set_theme),
+                    listOf(
+                        ThemeMode.LIGHT to stringResource(R.string.theme_light),
+                        ThemeMode.DARK to stringResource(R.string.theme_dark),
+                        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
+                    ),
+                    s.themeMode, actions.onThemeMode,
+                )
+            }
+        }
+        item { GroupNote(stringResource(R.string.set_appearance_note), Modifier.contentWidth()) }
+
         // ------------------------------------------------------------------ language
         item { GroupHeader(stringResource(R.string.sec_language), Modifier.contentWidth()) }
         item {
@@ -228,7 +267,7 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 GroupRow(
                     stringResource(R.string.set_delete),
                     if (s.deletePending) stringResource(R.string.delete_pending_note) else stringResource(R.string.set_delete_note),
-                    icon = VoxIcons.Trash, iconTint = Vox.colors.zoneInk(RiskZone.DANGEROUS),
+                    icon = VoxIcons.Trash, iconTint = Vox.colors.danger,
                     onClick = { confirmDelete = true },
                 )
             }
@@ -255,7 +294,7 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
             text = { Text(stringResource(R.string.delete_confirm_body)) },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; actions.onDeleteAll() }) {
-                    Text(stringResource(R.string.action_delete), color = Vox.colors.zoneInk(RiskZone.DANGEROUS))
+                    Text(stringResource(R.string.action_delete), color = Vox.colors.danger)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },

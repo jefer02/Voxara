@@ -1,6 +1,6 @@
 package com.example.voxara.phone.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,12 +35,16 @@ import com.example.voxara.phone.ui.PhoneActions
 import com.example.voxara.phone.ui.PhoneRoutes
 import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.components.Banner
+import com.example.voxara.phone.ui.components.CapsuleMeter
+import com.example.voxara.phone.ui.components.HeroCard
+import com.example.voxara.phone.ui.components.IconTile
+import com.example.voxara.phone.ui.components.ScaleMark
+import com.example.voxara.phone.ui.components.ZoneBadge
 import com.example.voxara.phone.ui.components.EmptyState
 import com.example.voxara.phone.ui.components.FreshnessLine
 import com.example.voxara.phone.ui.components.Group
 import com.example.voxara.phone.ui.components.GroupDivider
 import com.example.voxara.phone.ui.components.GroupRow
-import com.example.voxara.phone.ui.components.RingGauge
 import com.example.voxara.phone.ui.components.SkeletonCard
 import com.example.voxara.phone.ui.components.StatCard
 import com.example.voxara.phone.ui.components.VoxCard
@@ -51,15 +54,19 @@ import com.example.voxara.phone.ui.components.contentWidth
 import com.example.voxara.phone.ui.components.zoneWordText
 import com.example.voxara.phone.ui.dateTimeText
 import com.example.voxara.phone.ui.isLevel
+import com.example.voxara.phone.ui.theme.EyebrowStyle
 import com.example.voxara.phone.ui.theme.Vox
-import com.example.voxara.phone.ui.timeText
 import com.example.voxara.phone.ui.titleRes
 import com.example.voxara.ui.design.VoxIcons
 import kotlin.math.roundToInt
 
 @Composable
 fun HomeScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) -> Unit) {
-    VoxScreen(title = stringResource(R.string.home_title), refreshing = s.syncing, onRefresh = actions.onRefresh) {
+    // The editorial label over the title says how the watch link is (the template's "Wear OS Sync").
+    VoxScreen(
+        title = stringResource(R.string.home_title), eyebrow = linkText(s).first,
+        refreshing = s.syncing, onRefresh = actions.onRefresh,
+    ) {
         item { LinkChip(s, onClick = { navigate(PhoneRoutes.WATCH) }) }
 
         if (!s.loaded) {
@@ -72,12 +79,12 @@ fun HomeScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) -> Uni
         }
 
         val head = s.head
-        item { HeroCard(s, Modifier.contentWidth()) }
+        item { HomeHero(s, Modifier.contentWidth()) }
         if (s.status?.calibrated == false) {
             item {
                 Banner(
                     VoxIcons.Tune, stringResource(R.string.uncalibrated_title), stringResource(R.string.uncalibrated_body),
-                    tint = Vox.colors.zoneInk(RiskZone.MODERATE), modifier = Modifier.contentWidth(),
+                    tint = Vox.colors.caution, modifier = Modifier.contentWidth(),
                     action = stringResource(R.string.action_open_calibration), onAction = actions.onOpenCalibration,
                 )
             }
@@ -86,7 +93,7 @@ fun HomeScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) -> Uni
             item {
                 Banner(
                     VoxIcons.Clock, stringResource(R.string.fresh_stale_hint), freshnessTextPlain(s),
-                    tint = Vox.colors.zoneInk(RiskZone.MODERATE), modifier = Modifier.contentWidth(),
+                    tint = Vox.colors.caution, modifier = Modifier.contentWidth(),
                     action = stringResource(R.string.action_sync_now), onAction = actions.onRefresh,
                 )
             }
@@ -137,21 +144,28 @@ private fun StatRow(modifier: Modifier, content: @Composable (Modifier) -> Unit)
     }
 }
 
+/** The link in words, with the zone whose icon goes with it (null while checking). */
+@Composable
+private fun linkText(s: PhoneUiState): Pair<String, RiskZone?> = when (val l = s.link) {
+    LinkState.Checking -> stringResource(R.string.link_checking) to null
+    LinkState.WearApiMissing -> stringResource(R.string.link_api_missing) to RiskZone.LOUD
+    LinkState.NoWatch -> stringResource(R.string.link_no_watch) to RiskZone.MODERATE
+    is LinkState.NotInstalled -> stringResource(R.string.link_not_installed) to RiskZone.MODERATE
+    is LinkState.Linked -> stringResource(R.string.link_linked, l.watch.name) to RiskZone.OK
+    is LinkState.Problem -> stringResource(R.string.link_problem) to RiskZone.LOUD
+}
+
 /** The watch connection at a glance; tapping it opens the Watch tab. */
 @Composable
 fun LinkChip(s: PhoneUiState, onClick: () -> Unit) {
     val c = Vox.colors
-    val (text, zone) = when (val l = s.link) {
-        LinkState.Checking -> stringResource(R.string.link_checking) to null
-        LinkState.WearApiMissing -> stringResource(R.string.link_api_missing) to RiskZone.LOUD
-        LinkState.NoWatch -> stringResource(R.string.link_no_watch) to RiskZone.MODERATE
-        is LinkState.NotInstalled -> stringResource(R.string.link_not_installed) to RiskZone.MODERATE
-        is LinkState.Linked -> stringResource(R.string.link_linked, l.watch.name) to RiskZone.OK
-        is LinkState.Problem -> stringResource(R.string.link_problem) to RiskZone.LOUD
-    }
+    val (text, zone) = linkText(s)
     val sub = if (s.syncing) stringResource(R.string.syncing)
     else s.lastSyncMs?.let { stringResource(R.string.last_synced, dateTimeText(it, s.nowMs)) } ?: stringResource(R.string.fresh_never)
-    Surface(onClick = onClick, shape = CircleShape, color = c.surface, contentColor = c.text, modifier = Modifier.heightIn(min = 48.dp)) {
+    Surface(
+        onClick = onClick, shape = CircleShape, color = c.surface, contentColor = c.text,
+        border = BorderStroke(1.dp, c.outline), modifier = Modifier.heightIn(min = 48.dp),
+    ) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 if (zone == null) VoxIcons.Watch else VoxIcons.zone(zone), contentDescription = null,
@@ -166,38 +180,60 @@ fun LinkChip(s: PhoneUiState, onClick: () -> Unit) {
     }
 }
 
+/**
+ * THE HERO — the template's hero card on Voxara's data: Tono's status line, the Hearing Care Score
+ * in Mono, today's dose as the status badge and the 26-capsule meter (0–120 %, Voxara's percent
+ * zones), wave lines behind whose height follows today's dose.
+ */
 @Composable
-private fun HeroCard(s: PhoneUiState, modifier: Modifier) {
+private fun HomeHero(s: PhoneUiState, modifier: Modifier) {
     val c = Vox.colors
     val tono = s.settings.tonoEnabled
     val status = s.coach.reply?.status?.takeIf { tono } ?: stringResource(R.string.home_status_fallback)
     val scoreCd = stringResource(R.string.home_score_cd, s.score)
-    VoxCard(modifier) {
-        // The brand is always Voxara; Tono is only the voice of the status line under it.
-        Text(stringResource(R.string.home_title).uppercase(), style = MaterialTheme.typography.labelMedium, color = c.brand)
-        if (tono) {
-            Text(
-                stringResource(R.string.tono_says, stringResource(R.string.tono_title)),
-                style = MaterialTheme.typography.labelSmall, color = c.text3,
-            )
+    val dose = s.head.dosePercent
+    val doseZone = RiskZone.ofPercent(dose)
+    HeroCard(intensity = (dose / HERO_DOSE_SCALE).toFloat(), zone = doseZone, modifier = modifier) {
+        Row(verticalAlignment = Alignment.Top) {
+            // The brand is always Voxara; Tono is only the voice of the status line under it.
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.home_title).uppercase(), style = EyebrowStyle, color = c.brand)
+                if (tono) {
+                    Text(
+                        stringResource(R.string.tono_says, stringResource(R.string.tono_title)).uppercase(),
+                        style = EyebrowStyle, color = c.text3,
+                    )
+                }
+            }
+            ZoneBadge(doseZone)
         }
         Text(status, style = MaterialTheme.typography.headlineMedium, color = c.text)
         if (tono && s.coach.source == ReplySource.CLOUD_AI) {
             Text(stringResource(R.string.tono_source_ai), style = MaterialTheme.typography.labelSmall, color = c.text3)
         }
-        Spacer(Modifier.size(4.dp))
-        Row(Modifier.semantics(mergeDescendants = true) { contentDescription = scoreCd }, verticalAlignment = Alignment.CenterVertically) {
-            RingGauge(s.score / 100f, c.brand, size = 96.dp, stroke = 12.dp) {
-                Text("${s.score}", style = MaterialTheme.typography.displaySmall, color = c.text)
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.home_score), style = MaterialTheme.typography.titleMedium, color = c.text)
+        Row(
+            Modifier.semantics(mergeDescendants = true) { contentDescription = scoreCd },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("${s.score}", style = MaterialTheme.typography.displayMedium, color = c.text)
+            Spacer(Modifier.width(14.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.home_score).uppercase(), style = EyebrowStyle, color = c.text3)
                 Text(stringResource(R.string.home_score_sub), style = MaterialTheme.typography.bodySmall, color = c.text2)
             }
         }
+        CapsuleMeter(
+            fraction = (dose / HERO_DOSE_SCALE).toFloat(),
+            zoneAt = { RiskZone.ofPercent(it * HERO_DOSE_SCALE) },
+            // Most important first: the limit, then the start, then the zone boundaries.
+            marks = listOf(100, 0, 50, 80).map { ScaleMark((it / HERO_DOSE_SCALE).toFloat(), stringResource(R.string.value_percent, it)) },
+            description = stringResource(R.string.hero_dose_cd, dose.roundToInt(), zoneWordText(doseZone)),
+        )
     }
 }
+
+/** The capsule meter's full scale: 0–120 % of the daily dose, so 100 % sits clearly inside it. */
+private const val HERO_DOSE_SCALE = 120.0
 
 @Composable
 private fun TodayStripCard(s: PhoneUiState, modifier: Modifier, onClick: () -> Unit) {
@@ -241,8 +277,8 @@ private fun LastAlertCard(s: PhoneUiState, modifier: Modifier, onClick: () -> Un
                 com.example.voxara.core.alerts.Tier.ADVISORY -> RiskZone.MODERATE
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(VoxIcons.zone(zone), contentDescription = null, tint = c.zoneInk(zone), modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
+                IconTile(VoxIcons.zone(zone), c.zoneInk(zone))
+                Spacer(Modifier.width(12.dp))
                 Column {
                     Text(stringResource(last.kind.titleRes()), style = MaterialTheme.typography.bodyLarge, color = c.text)
                     Text(
