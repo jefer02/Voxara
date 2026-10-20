@@ -21,6 +21,7 @@ import com.example.voxara.tile.headroomMinutes
 import com.example.voxara.tile.tintFor
 import com.example.voxara.tile.zoneFor
 import com.example.voxara.tile.zoneWordRes
+import com.example.voxara.core.design.Accent
 import com.example.voxara.core.design.Palette
 import kotlin.math.roundToInt
 
@@ -69,8 +70,8 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
                         Icon.createWithResource(this, R.drawable.ic_voxara_status)
                     ).build()
                 )
-                // Zone colours from the shared palette; the text says the value in words too.
-                .setColorRamp(ColorRamp(intArrayOf(Palette.ZONE_OK.toInt(), tint), true))
+                // From the watch accent to the tier colour; the text says the value in words too.
+                .setColorRamp(ColorRamp(intArrayOf(Palette.accent(Accent.PURPLE, dark = true).fill.toInt(), tint), true))
                 .build()
 
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(
