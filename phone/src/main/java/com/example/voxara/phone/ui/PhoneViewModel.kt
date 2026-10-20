@@ -109,6 +109,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                             retentionDays = st.retentionDays,
                             mirrorAlerts = st.mirrorAlerts,
                             deletePending = st.deletePending,
+                            accent = st.accent,
+                            themeMode = st.themeMode,
                         )
                     }
                 }
@@ -252,6 +254,9 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         },
         onFinishSetup = { viewModelScope.launch { store.setSetupDone(true); refresh(quiet = true) } },
         onRunSetupAgain = { viewModelScope.launch { store.setSetupDone(false) } },
+        // Appearance: stored on the phone only; the widget is re-rendered in the new colours.
+        onAccent = { a -> viewModelScope.launch { store.setAccent(a); runCatching { DoseWidget.refresh(ctx) } } },
+        onThemeMode = { m -> viewModelScope.launch { store.setThemeMode(m); runCatching { DoseWidget.refresh(ctx) } } },
     )
 
     private fun open(uri: String) {

@@ -9,9 +9,11 @@ import com.example.voxara.core.ai.CoachReply
 import com.example.voxara.core.ai.CoachTask
 import com.example.voxara.core.alerts.AlertKind
 import com.example.voxara.core.alerts.Tier
+import com.example.voxara.core.design.Accent
 import com.example.voxara.link.LinkState
 import com.example.voxara.link.WatchNode
 import com.example.voxara.phone.R
+import com.example.voxara.phone.data.ThemeMode
 import com.example.voxara.phone.model.Freshness
 import com.example.voxara.phone.model.Headline
 import com.example.voxara.phone.model.History
@@ -65,6 +67,9 @@ data class PhoneUiState(
     val bluetoothGranted: Boolean = true,
     val appVersion: String = "",
     val debugBuild: Boolean = false,
+    /** Appearance: phone only, stored in PhoneStore, never synced. */
+    val accent: Accent = Accent.DEFAULT,
+    val themeMode: ThemeMode = ThemeMode.DEFAULT,
 ) {
     val head: Headline get() = headline(status, history, lastSyncMs, settings.sensitiveListener, nowMs)
     val score: Int get() = careScore(head.weeklyPercent, head.headphoneWeeklyPercent, history.ambient)
@@ -97,6 +102,8 @@ data class PhoneActions(
     val onMirrorAlerts: (Boolean) -> Unit = {},
     val onFinishSetup: () -> Unit = {},
     val onRunSetupAgain: () -> Unit = {},
+    val onAccent: (Accent) -> Unit = {},
+    val onThemeMode: (ThemeMode) -> Unit = {},
 )
 
 // ------------------------------------------------------------------ shared wording
