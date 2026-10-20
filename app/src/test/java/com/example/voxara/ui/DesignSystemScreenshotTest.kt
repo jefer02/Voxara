@@ -2,6 +2,7 @@ package com.example.voxara.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
 import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.ui.design.AlertSheet
-import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
@@ -26,7 +26,12 @@ import com.example.voxara.ui.design.VType
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.WeekBars
 import com.example.voxara.ui.design.ZoneBadge
-import com.example.voxara.ui.design.ZoneGauge
+import com.example.voxara.ui.design.EditorialHeader
+import com.example.voxara.ui.design.GlowNumber
+import com.example.voxara.ui.design.LevelBezel
+import com.example.voxara.ui.design.PageDots
+import com.example.voxara.ui.design.SourcePill
+import com.example.voxara.ui.design.WaveHalo
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -42,7 +47,11 @@ class DesignSystemScreenshotTest {
     @Test
     fun gauges() = ScreenshotHarness.captureAll("ds_gauges") {
         Column(Modifier.fillMaxSize().background(VColor.Black), horizontalAlignment = Alignment.CenterHorizontally) {
-            ZoneGauge(dba = 88f, modifier = Modifier.size(150.dp).padding(top = 20.dp))
+            Box(Modifier.size(150.dp).padding(top = 20.dp), contentAlignment = Alignment.Center) {
+                WaveHalo(0.73f, VColor.tone(RiskZone.LOUD).fill, Modifier.fillMaxSize())
+                LevelBezel(dba = 88f, modifier = Modifier.fillMaxSize())
+                GlowNumber("88", VColor.tone(RiskZone.LOUD).fill)
+            }
             ProgressRing(0.56f, Modifier.size(64.dp)) { Text("56%", style = VType.Label, color = VColor.Text) }
         }
     }
@@ -54,7 +63,9 @@ class DesignSystemScreenshotTest {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(VSpace.xs),
         ) {
-            HeroStatus("Loud café. Your week is on track.")
+            EditorialHeader("Voxara", title = "Loud café")
+            SourcePill("Auto · Street", VColor.AccentInk)
+            PageDots(7, 2)
             RiskZone.entries.forEach { ZoneBadge(it) }
         }
     }
