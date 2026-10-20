@@ -25,6 +25,7 @@ import androidx.glance.layout.padding
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.example.voxara.core.design.Accent
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.risk.RiskZone
@@ -32,6 +33,7 @@ import com.example.voxara.phone.MainActivity
 import com.example.voxara.phone.PhoneGraph
 import com.example.voxara.phone.PhoneLocale
 import com.example.voxara.phone.R
+import com.example.voxara.phone.data.ThemeMode
 import com.example.voxara.ui.design.wordRes
 import java.text.DateFormat
 import java.util.Date
@@ -40,11 +42,15 @@ import kotlin.math.roundToInt
 /**
  * HOME-SCREEN WIDGET — today's dose from the watch, with the time it was true. Shown only when
  * the watch's status is from today; otherwise "No data today". Never live: refreshed after each
- * sync. The zone is a word, never colour alone.
+ * sync. The zone is a word, never colour alone. Colours follow the app's accent and theme
+ * (Settings → Appearance); the widget is re-rendered when they change.
  */
 class DoseWidget : GlanceAppWidget() {
 
-    private data class Data(val percent: Int?, val zoneWord: String?, val zone: RiskZone?, val line: String, val title: String)
+    private data class Data(
+        val percent: Int?, val zoneWord: String?, val zone: RiskZone?, val line: String, val title: String,
+        val accent: Accent, val themeMode: ThemeMode,
+    )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = load(context)
@@ -66,25 +72,34 @@ class DoseWidget : GlanceAppWidget() {
                 zone = zone,
                 line = res.getString(R.string.widget_as_of, time.format(Date(st.atMs))),
                 title = res.getString(R.string.widget_name),
+                accent = s.accent, themeMode = s.themeMode,
             )
         } else {
-            Data(null, null, null, res.getString(R.string.widget_no_data), res.getString(R.string.widget_name))
+            Data(null, null, null, res.getString(R.string.widget_no_data), res.getString(R.string.widget_name), s.accent, s.themeMode)
         }
     }
 
     @Composable
     private fun Content(d: Data) {
-        val bg = ColorProvider(day = Color(Palette.LIGHT_SURFACE_1), night = Color(Palette.SURFACE_1))
-        val text = ColorProvider(day = Color(Palette.LIGHT_TEXT_PRIMARY), night = Color(Palette.TEXT_PRIMARY))
-        val text2 = ColorProvider(day = Color(Palette.LIGHT_TEXT_SECONDARY), night = Color(Palette.TEXT_SECONDARY))
-        val ink = d.zone?.let { ColorProvider(day = Color(Palette.zoneInk(it)), night = Color(Palette.zone(it))) } ?: text2
+        // The app's appearance: Light / Dark pin both slots; Follow system gives Glance a day and a night colour.
+        fun pick(light: Long, dark: Long) = when (d.themeMode) {
+            ThemeMode.LIGHT -> ColorProvider(day = Color(light), night = Color(light))
+            ThemeMode.DARK -> ColorProvider(day = Color(dark), night = Color(dark))
+            ThemeMode.SYSTEM -> ColorProvider(day = Color(light), night = Color(dark))
+        }
+        val bg = pick(Palette.LIGHT_CARD, Palette.DARK_CARD)
+        val text = pick(Palette.LIGHT_TEXT, Palette.DARK_TEXT)
+        val text2 = pick(Palette.LIGHT_TEXT_2, Palette.DARK_TEXT_2)
+        val accent = pick(Palette.accent(d.accent, false).ink, Palette.accent(d.accent, true).ink)
+        // The zone word in its tier colour (accent, amber, crimson), always as a word too.
+        val ink = d.zone?.let { pick(Palette.level(it, d.accent, false).ink, Palette.level(it, d.accent, true).ink) } ?: text2
         Column(
-            modifier = GlanceModifier.fillMaxSize().background(bg).cornerRadius(24.dp).padding(16.dp)
+            modifier = GlanceModifier.fillMaxSize().background(bg).cornerRadius(22.dp).padding(16.dp)
                 .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.Start,
         ) {
-            Text(d.title, style = TextStyle(color = text2, fontSize = 13.sp, fontWeight = FontWeight.Medium))
+            Text(d.title.uppercase(), style = TextStyle(color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold))
             Spacer(GlanceModifier.height(4.dp))
             Text(
                 d.percent?.let { "$it%" } ?: "—",
