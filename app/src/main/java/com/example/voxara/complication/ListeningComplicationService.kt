@@ -18,6 +18,7 @@ import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.tile.listeningPercent
 import com.example.voxara.tile.listeningTint
+import com.example.voxara.core.design.Accent
 import com.example.voxara.core.design.Palette
 
 /**
@@ -44,7 +45,7 @@ class ListeningComplicationService : SuspendingComplicationDataSourceService() {
                 .setMonochromaticImage(
                     MonochromaticImage.Builder(Icon.createWithResource(this, R.drawable.ic_voxara_status)).build()
                 )
-                .setColorRamp(ColorRamp(intArrayOf(Palette.ZONE_OK.toInt(), listeningTint(percent)), true))
+                .setColorRamp(ColorRamp(intArrayOf(Palette.accent(Accent.PURPLE, dark = true).fill.toInt(), listeningTint(percent)), true))
                 .build()
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(text = value, contentDescription = description)
                 .setTitle(PlainComplicationText.Builder(res.getString(R.string.complication_listening_title)).build())

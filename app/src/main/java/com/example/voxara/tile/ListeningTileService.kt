@@ -4,13 +4,9 @@ import android.content.Context
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
-import androidx.wear.protolayout.DimensionBuilders.degrees
 import androidx.wear.protolayout.DimensionBuilders.dp
 import androidx.wear.protolayout.DimensionBuilders.expand
 import androidx.wear.protolayout.DimensionBuilders.sp
-import androidx.wear.protolayout.LayoutElementBuilders.ARC_ANCHOR_START
-import androidx.wear.protolayout.LayoutElementBuilders.Arc
-import androidx.wear.protolayout.LayoutElementBuilders.ArcLine
 import androidx.wear.protolayout.LayoutElementBuilders.Box
 import androidx.wear.protolayout.LayoutElementBuilders.Column
 import androidx.wear.protolayout.LayoutElementBuilders.FONT_WEIGHT_BOLD
@@ -76,15 +72,14 @@ internal fun listeningPercent(p: VoxaraStore.Persisted): Int {
     return (100.0 * p.headphoneWeeklyPa2h / budget).roundToInt()
 }
 
-/** The shared zone palette, by share of the weekly allowance. */
-internal fun listeningTint(percent: Int): Int = Palette.zone(RiskZone.ofPercent(percent.toDouble())).toInt()
+/** The tier colour (Purple, amber, crimson) by share of the weekly allowance. */
+internal fun listeningTint(percent: Int): Int = tierTint(RiskZone.ofPercent(percent.toDouble()))
 
 @androidx.annotation.OptIn(androidx.wear.protolayout.expression.ProtoLayoutExperimental::class)
 internal fun buildListeningTile(context: Context, p: VoxaraStore.Persisted): TileBuilders.Tile {
     val res = LocaleStore.localized(context)
     val percent = listeningPercent(p)
     val tint = listeningTint(percent)
-    val sweep = (percent / 100f).coerceIn(0f, 1f) * 360f
 
     val launch = ModifiersBuilders.Modifiers.Builder()
         .setClickable(
@@ -109,32 +104,16 @@ internal fun buildListeningTile(context: Context, p: VoxaraStore.Persisted): Til
         .setFontStyle(FontStyle.Builder().setSize(sp(size)).setWeight(weight).setColor(argb(color)).build())
         .build()
 
-    val ring = Box.Builder()
-        .setWidth(expand()).setHeight(expand())
-        .addContent(
-            Arc.Builder().setAnchorAngle(degrees(0f)).setAnchorType(ARC_ANCHOR_START)
-                .addContent(ArcLine.Builder().setLength(degrees(360f)).setThickness(dp(12f)).setColor(argb(Palette.SURFACE_3.toInt())).build())
-                .build()
-        )
-        .apply {
-            if (sweep > 1f) addContent(
-                Arc.Builder().setAnchorAngle(degrees(0f)).setAnchorType(ARC_ANCHOR_START)
-                    .addContent(ArcLine.Builder().setLength(degrees(sweep)).setThickness(dp(12f)).setColor(argb(tint)).build())
-                    .build()
-            )
-        }
-        .addContent(
-            Column.Builder()
-                .addContent(text(res.getString(R.string.tile_listening_title), 12f, FONT_WEIGHT_MEDIUM, Palette.TEXT_SECONDARY.toInt()))
-                .addContent(Spacer.Builder().setHeight(dp(2f)).build())
-                .addContent(text(res.getString(R.string.tile_dose_value, percent), 36f, FONT_WEIGHT_BOLD, Palette.TEXT_PRIMARY.toInt()))
-                .addContent(text(res.getString(zoneWordRes(RiskZone.ofPercent(percent.toDouble()))), 13f, FONT_WEIGHT_MEDIUM, tint))
-                .addContent(Spacer.Builder().setHeight(dp(2f)).build())
-                .addContent(text(res.getString(R.string.tile_listening_sub), 12f, FONT_WEIGHT_MEDIUM, Palette.TEXT_SECONDARY.toInt()))
-                .build()
-        )
-        .setModifiers(launch)
+    val center = Column.Builder()
+        .addContent(text(res.getString(R.string.tile_listening_title), 12f, FONT_WEIGHT_MEDIUM, Palette.DARK_TEXT_2.toInt()))
+        .addContent(Spacer.Builder().setHeight(dp(2f)).build())
+        .addContent(text(res.getString(R.string.tile_dose_value, percent), 36f, FONT_WEIGHT_BOLD, Palette.DARK_TEXT.toInt()))
+        .addContent(text(res.getString(zoneWordRes(RiskZone.ofPercent(percent.toDouble()))), 13f, FONT_WEIGHT_MEDIUM, tint))
+        .addContent(Spacer.Builder().setHeight(dp(2f)).build())
+        .addContent(text(res.getString(R.string.tile_listening_sub), 12f, FONT_WEIGHT_MEDIUM, Palette.DARK_TEXT_2.toInt()))
         .build()
+    // The same 270° bezel as the dose tile.
+    val ring = ringBox(percent / 100f, tint, center, launch)
 
     val root = Box.Builder().setWidth(expand()).setHeight(expand())
         .setModifiers(
