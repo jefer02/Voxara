@@ -5,63 +5,89 @@ import kotlin.math.pow
 
 /**
  * VOXARA PALETTE — raw ARGB values, pure so contrast is checked by unit tests (WCAG 2.x).
- * True-black OLED base, tonal surfaces, three text inks, four zone colours and the brand
- * gradient. Voxara's own values (not copied from any platform palette).
+ * The style comes from docs/design/STYLE.md: deep blue-black and paper-white neutrals, one
+ * user-chosen accent (four options) and two fixed tiers (caution amber, danger crimson) that the
+ * level-reactive accent switches to. The watch is pure black and always Purple.
  */
 object Palette {
+    /** The watch background (AMOLED), and black for the ambient view. */
     const val BLACK = 0xFF000000
-    const val SURFACE_1 = 0xFF121316
-    const val SURFACE_2 = 0xFF1C1D21
-    const val SURFACE_3 = 0xFF26282D
-    const val OUTLINE = 0xFF3A3D44
 
-    const val TEXT_PRIMARY = 0xFFFFFFFF
-    const val TEXT_SECONDARY = 0xFFB9BEC8
-    const val TEXT_TERTIARY = 0xFF8E94A0
+    // ------------------------------------------------------------------ dark neutrals
+    const val DARK_BG = 0xFF090B10
+    const val DARK_CARD = 0xFF131722
+    const val DARK_CARD_SUBTLE = 0xFF1B2030
+    const val DARK_TEXT = 0xFFF8FAFC
+    const val DARK_TEXT_2 = 0xFFAEB6C4
+    const val DARK_MUTED = 0xFF8A94A6
+    /** 1 dp card border: white at 8 %. */
+    const val DARK_BORDER = 0x14FFFFFF
+    /** Inactive capsules and ring tracks: white at 12 %. */
+    const val DARK_TRACK = 0x1FFFFFFF
+    /** The watch bezel track: white at 7 %. */
+    const val WATCH_TRACK = 0x12FFFFFF
 
-    const val ZONE_OK = 0xFF3DB8F5
-    const val ZONE_MODERATE = 0xFFF2C94C
-    const val ZONE_LOUD = 0xFFFF8C42
-    const val ZONE_DANGEROUS = 0xFFFF4F8B
+    // ------------------------------------------------------------------ light neutrals (phone)
+    const val LIGHT_BG = 0xFFF3F5F9
+    const val LIGHT_CARD = 0xFFFFFFFF
+    const val LIGHT_CARD_SUBTLE = 0xFFEBF0F7
+    const val LIGHT_TEXT = 0xFF0F172A
+    const val LIGHT_TEXT_2 = 0xFF334155
+    /** The template's #64748B is below 4.5:1 on the light background; darkened to pass. */
+    const val LIGHT_MUTED = 0xFF5B677A
+    const val LIGHT_BORDER = 0x120F172A
+    const val LIGHT_TRACK = 0x1A0F172A
 
-    /** Brand gradient: Voxara's signal cyan to violet. For brand/AI accents only, never state. */
-    const val BRAND_START = 0xFF35E8FF
-    const val BRAND_END = 0xFF8B7CFF
+    // ------------------------------------------------------------------ fixed hues
+    const val SECONDARY = 0xFF6366F1
+    const val SECONDARY_INK_DARK = 0xFF818CF8
+    const val SECONDARY_INK_LIGHT = 0xFF4F46E5
+    const val WARNING = 0xFFFFB800
+    const val DANGER = 0xFFFF2A6D
 
-    /** Text on zone-coloured fills. */
-    const val ON_ZONE = 0xFF000000
+    /** Text on any accent or tier fill. */
+    const val ON_FILL = 0xFF05080D
 
-    // ------------------------------------------------------------------ light theme (phone)
-    // Voxara's own light values. Zone colours keep their bright fills for rings and bars; text and
-    // icons in a zone colour use the darker "ink" so they stay readable (≥ 4.5:1) on white.
-    const val LIGHT_BG = 0xFFF2F3F7
-    const val LIGHT_SURFACE_1 = 0xFFFFFFFF
-    const val LIGHT_SURFACE_2 = 0xFFE8EAF0
-    const val LIGHT_OUTLINE = 0xFFD3D6DD
-    const val LIGHT_TEXT_PRIMARY = 0xFF111317
-    const val LIGHT_TEXT_SECONDARY = 0xFF4A5060
-    const val LIGHT_TEXT_TERTIARY = 0xFF5E6574
-    const val LIGHT_BRAND_INK = 0xFF00707F
-    const val LIGHT_BRAND_INK_2 = 0xFF5B4BD6
+    /** Soft tint (badge and icon-tile backgrounds) and glow alphas over a fill. */
+    const val SOFT_ALPHA = 0.15f
+    const val GLOW_ALPHA = 0.35f
 
-    const val ZONE_OK_INK = 0xFF0A6A99
-    const val ZONE_MODERATE_INK = 0xFF7A5B00
-    const val ZONE_LOUD_INK = 0xFFA3480A
-    const val ZONE_DANGEROUS_INK = 0xFFC0175A
+    /** One colour role in both forms: [fill] for graphics, [ink] for text and icons, [onFill] for text on the fill. */
+    data class Tone(val fill: Long, val ink: Long, val onFill: Long = ON_FILL)
 
-    /** Zone colour for text and icons on a light background. */
-    fun zoneInk(z: RiskZone): Long = when (z) {
-        RiskZone.OK -> ZONE_OK_INK
-        RiskZone.MODERATE -> ZONE_MODERATE_INK
-        RiskZone.LOUD -> ZONE_LOUD_INK
-        RiskZone.DANGEROUS -> ZONE_DANGEROUS_INK
+    /** The user's accent in a theme. The watch always uses [Accent.PURPLE] dark. */
+    fun accent(a: Accent, dark: Boolean): Tone = when (a) {
+        Accent.PURPLE -> if (dark) Tone(0xFF8B5CF6, 0xFFA78BFA) else Tone(0xFF8B5CF6, 0xFF6D28D9)
+        Accent.TURQUOISE -> if (dark) Tone(0xFF00E5BF, 0xFF00E5BF) else Tone(0xFF009E87, 0xFF00695C)
+        Accent.BLUE -> if (dark) Tone(0xFF3B82F6, 0xFF60A5FA) else Tone(0xFF3B82F6, 0xFF1D4ED8)
+        Accent.EMERALD -> if (dark) Tone(0xFF10B981, 0xFF34D399) else Tone(0xFF059669, 0xFF065F46)
     }
 
-    fun zone(z: RiskZone): Long = when (z) {
-        RiskZone.OK -> ZONE_OK
-        RiskZone.MODERATE -> ZONE_MODERATE
-        RiskZone.LOUD -> ZONE_LOUD
-        RiskZone.DANGEROUS -> ZONE_DANGEROUS
+    /** Caution tier (zone LOUD). */
+    fun caution(dark: Boolean): Tone = if (dark) Tone(WARNING, WARNING) else Tone(0xFFB7791F, 0xFF92400E)
+
+    /** Danger tier (zone DANGEROUS). */
+    fun danger(dark: Boolean): Tone = if (dark) Tone(DANGER, 0xFFFF6B93) else Tone(DANGER, 0xFF9F1239)
+
+    /**
+     * THE LEVEL-REACTIVE ACCENT — OK and MODERATE keep the chosen accent (nothing alerts there),
+     * LOUD is caution, DANGEROUS is danger. Voxara's zone boundaries, never the template's.
+     */
+    fun level(zone: RiskZone, a: Accent, dark: Boolean): Tone = when (zone) {
+        RiskZone.OK, RiskZone.MODERATE -> accent(a, dark)
+        RiskZone.LOUD -> caution(dark)
+        RiskZone.DANGEROUS -> danger(dark)
+    }
+
+    /** Neutral surfaces of a theme, for the contrast tests and non-Compose surfaces (widget, tiles). */
+    fun surfaces(dark: Boolean): List<Long> =
+        if (dark) listOf(DARK_BG, DARK_CARD, DARK_CARD_SUBTLE) else listOf(LIGHT_BG, LIGHT_CARD, LIGHT_CARD_SUBTLE)
+
+    /** [fg] at [alpha] over the opaque [bg] (straight alpha), as an opaque colour. */
+    fun over(fg: Long, alpha: Float, bg: Long): Long {
+        fun ch(c: Long, shift: Int) = ((c shr shift) and 0xFF).toInt()
+        fun mix(shift: Int) = Math.round(alpha * ch(fg, shift) + (1 - alpha) * ch(bg, shift)).toLong()
+        return 0xFF000000 or (mix(16) shl 16) or (mix(8) shl 8) or mix(0)
     }
 
     /** WCAG relative luminance of an opaque ARGB colour. */
@@ -78,5 +104,16 @@ object Palette {
         val la = luminance(a)
         val lb = luminance(b)
         return (maxOf(la, lb) + 0.05) / (minOf(la, lb) + 0.05)
+    }
+}
+
+/** The four accent colours of the template's colour picker. Purple is the default (and the watch's). */
+enum class Accent {
+    PURPLE, TURQUOISE, BLUE, EMERALD;
+
+    companion object {
+        val DEFAULT = PURPLE
+
+        fun parse(name: String?): Accent = entries.firstOrNull { it.name == name } ?: DEFAULT
     }
 }
