@@ -30,6 +30,7 @@ import androidx.wear.tiles.tooling.preview.Preview
 import androidx.wear.tiles.tooling.preview.TilePreviewData
 import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.voxara.R
+import com.example.voxara.core.design.Accent
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.format.formatHeadroom
 import com.example.voxara.core.monitoring.MonitoringStatus
@@ -94,8 +95,11 @@ class VoxaraTileService : TileService() {
 internal fun zoneFor(dba: Double, dosePercent: Double): RiskZone =
     maxOf(RiskZone.of(dba), RiskZone.ofPercent(dosePercent))
 
-/** Zone colour as an ARGB int (the shared palette). */
-internal fun tintFor(dba: Double, dosePercent: Double): Int = Palette.zone(zoneFor(dba, dosePercent)).toInt()
+/** The level-reactive tier colour of a zone (watch Purple, amber, crimson) as an ARGB int. */
+internal fun tierTint(zone: RiskZone): Int = Palette.level(zone, Accent.PURPLE, dark = true).ink.toInt()
+
+/** Tier colour for a cached reading. */
+internal fun tintFor(dba: Double, dosePercent: Double): Int = tierTint(zoneFor(dba, dosePercent))
 
 internal fun zoneWordRes(z: RiskZone): Int = z.wordRes()
 
@@ -127,23 +131,30 @@ internal fun tileText(s: String, size: Float, weight: Int, color: Int): LayoutEl
         )
         .build()
 
-/** A thick full ring with [fraction] filled in [tint]. */
-internal fun ringBox(fraction: Float, tint: Int, center: LayoutElementBuilders.LayoutElement, modifiers: ModifiersBuilders.Modifiers): Box {
-    val sweep = fraction.coerceIn(0f, 1f) * 360f
-    return Box.Builder()
-        .setWidth(expand()).setHeight(expand())
+/** Where the bezel starts: lower left, so the 270° arc leaves its gap at the bottom (the template's bezel). */
+private const val BEZEL_START = 225f
+private const val BEZEL_SWEEP = 270f
+
+/** One rounded 270° ArcLine from the bezel start. */
+private fun bezelLine(length: Float, color: Int): Arc =
+    Arc.Builder().setAnchorAngle(degrees(BEZEL_START)).setAnchorType(ARC_ANCHOR_START)
         .addContent(
-            Arc.Builder().setAnchorAngle(degrees(0f)).setAnchorType(ARC_ANCHOR_START)
-                .addContent(ArcLine.Builder().setLength(degrees(360f)).setThickness(dp(12f)).setColor(argb(Palette.SURFACE_3.toInt())).build())
+            ArcLine.Builder().setLength(degrees(length)).setThickness(dp(8f)).setColor(argb(color))
+                .setStrokeCap(LayoutElementBuilders.STROKE_CAP_ROUND)
                 .build()
         )
-        .apply {
-            if (sweep > 1f) addContent(
-                Arc.Builder().setAnchorAngle(degrees(0f)).setAnchorType(ARC_ANCHOR_START)
-                    .addContent(ArcLine.Builder().setLength(degrees(sweep)).setThickness(dp(12f)).setColor(argb(tint)).build())
-                    .build()
-            )
-        }
+        .build()
+
+/**
+ * The tile version of the bezel arc: a 270° track (white 12 %) and [fraction] of it in [tint] with
+ * rounded caps. Tiles cannot animate or glow, so this is colours and arcs only.
+ */
+internal fun ringBox(fraction: Float, tint: Int, center: LayoutElementBuilders.LayoutElement, modifiers: ModifiersBuilders.Modifiers): Box {
+    val sweep = fraction.coerceIn(0f, 1f) * BEZEL_SWEEP
+    return Box.Builder()
+        .setWidth(expand()).setHeight(expand())
+        .addContent(bezelLine(BEZEL_SWEEP, Palette.DARK_TRACK.toInt()))
+        .apply { if (sweep > 1f) addContent(bezelLine(sweep, tint)) }
         .addContent(center)
         .setModifiers(modifiers)
         .build()
@@ -164,7 +175,7 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
     val dose = p.dosePercent
     val dba = p.lastDba
     val zone = zoneFor(dba, dose)
-    val tint = Palette.zone(zone).toInt()
+    val tint = tierTint(zone)
     // Built by the tile host, which hands us its own context: resolve the language ourselves.
     val res = LocaleStore.localized(context)
     // Left on but no heartbeat: the watch stopped monitoring. Tapping the tile opens the app.
@@ -174,8 +185,8 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
         lastHeartbeatMs = p.heartbeatMs,
         nowMs = System.currentTimeMillis(),
     ) == MonitoringStatus.PAUSED
-    val secondary = Palette.TEXT_SECONDARY.toInt()
-    val primary = Palette.TEXT_PRIMARY.toInt()
+    val secondary = Palette.DARK_TEXT_2.toInt()
+    val primary = Palette.DARK_TEXT.toInt()
 
     val bottom = when {
         paused -> res.getString(R.string.paused_resume)
@@ -194,7 +205,7 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
         .addContent(tileText(res.getString(R.string.tile_dose_value, dose.roundToInt()), 36f, FONT_WEIGHT_BOLD, primary))
         .addContent(tileText(detail, 13f, FONT_WEIGHT_MEDIUM, tint))
         .addContent(Spacer.Builder().setHeight(dp(2f)).build())
-        .addContent(tileText(bottom, 12f, FONT_WEIGHT_MEDIUM, if (paused) Palette.ZONE_MODERATE.toInt() else secondary))
+        .addContent(tileText(bottom, 12f, FONT_WEIGHT_MEDIUM, if (paused) Palette.caution(true).ink.toInt() else secondary))
         .build()
 
     return TileBuilders.Tile.Builder()
