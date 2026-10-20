@@ -29,6 +29,7 @@ import com.example.voxara.phone.ui.components.GroupDivider
 import com.example.voxara.phone.ui.components.GroupHeader
 import com.example.voxara.phone.ui.components.GroupNote
 import com.example.voxara.phone.ui.components.GroupRow
+import com.example.voxara.phone.ui.components.IconTile
 import com.example.voxara.phone.ui.components.LinkButton
 import com.example.voxara.phone.ui.components.PillButton
 import com.example.voxara.phone.ui.components.VoxCard
@@ -106,12 +107,12 @@ private fun DeviceCard(s: PhoneUiState, actions: PhoneActions, modifier: Modifie
         )
         LinkState.NoWatch -> Banner(
             VoxIcons.Watch, stringResource(R.string.link_no_watch), stringResource(R.string.link_no_watch_body),
-            tint = c.zoneInk(RiskZone.MODERATE), modifier = modifier,
+            tint = c.caution, modifier = modifier,
             action = stringResource(R.string.action_open_wearable), onAction = actions.onOpenWearableApp,
         )
         is LinkState.NotInstalled -> VoxCard(modifier) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(VoxIcons.Info, null, tint = c.zoneInk(RiskZone.MODERATE), modifier = Modifier.size(24.dp))
+                IconTile(VoxIcons.Info, c.caution)
                 Spacer(Modifier.width(12.dp))
                 Text(stringResource(R.string.link_not_installed), style = MaterialTheme.typography.titleMedium, color = c.text)
             }
@@ -131,7 +132,7 @@ private fun LinkedCard(s: PhoneUiState, watch: WatchNode, problem: SyncProblem?,
     val c = Vox.colors
     VoxCard(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(VoxIcons.Watch, null, tint = c.brand, modifier = Modifier.size(32.dp))
+            IconTile(VoxIcons.Watch, c.brand, size = 44.dp)
             Spacer(Modifier.width(12.dp))
             androidx.compose.foundation.layout.Column {
                 Text(watch.name, style = MaterialTheme.typography.titleLarge, color = c.text)
