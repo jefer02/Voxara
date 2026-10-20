@@ -16,7 +16,6 @@ import androidx.compose.ui.res.stringResource
 import com.example.voxara.R
 import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.dose.energyAverage
-import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.data.ExposureState
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.ChoiceList
@@ -60,7 +59,7 @@ fun CalibrationProbePanel(
     val averageDbfsA = if (recent.isEmpty()) null else energyAverage(recent.toDoubleArray())
 
     Column(Modifier.fillMaxWidth()) {
-        SectionLabel(stringResource(R.string.probe_title), color = VColor.BrandStart)
+        SectionLabel(stringResource(R.string.probe_title), color = VColor.AccentInk)
         ChoiceList(
             listOf(
                 MicSource.UNPROCESSED to stringResource(R.string.probe_unprocessed),
@@ -75,7 +74,7 @@ fun CalibrationProbePanel(
                 onProbe(option)
             },
         )
-        if (!state.monitoring) BodyText(stringResource(R.string.probe_needs_monitoring), color = VColor.zone(RiskZone.MODERATE))
+        if (!state.monitoring) BodyText(stringResource(R.string.probe_needs_monitoring), color = VColor.Caution)
 
         state.device?.let { d ->
             InfoRow(stringResource(R.string.probe_device), "${d.manufacturer} ${d.model}")
@@ -109,7 +108,7 @@ fun CalibrationProbePanel(
         result?.let { ok ->
             BodyText(
                 stringResource(if (ok) R.string.probe_saved else R.string.probe_out_of_range),
-                color = if (ok) VColor.zone(RiskZone.OK) else VColor.zone(RiskZone.DANGEROUS),
+                color = if (ok) VColor.AccentInk else VColor.Danger,
             )
         }
     }

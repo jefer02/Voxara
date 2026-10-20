@@ -24,6 +24,7 @@ import com.example.voxara.core.ai.CoachTask
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
+import com.example.voxara.ui.design.EditorialHeader
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
@@ -55,10 +56,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
 
     VoxList {
         item {
-            SectionLabel(
-                if (tono) stringResource(R.string.home_ask, name).uppercase() else stringResource(R.string.voice_title),
-                color = VColor.BrandStart,
-            )
+            EditorialHeader(if (tono) stringResource(R.string.home_ask, name) else stringResource(R.string.voice_title))
         }
         if (turn.heard.isNotBlank()) {
             item { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary, maxLines = 3) }
@@ -79,7 +77,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
         if (listening) item { ListeningWave(turn.amplitude) }
         if (showCoach && reply != null && !coach.loading && !listening) {
             if (reply.why.isNotBlank()) item { BodyText(reply.why, color = VColor.TextSecondary) }
-            item { BodyText(reply.suggestion, color = VColor.BrandStart) }
+            item { BodyText(reply.suggestion, color = VColor.AccentInk) }
             item {
                 SectionLabel(
                     stringResource(
@@ -139,7 +137,7 @@ private fun ListeningWave(amplitude: Float) {
             val h = size.height * (0.15f + 0.85f * a * shape)
             val x = gap * i
             drawLine(
-                VColor.BrandStart, Offset(x, (size.height - h) / 2), Offset(x, (size.height + h) / 2),
+                VColor.AccentInk, Offset(x, (size.height - h) / 2), Offset(x, (size.height + h) / 2),
                 strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round,
             )
         }
