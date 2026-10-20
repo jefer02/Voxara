@@ -1,7 +1,6 @@
 package com.example.voxara.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,9 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.Text
 import com.example.voxara.R
 import com.example.voxara.core.ai.CoachTask
@@ -23,15 +20,16 @@ import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.HeroStatus
-import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
 import com.example.voxara.ui.design.VColor
-import com.example.voxara.ui.design.VType
 import com.example.voxara.ui.design.VoxList
 import com.example.voxara.ui.design.ZoneBadge
-import com.example.voxara.ui.design.ZoneGauge
+import com.example.voxara.ui.design.CircularOverlay
+import com.example.voxara.ui.design.GlowNumber
+import com.example.voxara.ui.design.LevelBezel
+import com.example.voxara.ui.design.ZoneIconCircle
 import com.example.voxara.ui.design.zoneWord
 import kotlin.math.roundToInt
 
@@ -56,15 +54,11 @@ fun LimitAlertScreen(env: UiEnv, kind: LimitKind, actions: VoxaraActions, onDism
         LimitKind.WEEK_HEADPHONE -> R.string.alert_hp_week_100_title to R.string.alert_hp_week_100_body
     }
     val reply = env.coach.reply
-    Box(Modifier.fillMaxSize().background(VColor.Black)) {
+    // The template's round toast: a dark round panel with a border in the danger tier.
+    CircularOverlay(border = VColor.tone(RiskZone.DANGEROUS).fill) {
         VoxList {
             // One item per element (not one tall sheet), so the round-screen list lays them out.
-            item {
-                Icon(
-                    VoxIcons.zone(RiskZone.DANGEROUS), contentDescription = zoneWord(RiskZone.DANGEROUS),
-                    tint = VColor.zone(RiskZone.DANGEROUS), modifier = Modifier.size(32.dp),
-                )
-            }
+            item { ZoneIconCircle(RiskZone.DANGEROUS) }
             item { HeroStatus(stringResource(title, percent), maxLines = 4) }
             item { BodyText(stringResource(body, percent)) }
             item { PillButton(stringResource(R.string.alert_action_ack), onClick = onDismiss) }
@@ -83,8 +77,8 @@ fun LimitAlertScreen(env: UiEnv, kind: LimitKind, actions: VoxaraActions, onDism
 }
 
 /**
- * AMBIENT — the always-on view, whatever screen was open: level, zone word and a hairline gauge.
- * Under 5% of pixels lit, no animation, grey only.
+ * AMBIENT — the always-on view, whatever screen was open: level, zone word and a hairline bezel.
+ * Under 5% of pixels lit, no animation, no glow, grey outline only.
  */
 @Composable
 fun AmbientScreen(env: UiEnv) {
@@ -95,13 +89,10 @@ fun AmbientScreen(env: UiEnv) {
         Modifier.fillMaxSize().background(VColor.Black).semantics(mergeDescendants = true) { contentDescription = cd },
         contentAlignment = Alignment.Center,
     ) {
-        ZoneGauge(dba = s.dba.toFloat().takeIf { s.dba > 0.0 }, modifier = Modifier.size(maxWidth * 0.9f))
+        // LocalAmbient makes these hairline, grey and still: no waves, no glow, no fills.
+        LevelBezel(dba = s.dba.toFloat().takeIf { s.dba > 0.0 }, modifier = Modifier.size(maxWidth * 0.9f))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                if (s.dba > 0.0) s.dba.roundToInt().toString() else "—",
-                style = VType.Hero.copy(fontWeight = FontWeight.Normal),
-                color = VColor.TextSecondary,
-            )
+            GlowNumber(if (s.dba > 0.0) s.dba.roundToInt().toString() else "—", glow = VColor.TextTertiary)
             ZoneBadge(zone, modifier = Modifier.padding(top = 4.dp))
         }
     }

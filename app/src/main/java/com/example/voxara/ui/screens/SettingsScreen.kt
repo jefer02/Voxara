@@ -6,9 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.Text
@@ -16,7 +13,6 @@ import com.example.voxara.R
 import com.example.voxara.core.alerts.AlertDefaults
 import com.example.voxara.core.headphones.HeadphoneCategory
 import com.example.voxara.core.monitoring.MonitoringStatus
-import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.Scenario
 import com.example.voxara.debug.DebugTools
@@ -26,14 +22,14 @@ import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
+import com.example.voxara.ui.design.Eyebrow
+import com.example.voxara.ui.design.EditorialHeader
 import com.example.voxara.ui.design.ChoiceList
 import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.Panel
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
-import com.example.voxara.ui.design.SectionLabel
 import com.example.voxara.ui.design.VColor
-import com.example.voxara.ui.design.VType
 import com.example.voxara.ui.design.ValueStepper
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.VoxList
@@ -51,10 +47,10 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
     val inc = stringResource(R.string.increase_cd)
 
     VoxList {
-        item { Text(stringResource(R.string.card_settings), style = VType.Title, color = VColor.Text, modifier = Modifier.semantics { heading() }) }
+        item { EditorialHeader(stringResource(R.string.app_name), title = stringResource(R.string.card_settings)) }
 
         // ------------------------------------------------------------------ monitoring
-        item { SectionLabel(stringResource(R.string.set_monitoring)) }
+        item { Eyebrow(stringResource(R.string.set_monitoring)) }
         item {
             val paused = s.monitoringStatus == MonitoringStatus.PAUSED
             MetricCard(
@@ -67,7 +63,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                         else -> R.string.off
                     }
                 ),
-                accent = if (paused) VColor.zone(RiskZone.MODERATE) else VColor.BrandStart,
+                accent = if (paused) VColor.Caution else VColor.AccentInk,
             )
         }
         item {
@@ -78,14 +74,14 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 style = if (s.monitoring && !paused) PillStyle.TONAL else PillStyle.PRIMARY,
             )
         }
-        if (s.power?.powerSaveMode == true) item { BodyText(stringResource(R.string.power_save_on), color = VColor.zone(RiskZone.MODERATE)) }
+        if (s.power?.powerSaveMode == true) item { BodyText(stringResource(R.string.power_save_on), color = VColor.Caution) }
         item { BodyText(stringResource(R.string.keep_running_body)) }
         if (s.batterySettingsAvailable && s.power?.ignoringBatteryOptimizations == false) {
             item { PillButton(stringResource(R.string.battery_settings), onClick = actions.onOpenBatterySettings, style = PillStyle.OUTLINED) }
         }
 
         // ------------------------------------------------------------------ mode
-        item { SectionLabel(stringResource(R.string.mode_title)) }
+        item { Eyebrow(stringResource(R.string.mode_title)) }
         item {
             MetricCard(
                 icon = VoxIcons.Tune,
@@ -96,7 +92,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         }
 
         // ------------------------------------------------------------------ alerts
-        item { SectionLabel(stringResource(R.string.alerts_title)) }
+        item { Eyebrow(stringResource(R.string.alerts_title)) }
         item {
             ValueStepper(
                 label = stringResource(R.string.set_alert_level),
@@ -143,7 +139,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         item { BodyText(stringResource(R.string.sensitive_note)) }
 
         // ------------------------------------------------------------------ headphones
-        item { SectionLabel(stringResource(R.string.hp_settings_title)) }
+        item { Eyebrow(stringResource(R.string.hp_settings_title)) }
         item {
             ChoiceList(
                 listOf<Pair<HeadphoneCategory?, String>>(
@@ -167,7 +163,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         item { BodyText(stringResource(R.string.hp_loud_note, AlertDefaults.HEADPHONE_WINDOW_MIN)) }
 
         // ------------------------------------------------------------------ Tono
-        item { SectionLabel(stringResource(R.string.tono_settings_title)) }
+        item { Eyebrow(stringResource(R.string.tono_settings_title)) }
         item {
             PillButton(
                 label = stringResource(if (s.tonoEnabled) R.string.tono_enabled_on else R.string.tono_enabled_off),
@@ -190,7 +186,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         item { BodyText(stringResource(if (env.cloudAvailable) R.string.tono_consent_body else R.string.tono_consent_unavailable, name)) }
 
         // ------------------------------------------------------------------ calibration
-        item { SectionLabel(stringResource(R.string.cal_title)) }
+        item { Eyebrow(stringResource(R.string.cal_title)) }
         item {
             val record = s.calibrationFor(s.activeSource)
             MetricCard(
@@ -200,7 +196,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                     R.string.cal_status_calibrated,
                     DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(record.calibratedAtMs)),
                 ) else stringResource(R.string.cal_status_uncalibrated),
-                accent = if (record != null) VColor.zone(RiskZone.OK) else VColor.zone(RiskZone.MODERATE),
+                accent = if (record != null) VColor.AccentInk else VColor.Caution,
                 onClick = { navigate(Routes.CALIBRATION) },
             )
         }
@@ -216,7 +212,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         item { BodyText(stringResource(R.string.calibration_note)) }
 
         // ------------------------------------------------------------------ language
-        item { SectionLabel(stringResource(R.string.language)) }
+        item { Eyebrow(stringResource(R.string.language)) }
         item {
             ChoiceList(
                 AppLanguage.entries.map { it to stringResource(it.labelRes()) },
@@ -226,17 +222,17 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         }
 
         // ------------------------------------------------------------------ privacy & about
-        item { SectionLabel(stringResource(R.string.set_privacy)) }
+        item { Eyebrow(stringResource(R.string.set_privacy)) }
         item { Panel { BodyText(stringResource(R.string.set_privacy_body), color = VColor.Text) } }
         item { Panel { BodyText(stringResource(R.string.disclaimer), color = VColor.Text) } }
         item { BodyText(stringResource(R.string.set_licenses), color = VColor.TextTertiary) }
 
         // ------------------------------------------------------------------ advanced
-        item { SectionLabel(stringResource(R.string.set_advanced)) }
+        item { Eyebrow(stringResource(R.string.set_advanced)) }
         item { PillButton(stringResource(R.string.reset_dose_title), onClick = { confirmReset = true }, style = PillStyle.OUTLINED) }
 
         if (env.debug) {
-            item { SectionLabel(stringResource(R.string.set_debug), color = VColor.BrandStart) }
+            item { Eyebrow(stringResource(R.string.set_debug), color = VColor.AccentInk) }
             // Debug builds only: the class and its strings exist in src/debug, a no-op in release.
             if (DebugTools.available) item { DebugTools.SettingsEntries(navigate) }
             if (DetectionLog.available) item { DetectionLog.SettingsEntries() }
