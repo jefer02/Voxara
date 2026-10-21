@@ -15,20 +15,15 @@ import com.example.voxara.debug.DebugTools
 import com.example.voxara.ui.screens.AmbientScreen
 import com.example.voxara.ui.screens.AskScreen
 import com.example.voxara.ui.screens.CalibrationScreen
-import com.example.voxara.ui.screens.HeadphonesScreen
 import com.example.voxara.ui.screens.HomeScreen
 import com.example.voxara.ui.screens.LimitAlertScreen
 import com.example.voxara.ui.screens.LimitKind
 import com.example.voxara.ui.screens.ModeScreen
-import com.example.voxara.ui.screens.NowScreen
 import com.example.voxara.ui.screens.OnboardingScreen
 import com.example.voxara.ui.screens.SettingsScreen
-import com.example.voxara.ui.screens.TodayScreen
-import com.example.voxara.ui.screens.WeekScreen
 
 /**
- * THE APP. First run: onboarding. Then Home (Tono's status line + cards) is the root, every area
- * one tap away, swipe right to go back. Ambient mode shows one calm always-on view. A 100% limit
+ * THE APP. First run: onboarding. Then Home (a pager of three round pages: Now, Dose, More) is the root; swipe right to go back. Ambient mode shows one calm always-on view. A 100% limit
  * shows full screen while the app is open (the haptic and the notification already fired).
  */
 @Composable
@@ -69,20 +64,26 @@ fun VoxaraApp(
     val currentActions by rememberUpdatedState(actions)
     val nav = rememberSwipeDismissableNavController()
     val go: (String) -> Unit = { nav.navigate(it) }
+    // A link to a page (a tile, a complication, the phone) opens the pager there as the root, so swiping back leaves the app.
+    val start = remember { pendingRoute?.takeIf(PageLinks::isPage) ?: Routes.HOME }
     LaunchedEffect(pendingRoute) {
         if (pendingRoute != null) {
-            nav.navigate(pendingRoute)
+            if (PageLinks.isPage(pendingRoute)) {
+                if (pendingRoute != start) nav.navigate(pendingRoute) { popUpTo(Routes.HOME) { inclusive = true } }
+            } else nav.navigate(pendingRoute)
             onRouteShown()
         }
     }
-    SwipeDismissableNavHost(navController = nav, startDestination = Routes.HOME) {
-        composable(Routes.HOME) { HomeScreen(currentEnv, currentActions, go) }
-        composable(Routes.NOW) { NowScreen(currentEnv, currentActions, go) }
+    SwipeDismissableNavHost(navController = nav, startDestination = start) {
+        composable(Routes.HOME) { HomeScreen(currentEnv, currentActions, navigate = go) }
+        // The glance pages are pages of the Home pager; their own routes open it on that page.
+        composable(Routes.NOW) { HomeScreen(currentEnv, currentActions, initialPage = Routes.NOW, navigate = go) }
         composable(Routes.MODE) { ModeScreen(currentEnv, currentActions) }
-        if (DebugTools.available) composable(Routes.DEBUG_HAPTICS) { DebugTools.HapticsScreen() }
-        composable(Routes.HEADPHONES) { HeadphonesScreen(currentEnv, currentActions) }
-        composable(Routes.TODAY) { TodayScreen(currentEnv) }
-        composable(Routes.WEEK) { WeekScreen(currentEnv, currentActions) }
+        if (DebugTools.available) composable(DebugTools.HAPTICS_ROUTE) { DebugTools.HapticsScreen() }
+        composable(Routes.HEADPHONES) { HomeScreen(currentEnv, currentActions, initialPage = Routes.HEADPHONES, navigate = go) }
+        composable(Routes.MENU) { HomeScreen(currentEnv, currentActions, initialPage = Routes.MENU, navigate = go) }
+        composable(Routes.TODAY) { HomeScreen(currentEnv, currentActions, initialPage = Routes.TODAY, navigate = go) }
+        composable(Routes.WEEK) { HomeScreen(currentEnv, currentActions, initialPage = Routes.WEEK, navigate = go) }
         composable(Routes.ASK) { AskScreen(currentEnv, currentActions) }
         composable(Routes.SETTINGS) { SettingsScreen(currentEnv, currentActions, go) }
         composable(Routes.CALIBRATION) {
