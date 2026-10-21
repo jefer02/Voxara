@@ -13,12 +13,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.wear.compose.material3.Text
 import com.example.voxara.R
 import com.example.voxara.haptics.HapticConductor
 import com.example.voxara.haptics.Pattern
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
+import com.example.voxara.data.Scenario
+import com.example.voxara.text.labelRes
 import com.example.voxara.ui.Routes
+import com.example.voxara.ui.UiEnv
+import com.example.voxara.ui.VoxaraActions
+import com.example.voxara.ui.design.ChoiceList
+import com.example.voxara.ui.design.Panel
+import com.example.voxara.ui.design.row
+import com.example.voxara.ui.screens.CalibrationProbePanel
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
@@ -36,15 +46,55 @@ import kotlinx.coroutines.delay
 object DebugTools {
     const val available = true
 
-    /** The entries this build adds to Settings → Debug tools. */
-    @Composable
-    fun SettingsEntries(navigate: (String) -> Unit) {
-        PillButton(
-            stringResource(R.string.debug_haptics_title),
-            onClick = { navigate(Routes.DEBUG_HAPTICS) },
-            icon = VoxIcons.Vibrate,
-            style = PillStyle.OUTLINED,
-        )
+    /** The haptics lab's route (debug builds only). */
+    const val HAPTICS_ROUTE = "debug_haptics"
+
+    /**
+     * The one collapsed "Developer tools" section at the very end of Settings: the haptics lab, the
+     * Auto-mode detection log, the calibration readout and (on the bench driver) scripted levels.
+     * Everything for testing on a watch lives here and nowhere else; release builds have no such section.
+     */
+    fun settingsSection(
+        list: TransformingLazyColumnScope,
+        env: UiEnv,
+        actions: VoxaraActions,
+        navigate: (String) -> Unit,
+        open: Boolean,
+        onToggle: () -> Unit,
+    ) = with(list) {
+        row {
+            val spoken = stringResource(if (open) R.string.dev_tools_open else R.string.dev_tools_closed)
+            PillButton(
+                stringResource(R.string.dev_tools_title),
+                onClick = onToggle,
+                icon = VoxIcons.Info,
+                style = PillStyle.OUTLINED,
+                modifier = Modifier.semantics { stateDescription = spoken },
+            )
+        }
+        if (open) {
+            row { BodyText(stringResource(R.string.dev_tools_note)) }
+            row {
+                PillButton(
+                    stringResource(R.string.debug_haptics_title),
+                    onClick = { navigate(HAPTICS_ROUTE) },
+                    icon = VoxIcons.Vibrate,
+                    style = PillStyle.OUTLINED,
+                )
+            }
+            if (DetectionLog.available) row { DetectionLog.SettingsEntries() }
+            row { Panel { CalibrationProbePanel(env.state, actions.onProbe, actions.onSaveSourceOffset) } }
+            if (env.state.simulated) {
+                row { BodyText(stringResource(R.string.bench_note)) }
+                row {
+                    ChoiceList(
+                        Scenario.entries.map { it to stringResource(R.string.scenario_chip, stringResource(it.labelRes()), it.dba.toInt()) },
+                        selected = null as Scenario?,
+                        onSelect = { it?.let(actions.onScenario) },
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -110,6 +160,7 @@ object DebugTools {
         Pattern.CALM -> R.string.debug_role_calm
         Pattern.MODE_CHANGE -> R.string.debug_role_mode
         Pattern.CONFIRM -> R.string.debug_role_confirm
+        Pattern.HEADPHONES -> R.string.debug_role_headphones
     }
 
     private data class QuietState(val dnd: Boolean, val ringer: String) {
