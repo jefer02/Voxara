@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.material3.AlertDialog
@@ -22,8 +23,8 @@ import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
-import com.example.voxara.ui.design.Eyebrow
-import com.example.voxara.ui.design.EditorialHeader
+import com.example.voxara.ui.design.GroupLabel
+import com.example.voxara.ui.design.ScreenTitle
 import com.example.voxara.ui.design.ChoiceList
 import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.Panel
@@ -33,6 +34,7 @@ import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.ValueStepper
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.VoxList
+import com.example.voxara.ui.design.row
 import java.text.DateFormat
 import java.util.Date
 
@@ -43,15 +45,15 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
     val a = s.alertSettings
     val name = stringResource(R.string.ai_name)
     var confirmReset by remember { mutableStateOf(false) }
+    var devOpen by rememberSaveable { mutableStateOf(false) }
     val dec = stringResource(R.string.decrease_cd)
     val inc = stringResource(R.string.increase_cd)
 
     VoxList {
-        item { EditorialHeader(stringResource(R.string.app_name), title = stringResource(R.string.card_settings)) }
+        row { ScreenTitle(stringResource(R.string.card_settings)) }
 
         // ------------------------------------------------------------------ monitoring
-        item { Eyebrow(stringResource(R.string.set_monitoring)) }
-        item {
+        row {
             val paused = s.monitoringStatus == MonitoringStatus.PAUSED
             MetricCard(
                 icon = if (s.monitoring) VoxIcons.Waves else VoxIcons.Pause,
@@ -66,7 +68,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 accent = if (paused) VColor.Caution else VColor.AccentInk,
             )
         }
-        item {
+        row {
             val paused = s.monitoringStatus == MonitoringStatus.PAUSED
             PillButton(
                 label = stringResource(if (paused) R.string.action_resume else if (s.monitoring) R.string.set_stop_monitoring else R.string.set_start_monitoring),
@@ -74,26 +76,26 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 style = if (s.monitoring && !paused) PillStyle.TONAL else PillStyle.PRIMARY,
             )
         }
-        if (s.power?.powerSaveMode == true) item { BodyText(stringResource(R.string.power_save_on), color = VColor.Caution) }
-        item { BodyText(stringResource(R.string.keep_running_body)) }
+        if (s.power?.powerSaveMode == true) row { BodyText(stringResource(R.string.power_save_on), color = VColor.Caution) }
+        row { BodyText(stringResource(R.string.keep_running_body)) }
         if (s.batterySettingsAvailable && s.power?.ignoringBatteryOptimizations == false) {
-            item { PillButton(stringResource(R.string.battery_settings), onClick = actions.onOpenBatterySettings, style = PillStyle.OUTLINED) }
+            row { PillButton(stringResource(R.string.battery_settings), onClick = actions.onOpenBatterySettings, style = PillStyle.OUTLINED) }
         }
 
         // ------------------------------------------------------------------ mode
-        item { Eyebrow(stringResource(R.string.mode_title)) }
-        item {
+        row { GroupLabel(stringResource(R.string.mode_title)) }
+        row {
             MetricCard(
                 icon = VoxIcons.Tune,
                 label = stringResource(R.string.mode_title),
-                value = modeValue(s.situationChoice, s.mode),
+                value = modeValue(s.situationChoice, s.mode, s.listening),
                 onClick = { navigate(Routes.MODE) },
             )
         }
 
         // ------------------------------------------------------------------ alerts
-        item { Eyebrow(stringResource(R.string.alerts_title)) }
-        item {
+        row { GroupLabel(stringResource(R.string.alerts_title)) }
+        row {
             ValueStepper(
                 label = stringResource(R.string.set_alert_level),
                 value = stringResource(R.string.alerts_threshold_value, a.thresholdDba),
@@ -102,8 +104,8 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 decreaseDescription = dec, increaseDescription = inc,
             )
         }
-        item { BodyText(stringResource(R.string.alerts_threshold_note, AlertDefaults.SUSTAINED_WINDOW_MIN)) }
-        item {
+        row { BodyText(stringResource(R.string.alerts_threshold_note, AlertDefaults.SUSTAINED_WINDOW_MIN)) }
+        row {
             PillButton(
                 label = stringResource(if (a.quietHoursEnabled) R.string.quiet_on else R.string.quiet_off, clock(a.quietStartMin), clock(a.quietEndMin)),
                 onClick = { actions.onAlertSettings(a.copy(quietHoursEnabled = !a.quietHoursEnabled)) },
@@ -111,7 +113,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
             )
         }
         if (a.quietHoursEnabled) {
-            item {
+            row {
                 ValueStepper(
                     stringResource(R.string.quiet_start), clock(a.quietStartMin),
                     { actions.onAlertSettings(a.copy(quietStartMin = Math.floorMod(a.quietStartMin - 30, 1440))) },
@@ -119,7 +121,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                     dec, inc,
                 )
             }
-            item {
+            row {
                 ValueStepper(
                     stringResource(R.string.quiet_end), clock(a.quietEndMin),
                     { actions.onAlertSettings(a.copy(quietEndMin = Math.floorMod(a.quietEndMin - 30, 1440))) },
@@ -128,19 +130,19 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 )
             }
         }
-        item { BodyText(stringResource(R.string.quiet_note)) }
-        item {
+        row { BodyText(stringResource(R.string.quiet_note)) }
+        row {
             PillButton(
                 label = stringResource(if (s.sensitiveListener) R.string.sensitive_on else R.string.sensitive_off),
                 onClick = { actions.onSensitive(!s.sensitiveListener) },
                 style = if (s.sensitiveListener) PillStyle.PRIMARY else PillStyle.TONAL,
             )
         }
-        item { BodyText(stringResource(R.string.sensitive_note)) }
+        row { BodyText(stringResource(R.string.sensitive_note)) }
 
         // ------------------------------------------------------------------ headphones
-        item { Eyebrow(stringResource(R.string.hp_settings_title)) }
-        item {
+        row { GroupLabel(stringResource(R.string.hp_settings_title)) }
+        row {
             ChoiceList(
                 listOf<Pair<HeadphoneCategory?, String>>(
                     HeadphoneCategory.EARBUDS to stringResource(R.string.hp_cat_earbuds_title),
@@ -151,7 +153,7 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 onSelect = actions.onUsualHeadphones,
             )
         }
-        item {
+        row {
             ValueStepper(
                 label = stringResource(R.string.set_very_loud),
                 value = stringResource(R.string.alerts_threshold_value, a.headphoneLoudDba),
@@ -160,11 +162,11 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 decreaseDescription = dec, increaseDescription = inc,
             )
         }
-        item { BodyText(stringResource(R.string.hp_loud_note, AlertDefaults.HEADPHONE_WINDOW_MIN)) }
+        row { BodyText(stringResource(R.string.hp_loud_note, AlertDefaults.HEADPHONE_WINDOW_MIN)) }
 
         // ------------------------------------------------------------------ Tono
-        item { Eyebrow(stringResource(R.string.tono_settings_title)) }
-        item {
+        row { GroupLabel(stringResource(R.string.tono_settings_title)) }
+        row {
             PillButton(
                 label = stringResource(if (s.tonoEnabled) R.string.tono_enabled_on else R.string.tono_enabled_off),
                 onClick = { actions.onTonoEnabled(!s.tonoEnabled) },
@@ -172,9 +174,9 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 style = if (s.tonoEnabled) PillStyle.PRIMARY else PillStyle.TONAL,
             )
         }
-        item { BodyText(stringResource(R.string.tono_enabled_note)) }
+        row { BodyText(stringResource(R.string.tono_enabled_note)) }
         if (env.cloudAvailable && s.tonoEnabled) {
-            item {
+            row {
                 PillButton(
                     label = stringResource(if (s.aiConsent) R.string.tono_consent_on else R.string.tono_consent_off),
                     onClick = { actions.onAiConsent(!s.aiConsent) },
@@ -183,24 +185,24 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 )
             }
         }
-        item { BodyText(stringResource(if (env.cloudAvailable) R.string.tono_consent_body else R.string.tono_consent_unavailable, name)) }
+        row { BodyText(stringResource(if (env.cloudAvailable) R.string.tono_consent_body else R.string.tono_consent_unavailable, name)) }
 
         // ------------------------------------------------------------------ calibration
-        item { Eyebrow(stringResource(R.string.cal_title)) }
-        item {
+        row { GroupLabel(stringResource(R.string.cal_title)) }
+        row {
             val record = s.calibrationFor(s.activeSource)
             MetricCard(
                 icon = VoxIcons.Tune,
                 label = stringResource(R.string.cal_title),
                 value = if (record != null) stringResource(
                     R.string.cal_status_calibrated,
-                    DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(record.calibratedAtMs)),
+                    DateFormat.getDateInstance(DateFormat.MEDIUM, androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(Date(record.calibratedAtMs)),
                 ) else stringResource(R.string.cal_status_uncalibrated),
-                accent = if (record != null) VColor.AccentInk else VColor.Caution,
+                accent = if (record != null) VColor.AccentInk else VColor.TextSecondary,
                 onClick = { navigate(Routes.CALIBRATION) },
             )
         }
-        item {
+        row {
             ValueStepper(
                 label = stringResource(R.string.set_fine_trim),
                 value = stringResource(R.string.calibration_value, s.calibrationOffsetDb),
@@ -209,11 +211,11 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
                 decreaseDescription = dec, increaseDescription = inc,
             )
         }
-        item { BodyText(stringResource(R.string.calibration_note)) }
+        row { BodyText(stringResource(R.string.calibration_note)) }
 
         // ------------------------------------------------------------------ language
-        item { Eyebrow(stringResource(R.string.language)) }
-        item {
+        row { GroupLabel(stringResource(R.string.language)) }
+        row {
             ChoiceList(
                 AppLanguage.entries.map { it to stringResource(it.labelRes()) },
                 selected = env.language,
@@ -222,34 +224,17 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         }
 
         // ------------------------------------------------------------------ privacy & about
-        item { Eyebrow(stringResource(R.string.set_privacy)) }
-        item { Panel { BodyText(stringResource(R.string.set_privacy_body), color = VColor.Text) } }
-        item { Panel { BodyText(stringResource(R.string.disclaimer), color = VColor.Text) } }
-        item { BodyText(stringResource(R.string.set_licenses), color = VColor.TextTertiary) }
+        row { GroupLabel(stringResource(R.string.set_privacy)) }
+        row { Panel { BodyText(stringResource(R.string.set_privacy_body), color = VColor.Text) } }
+        row { Panel { BodyText(stringResource(R.string.disclaimer), color = VColor.Text) } }
+        row { BodyText(stringResource(R.string.set_licenses), color = VColor.TextTertiary) }
 
         // ------------------------------------------------------------------ advanced
-        item { Eyebrow(stringResource(R.string.set_advanced)) }
-        item { PillButton(stringResource(R.string.reset_dose_title), onClick = { confirmReset = true }, style = PillStyle.OUTLINED) }
+        row { GroupLabel(stringResource(R.string.set_advanced)) }
+        row { PillButton(stringResource(R.string.reset_dose_title), onClick = { confirmReset = true }, style = PillStyle.OUTLINED) }
 
-        if (env.debug) {
-            item { Eyebrow(stringResource(R.string.set_debug), color = VColor.AccentInk) }
-            // Debug builds only: the class and its strings exist in src/debug, a no-op in release.
-            if (DebugTools.available) item { DebugTools.SettingsEntries(navigate) }
-            if (DetectionLog.available) item { DetectionLog.SettingsEntries() }
-            item {
-                Panel { CalibrationProbePanel(s, actions.onProbe, actions.onSaveSourceOffset) }
-            }
-            if (s.simulated) {
-                item { BodyText(stringResource(R.string.bench_note)) }
-                item {
-                    ChoiceList(
-                        Scenario.entries.map { it to stringResource(R.string.scenario_chip, stringResource(it.labelRes()), it.dba.toInt()) },
-                        selected = null as Scenario?,
-                        onSelect = { it?.let(actions.onScenario) },
-                    )
-                }
-            }
-        }
+        // Developer tools: one collapsed section at the very end, for testing on a watch. Debug builds only.
+        if (DebugTools.available) DebugTools.settingsSection(this, env, actions, navigate, devOpen) { devOpen = !devOpen }
     }
 
     AlertDialog(
