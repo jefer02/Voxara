@@ -1,7 +1,9 @@
 package com.example.voxara.complication
 
 import android.content.ComponentName
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.Icon
 import androidx.wear.watchface.complications.data.ColorRamp
 import androidx.wear.watchface.complications.data.ComplicationData
@@ -14,7 +16,10 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.example.voxara.R
+import com.example.voxara.presentation.MainActivity
+import com.example.voxara.ui.PageLinks
 import com.example.voxara.core.format.formatHeadroom
+import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.tile.headroomMinutes
@@ -44,8 +49,11 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
         val tint = tintFor(dba, dose)
         // Created by the watch face, not by the app: it has to resolve the language itself.
         val res = LocaleStore.localized(this)
+        // Headphones mode is part of what the wearer hears from TalkBack; the sound around them is still what this shows.
+        val headphonesMode = ExposureRepository.serviceActive && ExposureRepository.state.value.listening.active
         val description = PlainComplicationText.Builder(
-            res.getString(R.string.complication_cd, pct)
+            res.getString(R.string.complication_cd, pct) +
+                if (headphonesMode) " " + res.getString(R.string.complication_headphones_cd) else ""
         ).build()
 
         return when (type) {
@@ -72,6 +80,7 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
                 )
                 // From the watch accent to the tier colour; the text says the value in words too.
                 .setColorRamp(ColorRamp(intArrayOf(Palette.accent(Accent.PURPLE, dark = true).fill.toInt(), tint), true))
+                .setTapAction(tap())
                 .build()
 
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(
@@ -86,11 +95,18 @@ class DoseComplicationService : SuspendingComplicationDataSourceService() {
                         else formatHeadroom(headroomMinutes(dba, dose))
                     ).build()
                 )
+                .setTapAction(tap())
                 .build()
 
             else -> null
         }
     }
+
+    /** A tap opens the app on the page this complication is about (Dose, Today). */
+    private fun tap(): PendingIntent = PendingIntent.getActivity(
+        this, 1, Intent(this, MainActivity::class.java).putExtra(PageLinks.EXTRA_PAGE, "today"),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     companion object {
         fun requestRefresh(context: Context) {

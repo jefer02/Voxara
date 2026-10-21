@@ -1,7 +1,9 @@
 package com.example.voxara.complication
 
 import android.content.ComponentName
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.Icon
 import androidx.wear.watchface.complications.data.ColorRamp
 import androidx.wear.watchface.complications.data.ComplicationData
@@ -14,6 +16,8 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import com.example.voxara.R
+import com.example.voxara.presentation.MainActivity
+import com.example.voxara.ui.PageLinks
 import com.example.voxara.data.LocaleStore
 import com.example.voxara.data.VoxaraStore
 import com.example.voxara.tile.listeningPercent
@@ -46,13 +50,21 @@ class ListeningComplicationService : SuspendingComplicationDataSourceService() {
                     MonochromaticImage.Builder(Icon.createWithResource(this, R.drawable.ic_voxara_status)).build()
                 )
                 .setColorRamp(ColorRamp(intArrayOf(Palette.accent(Accent.PURPLE, dark = true).fill.toInt(), listeningTint(percent)), true))
+                .setTapAction(tap())
                 .build()
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(text = value, contentDescription = description)
                 .setTitle(PlainComplicationText.Builder(res.getString(R.string.complication_listening_title)).build())
+                .setTapAction(tap())
                 .build()
             else -> null
         }
     }
+
+    /** A tap opens the app on the page this complication is about (Dose, Week). */
+    private fun tap(): PendingIntent = PendingIntent.getActivity(
+        this, 2, Intent(this, MainActivity::class.java).putExtra(PageLinks.EXTRA_PAGE, "week"),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     companion object {
         fun requestRefresh(context: Context) {
