@@ -19,6 +19,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.ambient.AmbientLifecycleObserver
 import androidx.wear.compose.material3.AppScaffold
+import androidx.wear.compose.material3.TimeText
+import com.example.voxara.ui.design.ClockChrome
 import com.example.voxara.BuildConfig
 import com.example.voxara.ai.Tono
 import com.example.voxara.audio.DeviceAudioInfo
@@ -35,6 +37,7 @@ import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.LedgerBook
 import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.monitoring.monitoringStatus
+import com.example.voxara.core.headphones.HeadphoneModeChoice
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.data.AppLanguage
@@ -49,6 +52,7 @@ import com.example.voxara.service.MonitoringWatchdogWorker
 import com.example.voxara.service.Notifications
 import com.example.voxara.sync.CompanionLink
 import com.example.voxara.sync.WearContract
+import com.example.voxara.ui.PageLinks
 import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
@@ -76,13 +80,16 @@ class MainActivity : ComponentActivity() {
     /** Bumped after any permission result so the UI re-reads the grants. */
     private val permissionTick = mutableStateOf(0)
 
-    /** A screen the phone app asked to open (voxara://watch/calibration), until shown. */
+    /** A screen the phone app, a tile or a complication asked to open (voxara://watch/calibration, /week, ...), until shown. */
     private val pendingRoute = mutableStateOf<String?>(null)
 
     private fun readDeepLink(intent: Intent?) {
+        // A tile or complication names the page in an extra.
+        PageLinks.routeFor(intent?.getStringExtra(PageLinks.EXTRA_PAGE))?.let { pendingRoute.value = it }
         val uri = intent?.data ?: return
         if (uri.scheme != WearContract.LINK_SCHEME || uri.host != WearContract.LINK_HOST) return
         if (uri.path == "/calibration") pendingRoute.value = Routes.CALIBRATION
+        else PageLinks.routeFor(uri.path)?.let { pendingRoute.value = it }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -301,6 +308,17 @@ class MainActivity : ComponentActivity() {
         if (choice == SituationChoice.CONCERT) DosimeterService.start(this)
     }
 
+    /**
+     * The wearer picked a headphones-mode choice: the layer follows at once (the transition plays from
+     * the new state), a minimal confirmation tap under their finger, the choice stored and stamped so
+     * it syncs to the phone. The dosimeter, if running, keeps tracking the detection underneath.
+     */
+    private fun selectHeadphoneMode(choice: HeadphoneModeChoice) {
+        confirmHaptics.fire(Pattern.CONFIRM)
+        ExposureRepository.setHeadphoneMode(choice)
+        lifecycleScope.launch { ExposureRepository.store.setHeadphoneMode(choice) }
+    }
+
     private fun actions() = VoxaraActions(
         onMonitoring = { on ->
             if (on) DosimeterService.start(this) else DosimeterService.stop(this)
@@ -312,6 +330,7 @@ class MainActivity : ComponentActivity() {
             else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         },
         onSituationChoice = { choice -> selectSituation(choice, confirm = true) },
+        onHeadphoneMode = ::selectHeadphoneMode,
         onCalibrationTrim = { offset ->
             val clamped = offset.coerceIn(TRIM_RANGE.start, TRIM_RANGE.endInclusive)
             ExposureRepository.update { it.copy(calibrationOffsetDb = clamped) }
@@ -416,7 +435,7 @@ class MainActivity : ComponentActivity() {
             debug = BuildConfig.DEBUG,
         )
         VoxaraTheme(ambient = isAmbient, reduceMotion = reduceMotion()) {
-            AppScaffold {
+            AppScaffold(timeText = { if (!ClockChrome.hidden) TimeText() }) {
                 VoxaraApp(
                     env = env, actions = actions(), ambient = isAmbient,
                     pendingRoute = pendingRoute.value, onRouteShown = { pendingRoute.value = null },
