@@ -30,6 +30,7 @@ import androidx.wear.tiles.tooling.preview.Preview
 import androidx.wear.tiles.tooling.preview.TilePreviewData
 import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.voxara.R
+import com.example.voxara.ui.PageLinks
 import com.example.voxara.core.design.Accent
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.format.formatHeadroom
@@ -103,7 +104,7 @@ internal fun tintFor(dba: Double, dosePercent: Double): Int = tierTint(zoneFor(d
 
 internal fun zoneWordRes(z: RiskZone): Int = z.wordRes()
 
-internal fun openApp(context: Context, id: String) = ModifiersBuilders.Modifiers.Builder()
+internal fun openApp(context: Context, id: String, page: String = "today") = ModifiersBuilders.Modifiers.Builder()
     .setClickable(
         ModifiersBuilders.Clickable.Builder()
             .setId(id)
@@ -113,6 +114,8 @@ internal fun openApp(context: Context, id: String) = ModifiersBuilders.Modifiers
                         ActionBuilders.AndroidActivity.Builder()
                             .setPackageName(context.packageName)
                             .setClassName(MainActivity::class.java.name)
+                            // The dose tile opens the Dose page on Today.
+                            .addKeyToExtraMapping(PageLinks.EXTRA_PAGE, ActionBuilders.stringExtra(page))
                             .build()
                     )
                     .build()
@@ -188,11 +191,14 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
     val secondary = Palette.DARK_TEXT_2.toInt()
     val primary = Palette.DARK_TEXT.toInt()
 
+    // Headphones mode (the live layer, while the app's process runs) says so in indigo; a tile cannot animate.
+    val headphonesMode = ExposureRepository.serviceActive && ExposureRepository.state.value.listening.active
     val bottom = when {
         paused -> res.getString(R.string.paused_resume)
+        headphonesMode -> res.getString(R.string.tile_headphones_on)
         p.heartbeatMs > 0 -> res.getString(
             R.string.tile_updated,
-            DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(p.heartbeatMs)),
+            DateFormat.getTimeInstance(DateFormat.SHORT, res.resources.configuration.locales[0]).format(Date(p.heartbeatMs)),
         )
         else -> res.getString(R.string.card_now_none)
     }
@@ -205,7 +211,16 @@ internal fun buildTile(context: Context, p: VoxaraStore.Persisted): TileBuilders
         .addContent(tileText(res.getString(R.string.tile_dose_value, dose.roundToInt()), 36f, FONT_WEIGHT_BOLD, primary))
         .addContent(tileText(detail, 13f, FONT_WEIGHT_MEDIUM, tint))
         .addContent(Spacer.Builder().setHeight(dp(2f)).build())
-        .addContent(tileText(bottom, 12f, FONT_WEIGHT_MEDIUM, if (paused) Palette.caution(true).ink.toInt() else secondary))
+        .addContent(
+            tileText(
+                bottom, 12f, FONT_WEIGHT_MEDIUM,
+                when {
+                    paused -> Palette.caution(true).ink.toInt()
+                    headphonesMode -> Palette.SECONDARY_INK_DARK.toInt()
+                    else -> secondary
+                },
+            )
+        )
         .build()
 
     return TileBuilders.Tile.Builder()

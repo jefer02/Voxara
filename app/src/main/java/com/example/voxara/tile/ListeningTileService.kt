@@ -21,6 +21,7 @@ import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.example.voxara.R
+import com.example.voxara.ui.PageLinks
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_ADULT
@@ -91,6 +92,8 @@ internal fun buildListeningTile(context: Context, p: VoxaraStore.Persisted): Til
                             ActionBuilders.AndroidActivity.Builder()
                                 .setPackageName(context.packageName)
                                 .setClassName(MainActivity::class.java.name)
+                                // The weekly listening share lives on the Dose page, Week view.
+                                .addKeyToExtraMapping(PageLinks.EXTRA_PAGE, ActionBuilders.stringExtra("week"))
                                 .build()
                         )
                         .build()
