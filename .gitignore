@@ -32,3 +32,11 @@ output-metadata.json
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Generated design-review captures (regenerate with the screenshot tests)
+docs/design/watch-redesign/**/*.png
+docs/design/watch-redesign/**/*.jpg
+docs/design/watch-redesign/**/*.jpeg
+docs/design/watch-redesign/**/*.gif
+docs/design/watch-redesign/**/*.webp
+docs/design/watch-redesign/**/*.mp4
