@@ -4,6 +4,7 @@ import com.example.voxara.core.ai.MiniJson
 import com.example.voxara.core.alerts.AlertDefaults
 import com.example.voxara.core.alerts.AlertPolicy
 import com.example.voxara.core.alerts.HapticStrength
+import com.example.voxara.core.headphones.HeadphoneModeChoice
 import com.example.voxara.core.situation.SituationChoice
 import kotlin.math.roundToInt
 
@@ -31,7 +32,9 @@ enum class SettingField(val key: String) {
     TONO_ENABLED("tono_enabled"),
     CLOUD_AI("cloud_ai_consent"),
     /** Auto or a fixed situation mode. The mode the watch is IN travels in WatchStatus, never here. */
-    SITUATION_MODE("situation_mode");
+    SITUATION_MODE("situation_mode"),
+    /** Headphones mode: Auto (follow the detection), On or Off. A listening layer over the situation, never a situation. */
+    HEADPHONE_MODE("headphone_mode");
 
     companion object {
         fun ofKey(key: String): SettingField? = entries.firstOrNull { it.key == key }
@@ -71,6 +74,7 @@ fun normalize(field: SettingField, raw: String?): String? {
         SettingField.HEADPHONE_TYPE -> enum(HeadphoneType.entries.toTypedArray())
         SettingField.LANGUAGE -> enum(LanguageChoice.entries.toTypedArray())
         SettingField.SITUATION_MODE -> enum(SituationChoice.entries.toTypedArray())
+        SettingField.HEADPHONE_MODE -> enum(HeadphoneModeChoice.entries.toTypedArray())
     }
 }
 
@@ -134,6 +138,7 @@ data class VoxaraSettings(
     val tonoEnabled: Boolean = true,
     val cloudAi: Boolean = false,
     val situationChoice: SituationChoice = SituationChoice.DEFAULT,
+    val headphoneMode: HeadphoneModeChoice = HeadphoneModeChoice.DEFAULT,
 ) {
     fun valueOf(field: SettingField): String = when (field) {
         SettingField.ALERT_THRESHOLD -> alertThresholdDba.toString()
@@ -151,6 +156,7 @@ data class VoxaraSettings(
         SettingField.TONO_ENABLED -> tonoEnabled.toString()
         SettingField.CLOUD_AI -> cloudAi.toString()
         SettingField.SITUATION_MODE -> situationChoice.name
+        SettingField.HEADPHONE_MODE -> headphoneMode.name
     }
 
     companion object {
@@ -176,6 +182,7 @@ data class VoxaraSettings(
                 tonoEnabled = s(SettingField.TONO_ENABLED)?.toBoolean() ?: d.tonoEnabled,
                 cloudAi = s(SettingField.CLOUD_AI)?.toBoolean() ?: d.cloudAi,
                 situationChoice = SituationChoice.parse(s(SettingField.SITUATION_MODE)) ?: d.situationChoice,
+                headphoneMode = HeadphoneModeChoice.parse(s(SettingField.HEADPHONE_MODE)) ?: d.headphoneMode,
             )
         }
     }

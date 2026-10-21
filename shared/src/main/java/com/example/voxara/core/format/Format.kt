@@ -1,5 +1,7 @@
 package com.example.voxara.core.format
 
+import java.text.NumberFormat
+import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
@@ -48,6 +50,16 @@ fun formatCountdown(seconds: Double): String? {
     return if (s < 60) "${s}s" else "${s / 60}m ${(s % 60).toString().padStart(2, '0')}s"
 }
 
-/** "82.0 dBA", or null while nothing has accrued. The unit is the same in every locale. */
-fun formatTwa(twa: Double?): String? =
-    if (twa == null) null else "${(twa * 10).roundToInt() / 10.0} dBA"
+/**
+ * [value] with [digits] decimals in [locale]: "54.0" in English, "54,0" in Spanish. Every figure with a
+ * decimal that a person reads goes through here; digits-only text (clock, percentages) needs no locale.
+ */
+fun formatDecimal(value: Double, digits: Int = 1, locale: Locale = Locale.getDefault()): String =
+    NumberFormat.getNumberInstance(locale).apply {
+        minimumFractionDigits = digits
+        maximumFractionDigits = digits
+    }.format(value)
+
+/** "82.0 dBA" / "82,0 dBA" in [locale], or null while nothing has accrued. The unit is the same in every locale. */
+fun formatTwa(twa: Double?, locale: Locale = Locale.getDefault()): String? =
+    if (twa == null) null else "${formatDecimal(twa, 1, locale)} dBA"
