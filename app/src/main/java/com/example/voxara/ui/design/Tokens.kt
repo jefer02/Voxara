@@ -42,6 +42,8 @@ object VColor {
     val AccentInk = accent.ink
     /** Chart second series (headphones) and Tono's mark. */
     val Secondary = Color(Palette.SECONDARY_INK_DARK)
+    /** The same indigo as a graphic fill (arcs, rings, the moon's headphones side): 4.4:1 on black. */
+    val SecondaryFill = Color(Palette.SECONDARY)
     /** Caution notices (power saving, uncalibrated) and the LOUD tier. */
     val Caution = Color(Palette.caution(true).ink)
     /** Errors and the DANGEROUS tier. */
@@ -55,17 +57,21 @@ object VColor {
 }
 
 /**
- * TYPE SCALE — Plus Jakarta Sans for words, JetBrains Mono (tabular) for every number. Nothing
- * below 12 sp; all sizes are sp, so the wearer's font-size setting scales them.
+ * TYPE SCALE — Plus Jakarta Sans for words and numbers. JetBrains Mono is not used for numerals on
+ * the watch: its zero carries a dot that no OpenType setting removes ("30" reads "30·"). Standalone
+ * figures are laid out in fixed-width digit cells ([TabularNumber]) so they stay tabular, which is why
+ * no style asks for `tnum`: Plus Jakarta Sans' tabular alternates give "1" a slab foot, and every
+ * numeral on the watch must be the same plain glyph set. Nothing below 12 sp; all sizes are sp, so the
+ * wearer's font-size setting scales them.
  */
 object VType {
     val Hero = TextStyle(
-        fontFamily = MonoFamily, fontWeight = FontWeight.Bold, fontSize = 52.sp, lineHeight = 54.sp,
-        letterSpacing = (-0.04).em, fontFeatureSettings = TABULAR, textAlign = TextAlign.Center,
+        fontFamily = JakartaFamily, fontWeight = FontWeight.ExtraBold, fontSize = 52.sp, lineHeight = 54.sp,
+        letterSpacing = (-0.03).em, textAlign = TextAlign.Center,
     )
     val Display = TextStyle(
-        fontFamily = MonoFamily, fontWeight = FontWeight.Bold, fontSize = 36.sp, lineHeight = 40.sp,
-        letterSpacing = (-0.03).em, fontFeatureSettings = TABULAR, textAlign = TextAlign.Center,
+        fontFamily = JakartaFamily, fontWeight = FontWeight.ExtraBold, fontSize = 36.sp, lineHeight = 40.sp,
+        letterSpacing = (-0.02).em, textAlign = TextAlign.Center,
     )
     /** Editorial titles: extra-bold, tight. */
     val Title = TextStyle(
@@ -84,24 +90,19 @@ object VType {
         fontFamily = JakartaFamily, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 16.sp,
         textAlign = TextAlign.Center,
     )
-    /** The small uppercase, letter-spaced label above things (callers upper-case the text). */
-    val Eyebrow = TextStyle(
-        fontFamily = JakartaFamily, fontWeight = FontWeight.Bold, fontSize = 12.sp, lineHeight = 15.sp,
-        letterSpacing = 0.12.em, textAlign = TextAlign.Center,
-    )
     /** The minimum size anywhere in the app. */
     val Caption = TextStyle(
         fontFamily = JakartaFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 15.sp,
         textAlign = TextAlign.Center,
     )
     val Numeral = TextStyle(
-        fontFamily = MonoFamily, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 24.sp,
-        letterSpacing = (-0.02).em, fontFeatureSettings = TABULAR, textAlign = TextAlign.Center,
+        fontFamily = JakartaFamily, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, lineHeight = 24.sp,
+        letterSpacing = (-0.01).em, textAlign = TextAlign.Center,
     )
     /** Small numbers in rows, chips and scale labels. */
     val Value = TextStyle(
-        fontFamily = MonoFamily, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 16.sp,
-        fontFeatureSettings = TABULAR, textAlign = TextAlign.Center,
+        fontFamily = JakartaFamily, fontWeight = FontWeight.Bold, fontSize = 13.sp, lineHeight = 16.sp,
+        textAlign = TextAlign.Center,
     )
 }
 
@@ -118,7 +119,6 @@ object VSpace {
 
 object VRadius {
     val card = 22.dp
-    val hero = 26.dp
     val tile = 10.dp
     val pill = 50            // percent: fully round
     val bar = 6.dp
@@ -127,16 +127,31 @@ object VRadius {
 object VSize {
     /** Wear OS / Material minimum touch target. */
     val touch = 48.dp
-    val ringStroke = 12.dp
-    val ringStrokeSmall = 8.dp
     /** The bezel arc (template: 5.5 px on a 340 px ring). */
     val bezel = 5.dp
     val iconTile = 32.dp
     val border = 1.dp
 }
 
-/** Motion: springs for values, short tweens for appear/disappear, 400 ms between zone tiers. */
+/**
+ * Motion. Springs for values that follow data, short tweens for appear/disappear, 400 ms between
+ * zone tiers, a longer decelerating sweep when an arc first draws. Every use is gated by
+ * `LocalReduceMotion` / `LocalAnimate` (static fallback) and never runs in ambient.
+ */
 object VMotion {
+    /** The bezel arc sweeping from empty to its value when a screen opens. */
+    const val SWEEP_MS = 650
+    /** A page picture retracting when its page stops being the current one (faster than it draws in). */
+    const val EXIT_MS = 250
+    /** One digit rolling to the next. */
+    const val DIGIT_MS = 220
+    /** The zone tag swapping its icon and word. */
+    const val TAG_MS = 150
+    /** Chip / button press feedback. */
+    const val PRESS_MS = 100
+    /** The limit alert's entrance pulse (matches the first haptic beat). */
+    const val PULSE_MS = 420
+    fun sweep() = tween<Float>(durationMillis = SWEEP_MS, easing = FastOutSlowInEasing)
     fun <T> value() = spring<T>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
     fun <T> enter() = tween<T>(durationMillis = 250, easing = FastOutSlowInEasing)
     fun <T> exit() = tween<T>(durationMillis = 200, easing = FastOutSlowInEasing)
