@@ -13,7 +13,10 @@ import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.MinuteRecord
 import com.example.voxara.core.ledger.energyOf
 import com.example.voxara.core.ledger.nioshDoseOf
+import com.example.voxara.core.headphones.HeadphoneModeChoice
+import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.core.monitoring.MonitoringStatus
+import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.link.LinkState
 import com.example.voxara.link.SyncProblem
 import com.example.voxara.link.WatchNode
@@ -143,6 +146,21 @@ class PhoneScreenshotTest {
         for (accent in Accent.entries) for (dark in listOf(false, true)) {
             capture("home_accent", phone, 1.0f, dark = dark, accent = accent) { HomeScreen(calm, actions) {} }
         }
+    }
+
+    /** The watch in "Transport + Headphones" (detected by the watch), on Home, Watch and Settings; also with large text. */
+    @Test fun headphonesMode() {
+        val hp = state.copy(
+            status = status.copy(situationMode = SituationMode.TRANSPORT, headphonesMode = true, headphonesSource = LayerSource.WATCH),
+        )
+        for (scale in listOf(1.0f, 1.3f, 2.0f)) {
+            capture("home_hp", phone, scale) { HomeScreen(hp, actions) {} }
+            capture("watch_hp", phone, scale) { WatchScreen(hp, actions) }
+        }
+        capture("home_hp", phone, 1.0f, dark = true) { HomeScreen(hp, actions) {} }
+        capture("settings_hp", tall, 1.0f) { SettingsScreen(hp, actions) {} }
+        capture("settings_hp", tall, 1.0f, dark = true) { SettingsScreen(hp, actions) {} }
+        capture("settings_hp", tall, 2.0f) { SettingsScreen(hp.copy(settings = hp.settings.copy(headphoneMode = HeadphoneModeChoice.ON)), actions) {} }
     }
 
     @Test fun homeStates() {

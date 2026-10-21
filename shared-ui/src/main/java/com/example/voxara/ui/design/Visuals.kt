@@ -37,6 +37,8 @@ import com.example.voxara.core.design.Accent
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.risk.RiskZone
 import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -159,7 +161,10 @@ class WaveLines {
 /**
  * HARMONIC RINGS + HALO — the watch's closed, sine-deformed rings around the main number and the
  * radial halo under them. [intensity] 0..1 comes from the live level. [rings] 3 (4 while listening
- * on headphones, with a finer pattern, as in the template).
+ * on headphones, with a finer pattern, as in the template). [strength] scales the ring opacity (the
+ * watch lowers it behind text). [ringColor] tints the rings apart from the halo (headphones mode shifts the rings
+ * to indigo while the halo keeps its colour, so no brush is rebuilt per frame). [morph] 0..1 turns the organic rings into a stereo, left-right shape
+ * (headphones mode): two lobes with a waist at the top and bottom, the left half mirroring the right.
  */
 class HarmonicRings {
     private val path = Path()
@@ -169,7 +174,10 @@ class HarmonicRings {
     private var strong = Stroke(0f)
     private var faint = Stroke(0f)
 
-    fun draw(scope: DrawScope, phase: Float, intensity: Float, color: Color, rings: Int = 3, fine: Boolean = false) = with(scope) {
+    fun draw(
+        scope: DrawScope, phase: Float, intensity: Float, color: Color, rings: Int = 3, fine: Boolean = false,
+        strength: Float = 1f, morph: Float = 0f, ringColor: Color = color,
+    ) = with(scope) {
         val r0 = size.minDimension / 2
         if (r0 <= 0f) return@with
         val c = center
@@ -194,18 +202,24 @@ class HarmonicRings {
         val points = 96
         for (r in 0 until rings) {
             path.rewind()
-            val base = (86f + r * 14f) * unit
-            val amp = (4.5f + i * 22f) * (1f - r * 0.18f) * unit
+            // Rings spread from about half the radius to the edge, so they fill the space inside the bezel.
+            val base = (92f + r * 17f) * unit
+            val amp = (5f + i * 17f) * (1f - r * 0.18f) * unit
             val freq = if (fine) 6f + r * 2f else 4f + r
             for (p in 0..points) {
                 val a = p * (2 * PI.toFloat()) / points
-                val radius = base + sin(a * freq + phase + r) * amp + cos(a * (freq - 2f) - phase * 1.3f) * amp * 0.45f
-                val x = c.x + cos(a) * radius
+                val ca = cos(a)
+                // Stereo: the waves are drawn on the mirrored angle (the left ear echoes the right one)
+                // and the ring swells into two lobes along the horizontal axis.
+                val wa = if (morph > 0f) a + ((if (ca >= 0f) a else PI.toFloat() - a) - a) * morph else a
+                val lobe = if (morph > 0f) 1f + morph * (-0.22f + 0.40f * abs(ca).pow(1.3f)) else 1f
+                val radius = (base * lobe) + sin(wa * freq + phase + r) * amp + cos(wa * (freq - 2f) - phase * 1.3f) * amp * 0.45f
+                val x = c.x + ca * radius
                 val y = c.y + sin(a) * radius
                 if (p == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             path.close()
-            drawPath(path, color.copy(alpha = if (r == 0) 0.58f else 0.22f), style = if (r == 0) strong else faint)
+            drawPath(path, ringColor.copy(alpha = (if (r == 0) 0.58f else 0.22f) * strength), style = if (r == 0) strong else faint)
         }
     }
 }
