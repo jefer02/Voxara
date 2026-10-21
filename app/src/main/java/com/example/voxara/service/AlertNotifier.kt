@@ -76,6 +76,8 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
             haptics.fire(a.kind.pattern(), AlertPolicy.repeats(a.kind, prefs))
         }
         val now = System.currentTimeMillis()
+        // The screen sees it too: a headphones-mode transition is skipped for an alert.
+        ExposureRepository.update { it.copy(lastAlertAtMs = now) }
         alerts.forEach { a ->
             runCatching { ExposureDb.get(context).alerts.add(a.kind, a.value, a.level, now) }
                 .onFailure { Log.w("VoxaraAlerts", "alert history write failed", it) }

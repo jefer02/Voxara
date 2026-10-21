@@ -22,9 +22,11 @@ import com.example.voxara.audio.AudioBurstSampler
 import com.example.voxara.audio.DeviceAudioInfo
 import com.example.voxara.audio.HeadphoneMonitor
 import com.example.voxara.audio.PowerPolicy
-import com.example.voxara.core.headphones.Attribution
 import com.example.voxara.core.headphones.HeadphoneCategory
-import com.example.voxara.core.headphones.attribute
+import com.example.voxara.core.headphones.ListeningLayer
+import com.example.voxara.core.headphones.ListeningLayerPolicy
+import com.example.voxara.core.headphones.ListeningLayerState
+import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.audio.HeuristicSceneClassifier
 import com.example.voxara.complication.DoseComplicationService
 import com.example.voxara.core.advice.AdviceGrammar
@@ -74,6 +76,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 /**
@@ -115,6 +118,10 @@ class DosimeterService : LifecycleService() {
         private const val CONTINUOUS_BURST_MS = 250L
         private const val HEARTBEAT_EVERY_MS = 30_000L
         private const val ERROR_BACKOFF_MS = 2_000L
+        /** Headphones mode looks this often while nothing is changing (a device event wakes it sooner)... */
+        private const val LAYER_POLL_MS = 5_000L
+        /** ...and this often while a change is waiting out its hold time. */
+        private const val LAYER_PENDING_POLL_MS = 1_000L
 
         fun hasMic(context: Context) = ContextCompat.checkSelfPermission(
             context, Manifest.permission.RECORD_AUDIO,
@@ -159,6 +166,10 @@ class DosimeterService : LifecycleService() {
     /** When this dosimeter run started: no mode-change haptic in its first minutes. */
     private var startedAtMs = 0L
     private val modeHaptics = ModeChangeHapticGate()
+    /** Headphones mode has its own polite budget: a headphone switch must not use up the mode-change one. */
+    private val layerHaptics = ModeChangeHapticGate()
+    /** Headphones mode: detection with hysteresis (3 s in, 10 s out). Reads only; it never gates sampling or alerts. */
+    private val layer = ListeningLayer()
     /**
      * Automatic situation detection (Auto only). Probabilities and levels in memory, nothing else.
      * Licence gate: without SCENE_MODEL_ENABLED (release default) only the Concert rule runs.
@@ -232,6 +243,8 @@ class DosimeterService : LifecycleService() {
                         snoozeMinutes = p.snoozeMinutes,
                         tonoEnabled = p.tonoEnabled,
                         aiConsent = p.aiConsent,
+                        headphoneMode = p.headphoneMode,
+                        listening = it.listening.withChoice(p.headphoneMode),
                         situationChoice = p.situationChoice,
                         detectedMode = if (p.situationChoice == SituationChoice.AUTO) it.detectedMode else null,
                         mode = Situation.resolve(p.situationChoice, it.detectedMode),
@@ -294,6 +307,9 @@ class DosimeterService : LifecycleService() {
         }
 
         headphones.start()
+        headphones.onDevicesChanged = { ExposureRepository.layerWake.trySend(Unit) }
+        layer.reset()
+        val layerJob = lifecycleScope.launch { layerLoop() }
         var state = SampleState.IDLE
         var session: AudioBurstSampler.Session? = null
         var lastFoldAt: Long? = null
@@ -380,14 +396,17 @@ class DosimeterService : LifecycleService() {
                     val engine = ExposureRepository.engine
                     val hp = headphones.snapshot(now)
                     // THE DOUBLE-COUNT RULE: while listening, this span belongs to exactly one ledger.
-                    when (attribute(hp.listeningDba, leq, hp.category ?: HeadphoneCategory.UNKNOWN)) {
-                        Attribution.AMBIENT -> {
-                            engine.accumulate(leq, represents)
-                            withContext(Dispatchers.IO) { ambient.add(leq, represents, now) }
-                            sustained.add(leq, represents, now)
-                        }
-                        Attribution.HEADPHONE -> foldListening(hp.listeningDba!!, represents, now, hp)
+                    // Headphones mode is passed in only to show that it changes nothing here: the room
+                    // is always measured and always reaches the alert window.
+                    val plan = ListeningLayerPolicy.planBurst(
+                        repo.listening, hp.listeningDba, leq, hp.category ?: HeadphoneCategory.UNKNOWN,
+                    )
+                    if (plan.foldAmbient) {
+                        engine.accumulate(leq, represents)
+                        withContext(Dispatchers.IO) { ambient.add(leq, represents, now) }
                     }
+                    if (plan.feedSustained) sustained.add(leq, represents, now)
+                    if (plan.foldHeadphone) foldListening(hp.listeningDba!!, represents, now, hp)
                     val impulse = engine.notePeak(burst.peakDbc)
                     publishHeadphones(hp, now)
                     val weeklyPercent = 100.0 * ambient.weeklyPa2h(now) / weeklyBudgetPa2h
@@ -472,8 +491,13 @@ class DosimeterService : LifecycleService() {
                 }
             }
         } finally {
+            layerJob.cancel()
+            headphones.onDevicesChanged = null
             headphones.stop()
             session?.close()
+            // Nothing is watching for headphones any more: Auto falls back to off, a manual choice stays.
+            layer.reset()
+            ExposureRepository.update { it.copy(listening = ListeningLayerState.OFF.withChoice(it.headphoneMode)) }
             ExposureRepository.serviceActive = false
             // Ended without the wearer asking: that is a pause, and the UI offers a resume.
             ExposureRepository.update {
@@ -495,6 +519,60 @@ class DosimeterService : LifecycleService() {
                 sceneFeatures = sceneFeatures,
             )
         }
+    }
+
+    // ------------------------------------------------------------- headphones mode
+
+    /**
+     * HEADPHONES MODE. Looks at the watch's outputs and at the phone's last report, applies the
+     * hysteresis and publishes the layer. Its own loop, because the burst ladder can be a minute
+     * apart when it is quiet and putting headphones on should be noticed within seconds. It writes
+     * one state field and plays one soft haptic; the measuring, the ledgers and the alerts never read
+     * what it concludes ([ListeningLayerPolicy]).
+     */
+    private suspend fun layerLoop() {
+        while (running && lifecycleScope.isActive) {
+            val now = System.currentTimeMillis()
+            val next = layer.update(
+                now, ExposureRepository.state.value.headphoneMode,
+                watchHeadphones = headphones.rawConnected(),
+                phoneHeadphones = ListeningLayer.phoneReports(now, ExposureRepository.phoneHeadphonesAtMs),
+            )
+            publishLayer(next, now)
+            val wait = if (layer.pending) LAYER_PENDING_POLL_MS else LAYER_POLL_MS
+            withTimeoutOrNull(wait) { ExposureRepository.layerWake.receive() }
+        }
+    }
+
+    /**
+     * Publishes a changed layer. When it turned on or off by detection, the wrist gets one soft
+     * double tick (HEADPHONES), inside ModeChangeHapticGate's limits and never near an alert. A manual
+     * switch already gave its own tap under the wearer's finger and is not repeated here.
+     */
+    private fun publishLayer(next: ListeningLayerState, now: Long) {
+        val before = ExposureRepository.state.value.listening
+        if (next == before) return
+        ExposureRepository.update { it.copy(listening = next) }
+        if (next.active == before.active) return
+        Log.i(TAG, "headphones mode ${if (next.active) "on" else "off"} (${next.source})")
+        refreshNotification(now)
+        VoxaraTileService.requestRefresh(this)
+        ListeningTileService.requestRefresh(this)
+        DoseComplicationService.requestRefresh(this)
+        if (next.source == LayerSource.MANUAL || before.source == LayerSource.MANUAL) return
+        val s = ExposureRepository.state.value
+        val allowed = layerHaptics.tryPlay(
+            ModeChangeHapticGate.Context(
+                nowMs = now,
+                localDay = localEpochDay(now),
+                serviceStartedAtMs = startedAtMs,
+                lastAlertHapticAtMs = haptics.lastAlertAtMs.takeIf { it > 0L },
+                quietHours = inQuietHours(s.alertSettings, localMinuteOfDay(now)),
+                powerSave = PowerPolicy.read(this).powerSaveMode,
+                advisoryHaptics = s.hapticPrefs.advisoryHaptics,
+            )
+        )
+        if (allowed) haptics.fire(Pattern.HEADPHONES)
     }
 
     // ------------------------------------------------------------- automatic situation
@@ -835,7 +913,10 @@ class DosimeterService : LifecycleService() {
     private fun buildNotification(): Notification {
         val s = ExposureRepository.state.value
         val res = strings()
-        val content = res.getString(
+        // Headphones mode says so, and that the room is still being measured.
+        val content = if (s.listening.active) res.getString(
+            R.string.notification_content_headphones, s.dba.roundToInt(), s.dosePercent.roundToInt(),
+        ) else res.getString(
             R.string.notification_content, s.dba.roundToInt(), s.dosePercent.roundToInt(),
         )
         val pending = PendingIntent.getActivity(
@@ -865,6 +946,10 @@ class DosimeterService : LifecycleService() {
     private fun maybeNotify(risk: RiskState, now: Long) {
         if (risk == lastRisk && now - lastNotifyAt < NOTIFY_EVERY_MS) return
         lastRisk = risk
+        refreshNotification(now)
+    }
+
+    private fun refreshNotification(now: Long) {
         lastNotifyAt = now
         getSystemService(NotificationManager::class.java)
             .notify(Notifications.DOSIMETER_ID, buildNotification())
