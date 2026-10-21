@@ -1,7 +1,17 @@
 package com.example.voxara.ui.design
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +33,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,7 +63,9 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.Text
+import com.example.voxara.R
 import com.example.voxara.core.risk.RiskZone
+import kotlinx.coroutines.delay
 import com.example.voxara.ui.theme.LocalAmbient
 import com.example.voxara.ui.theme.LocalReduceMotion
 
@@ -70,29 +86,88 @@ private val pillShape = RoundedCornerShape(percent = VRadius.pill)
 fun zoneWord(z: RiskZone): String = stringResource(z.wordRes())
 
 /**
- * Icon + word in a pill: the zone, readable without colour. Accent-soft fill, tier ink and a tier
- * border, as the template's status badge. Ambient: grey outline only.
+ * ZONE TAG — the zone as icon + word in its tier colour: a small filled tag, not an outlined pill, so
+ * it does not look like a button (it is not one). A dark scrim under the tint keeps the word readable
+ * over the wave rings. When the zone changes, the colour crossfades (400 ms) and the icon and word
+ * swap with a short pop (150 ms); both are instant with reduced motion. Ambient: grey text with a
+ * hairline outline.
  */
 @Composable
-fun ZoneBadge(zone: RiskZone, modifier: Modifier = Modifier, label: String = zoneWord(zone)) {
+fun ZoneTag(zone: RiskZone, modifier: Modifier = Modifier) {
     val ambient = LocalAmbient.current
-    val tone = animateTone(VColor.tone(zone), instant = LocalReduceMotion.current || ambient)
+    val still = LocalReduceMotion.current || ambient
+    val tone = animateTone(VColor.tone(zone), instant = still)
     val ink = if (ambient) VColor.TextSecondary else tone.ink
+    val shape = RoundedCornerShape(8.dp)
+    AnimatedContent(
+        targetState = zone,
+        modifier = modifier
+            .clip(shape)
+            .let {
+                if (ambient) it.border(VSize.border, VColor.TextTertiary, shape)
+                else it.background(Color.Black.copy(alpha = 0.62f)).background(tone.soft)
+            },
+        transitionSpec = {
+            if (still) fadeIn(snap()) togetherWith fadeOut(snap())
+            else (fadeIn(tween(VMotion.TAG_MS)) + scaleIn(tween(VMotion.TAG_MS), initialScale = 0.9f)) togetherWith
+                fadeOut(tween(VMotion.TAG_MS / 2))
+        },
+        label = "zoneTag",
+    ) { z ->
+        Row(
+            Modifier.padding(horizontal = VSpace.s, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(VSpace.xs),
+        ) {
+            Icon(VoxIcons.zone(z), contentDescription = null, tint = ink, modifier = Modifier.size(16.dp * LocalTextScale.current))
+            Text(zoneWord(z), style = VType.Label.heroScaled(), color = ink, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * PRESSABLE — a tap target with press feedback: while held it shrinks to 96 % for [VMotion.PRESS_MS]
+ * and springs back (the system ripple stays). No scale with reduced motion; the ripple still confirms.
+ */
+@Composable
+fun Modifier.pressable(onClick: () -> Unit, onClickLabel: String? = null, role: Role = Role.Button): Modifier {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val still = LocalReduceMotion.current
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && !still) 0.96f else 1f,
+        animationSpec = tween(VMotion.PRESS_MS),
+        label = "press",
+    )
+    return this
+        .graphicsLayer { scaleX = scale; scaleY = scale }
+        .clickable(interactionSource = source, indication = LocalIndication.current, role = role, onClickLabel = onClickLabel, onClick = onClick)
+}
+
+/**
+ * RESUME PILL — shown in place of the zone tag while monitoring is paused: one tap resumes. A 48 dp
+ * target in the caution tone, with the state in words ("Monitoring paused") for the screen reader.
+ */
+@Composable
+fun ResumePill(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.action_resume)
+    val state = stringResource(R.string.paused_label)
     Row(
         modifier = modifier
+            .defaultMinSize(minHeight = VSize.touch)
             .clip(pillShape)
-            .background(if (ambient) Color.Transparent else tone.soft)
-            .border(VSize.border, if (ambient) VColor.TextTertiary else tone.ink.copy(alpha = 0.7f), pillShape)
+            .background(VColor.Caution.copy(alpha = 0.16f))
+            .border(VSize.border, VColor.Caution.copy(alpha = 0.7f), pillShape)
+            .pressable(onClick = onClick, onClickLabel = label)
+            .semantics { contentDescription = "$state. $label" }
             .padding(horizontal = VSpace.m, vertical = VSpace.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(VSpace.xs),
     ) {
-        Icon(VoxIcons.zone(zone), contentDescription = null, tint = ink, modifier = Modifier.size(16.dp))
-        Text(label, style = VType.Label, color = if (ambient) VColor.TextSecondary else ink, maxLines = 1)
+        Icon(VoxIcons.Play, contentDescription = null, tint = VColor.Caution, modifier = Modifier.size(16.dp))
+        Text(label, style = VType.Label, color = VColor.Caution, maxLines = 1)
     }
 }
-
-// ------------------------------------------------------------------------------------ arcs and rings
 
 /** Level gauge scale (dBA): the template's bezel maps 30–110 onto its arc. */
 const val GAUGE_MIN_DBA = 30f
@@ -105,39 +180,58 @@ fun gaugeFraction(dba: Float): Float = ((dba - GAUGE_MIN_DBA) / (GAUGE_MAX_DBA -
  * BEZEL ARC — the template's 270° progress arc (gap at the bottom), rounded caps, white-7 % track
  * and a glow under the progress (a wide translucent stroke: no blur on the watch). Position carries
  * the value, so it reads the same in any colour vision. Ambient: hairline track and progress in
- * grey, no glow.
+ * grey, no glow. It is drawn on the same rim as every page's ring ([Face]): give it the whole display.
+ * [gapDeg] above 0 draws the track as two arcs with that gap at the top (headphones mode, ambient: a
+ * still outline, no progress).
  */
 @Composable
 fun BezelArc(
     fraction: Float,
     color: Color,
     modifier: Modifier = Modifier,
-    stroke: Dp = VSize.bezel,
+    stroke: Dp = Dp.Unspecified,
+    gapDeg: Float = 0f,
 ) {
     val ambient = LocalAmbient.current
+    val still = LocalReduceMotion.current || ambient
+    // The first draw sweeps from empty to the value (a screen opening); later changes follow the
+    // data with a spring. No motion at all with reduced motion or in ambient.
+    var armed by remember { mutableStateOf(still) }
+    var sweeping by remember { mutableStateOf(!still) }
+    LaunchedEffect(Unit) {
+        armed = true
+        if (sweeping) { delay(VMotion.SWEEP_MS + 100L); sweeping = false }
+    }
     val shown by animateFloatAsState(
-        targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (LocalReduceMotion.current || ambient) snap() else VMotion.value(),
+        targetValue = if (armed) fraction.coerceIn(0f, 1f) else 0f,
+        animationSpec = if (still) snap() else if (sweeping) VMotion.sweep() else VMotion.value(),
         label = "bezel",
     )
     Canvas(modifier) {
-        val w = if (ambient) 1.5.dp.toPx() else stroke.toPx()
-        val glow = w * 3.2f
-        val inset = (if (ambient) w else glow) / 2 + 1.dp.toPx()
-        val arcSize = Size(size.minDimension - 2 * inset, size.minDimension - 2 * inset)
+        val w = if (ambient) 1.5.dp.toPx() else if (stroke != Dp.Unspecified) stroke.toPx() else size.minDimension * Face.BEZEL
+        val glow = w * 3f
+        // Outer edge on the shared rim, like every page's ring. In ambient the system clock is shown (the pages hide
+        // it), so the hairline sits further in, clear of the curved time text.
+        val inset = Face.RING_INSET + (if (ambient) 0.07f else 0f)
+        val radius = size.minDimension * (0.5f - inset) - (if (ambient) w else w * 1.1f) / 2
+        val arcSize = Size(2 * radius, 2 * radius)
         val topLeft = Offset((size.width - arcSize.width) / 2, (size.height - arcSize.height) / 2)
-        drawArc(
-            if (ambient) VColor.TextTertiary.copy(alpha = 0.5f) else VColor.BezelTrack,
-            135f, 270f, false, topLeft, arcSize, style = Stroke(w, cap = StrokeCap.Round),
-        )
+        val trackColor = if (ambient) VColor.TextTertiary.copy(alpha = 0.5f) else VColor.BezelTrack
+        if (gapDeg > 0f) {
+            val len = Face.SWEEP / 2 - gapDeg / 2
+            drawArc(trackColor, Face.START, len, false, topLeft, arcSize, style = Stroke(w, cap = StrokeCap.Round))
+            drawArc(trackColor, 270f + gapDeg / 2, len, false, topLeft, arcSize, style = Stroke(w, cap = StrokeCap.Round))
+            return@Canvas
+        }
+        drawArc(trackColor, Face.START, Face.SWEEP, false, topLeft, arcSize, style = Stroke(w, cap = StrokeCap.Round))
         if (shown > 0.003f) {
-            val sweep = 270f * shown
+            val sweep = Face.SWEEP * shown
             if (!ambient) {
-                drawArc(color.copy(alpha = 0.18f), 135f, sweep, false, topLeft, arcSize, style = Stroke(glow, cap = StrokeCap.Round))
+                drawArc(color.copy(alpha = 0.18f), Face.START, sweep, false, topLeft, arcSize, style = Stroke(glow, cap = StrokeCap.Round))
             }
             drawArc(
                 if (ambient) VColor.TextSecondary else color,
-                135f, sweep, false, topLeft, arcSize, style = Stroke(w * 1.1f, cap = StrokeCap.Round),
+                Face.START, sweep, false, topLeft, arcSize, style = Stroke(w * 1.1f, cap = StrokeCap.Round),
             )
         }
     }
@@ -148,45 +242,6 @@ fun BezelArc(
 fun LevelBezel(dba: Float?, modifier: Modifier = Modifier) {
     val tone = animateTone(VColor.tone(RiskZone.of((dba ?: 0f).toDouble())), instant = LocalReduceMotion.current)
     BezelArc(fraction = dba?.let(::gaugeFraction) ?: 0f, color = tone.fill, modifier = modifier)
-}
-
-/**
- * RING — a full progress ring (dose, weekly budget, score), rounded cap, translucent track. The
- * centre content always states the number in words.
- */
-@Composable
-fun ProgressRing(
-    fraction: Float,
-    modifier: Modifier = Modifier,
-    color: Color = VColor.AccentInk,
-    stroke: Dp = VSize.ringStroke,
-    content: @Composable BoxScope.() -> Unit = {},
-) {
-    val ambient = LocalAmbient.current
-    val animated by animateFloatAsState(
-        targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (LocalReduceMotion.current) snap() else VMotion.value(),
-        label = "ring",
-    )
-    Box(modifier, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = if (ambient) 2.dp.toPx() else stroke.toPx()
-            val inset = w / 2
-            val arcSize = Size(size.minDimension - 2 * inset, size.minDimension - 2 * inset)
-            val topLeft = Offset((size.width - arcSize.width) / 2, (size.height - arcSize.height) / 2)
-            drawArc(
-                if (ambient) VColor.TextTertiary.copy(alpha = 0.5f) else VColor.Track,
-                -90f, 360f, false, topLeft, arcSize, style = Stroke(w),
-            )
-            if (animated > 0.002f) {
-                drawArc(
-                    if (ambient) VColor.TextSecondary else color,
-                    -90f, 360f * animated, false, topLeft, arcSize, style = Stroke(w, cap = StrokeCap.Round),
-                )
-            }
-        }
-        content()
-    }
 }
 
 // ------------------------------------------------------------------------------------ text
@@ -206,33 +261,22 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, color: Color = VCo
     Text(text, style = VType.Caption, color = color, textAlign = TextAlign.Center, modifier = modifier, maxLines = 2)
 }
 
-/** The small uppercase, letter-spaced label above a group: a heading for TalkBack. */
+/** A group heading inside a long list (Settings): sentence case, quiet, a heading for TalkBack. */
 @Composable
-fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = VColor.TextTertiary) {
+fun GroupLabel(text: String, modifier: Modifier = Modifier, color: Color = VColor.TextSecondary) {
     Text(
-        text.uppercase(), style = VType.Eyebrow, color = color, textAlign = TextAlign.Center, maxLines = 2,
-        modifier = modifier.semantics { heading() },
+        text, style = VType.Label, color = color, textAlign = TextAlign.Center, maxLines = 2,
+        overflow = TextOverflow.Ellipsis, modifier = modifier.padding(top = VSpace.s).semantics { heading() },
     )
 }
 
-/**
- * EDITORIAL HEADER — the template's small uppercase accent label with a pulsing dot, and (when
- * given) a large extra-bold title under it. Both are headings.
- */
+/** A screen's title: extra-bold, tight, centred, one heading (no label above it). */
 @Composable
-fun EditorialHeader(label: String, modifier: Modifier = Modifier, title: String? = null, color: Color = VColor.AccentInk) {
-    val ambient = LocalAmbient.current
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(VSpace.xs)) {
-            PulseDot(color, animate = LocalAnimate.current && !ambient)
-            Text(label.uppercase(), style = VType.Eyebrow, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() })
-        }
-        if (title != null) {
-            Text(title, style = VType.Title, color = VColor.Text, textAlign = TextAlign.Center, maxLines = 3,
-                modifier = Modifier.semantics { heading() })
-        }
-    }
+fun ScreenTitle(text: String, modifier: Modifier = Modifier, color: Color = VColor.Text) {
+    Text(
+        text, style = VType.Title, color = color, textAlign = TextAlign.Center, maxLines = 3,
+        overflow = TextOverflow.Ellipsis, modifier = modifier.semantics { heading() },
+    )
 }
 
 @Composable
@@ -262,7 +306,7 @@ fun PillButton(
         { Icon(it, contentDescription = null, modifier = Modifier.size(20.dp)) }
     }
     val labelSlot: @Composable RowScope.() -> Unit = {
-        Text(label, style = VType.TitleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(label, style = VType.TitleSmall.capFont(1.5f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
     when (style) {
         PillStyle.PRIMARY -> Button(onClick = onClick, modifier = m, enabled = enabled, icon = iconSlot, label = labelSlot)
@@ -280,7 +324,7 @@ fun ReplyChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier)
             .clip(pillShape)
             .background(VColor.CardSubtle)
             .border(VSize.border, VColor.Border, pillShape)
-            .clickable(role = Role.Button, onClick = onClick)
+            .pressable(onClick = onClick)
             .padding(horizontal = VSpace.l, vertical = VSpace.s),
         contentAlignment = Alignment.Center,
     ) {
@@ -308,8 +352,8 @@ private fun Modifier.card(): Modifier = this
     .border(VSize.border, VColor.Border, RoundedCornerShape(VRadius.card))
 
 /**
- * METRIC CARD — a settings/list row: icon tile, muted label, value, optional detail. The
- * whole card is the touch target.
+ * METRIC CARD — a list row: tinted icon, muted label, value, optional detail, fully rounded like the
+ * Wear buttons it sits among. The whole row is the touch target.
  */
 @Composable
 fun MetricCard(
@@ -322,31 +366,27 @@ fun MetricCard(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        // Narrow card for the font scale (192 dp at 1.3×): a smaller tile and tighter padding, so one
-        // long word ("MONITORING") still fits on its line.
-        val compact = maxWidth < 180.dp * LocalDensity.current.fontScale
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = VSize.touch)
-                .card()
-                .let { if (onClick != null) it.clickable(role = Role.Button, onClick = onClick) else it }
-                .padding(horizontal = if (compact) VSpace.s else VSpace.m, vertical = VSpace.m),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else VSpace.s + 2.dp),
-        ) {
-            IconTile(icon, accent, size = if (compact) 24.dp else VSize.iconTile)
-            Column(Modifier.weight(1f)) {
-                // Caption, not the tracked uppercase eyebrow: one long word must still fit a 192 dp card at 1.3×.
-                Text(label, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextTertiary, maxLines = 2)
-                Text(value, style = VType.TitleSmall.copy(textAlign = TextAlign.Start), color = VColor.Text, maxLines = 2)
-                detail?.let {
-                    Text(it, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextSecondary, maxLines = 2)
-                }
+    val shape = RoundedCornerShape(VRadius.card)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = VSize.touch)
+            .clip(shape)
+            .background(VColor.Card)
+            .let { if (onClick != null) it.pressable(onClick = onClick) else it }
+            .padding(horizontal = VSpace.l, vertical = VSpace.s + 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(VSpace.s + 2.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextSecondary, maxLines = 2)
+            Text(value, style = VType.TitleSmall.copy(textAlign = TextAlign.Start), color = VColor.Text, maxLines = 2)
+            detail?.let {
+                Text(it, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextSecondary, maxLines = 2)
             }
-            trailing?.invoke()
         }
+        trailing?.invoke()
     }
 }
 
@@ -403,30 +443,6 @@ fun WeekBars(
 }
 
 // ------------------------------------------------------------------------------------ sheets
-
-/**
- * ALERT SHEET — alert content: zone icon in a tier-soft circle, title, body, actions. Haptics come
- * first (from the service); this is what the wearer sees when they look.
- */
-@Composable
-fun AlertSheet(
-    zone: RiskZone,
-    title: String,
-    body: String,
-    modifier: Modifier = Modifier,
-    actions: @Composable () -> Unit,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(VSpace.s),
-    ) {
-        ZoneIconCircle(zone)
-        Text(title, style = VType.Title, color = VColor.Text, textAlign = TextAlign.Center, maxLines = 3)
-        BodyText(body, color = VColor.TextSecondary)
-        actions()
-    }
-}
 
 /** The toast's round icon: the zone icon in its tier colour on the tier's soft tint. */
 @Composable
