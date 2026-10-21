@@ -348,9 +348,26 @@
     <string name="widget_as_of">As of %1$s</string>
     <!-- Situation modes (names and blurbs live in shared-ui) -->
     <string name="sec_mode">Mode</string>
+    <string name="sec_headphone_mode">Headphones mode</string>
+    <string name="hp_mode_choice_auto">Auto</string>
+    <string name="hp_mode_choice_on">On</string>
+    <string name="hp_mode_choice_off">Off</string>
+    <string name="hp_mode_blurb_auto">Turns on by itself when headphones are detected on the watch or, with listening sync on, on this phone.</string>
+    <string name="hp_mode_blurb_on">Stays on until you change it. The watch leads with the estimated listening level.</string>
+    <string name="hp_mode_blurb_off">Never switches by itself. Headphone listening is still estimated and saved.</string>
+    <string name="hp_mode_rule">In headphones mode the sound around you is still measured and saved, and its alerts still work.</string>
     <string name="mode_selected_cd">Selected</string>
     <string name="watch_mode">Mode on the watch: %1$s</string>
     <string name="watch_mode_auto">Auto · %1$s</string>
+    <string name="mode_plus_headphones">%1$s + Headphones</string>
+    <string name="home_mode_cd">Mode on the watch: %1$s</string>
+    <string name="hp_mode_how">How it switches</string>
+    <string name="hp_state_on">Headphones mode is on</string>
+    <string name="hp_state_off">Headphones mode is off</string>
+    <string name="hp_source_watch">detected by the watch</string>
+    <string name="hp_source_phone">reported by this phone</string>
+    <string name="hp_source_manual">switched by hand</string>
+    <string name="hp_state_detail">%1$s · %2$s</string>
     <!-- Settings → Appearance (phone only, never synced to the watch) -->
     <string name="sec_appearance">Appearance</string>
     <string name="set_accent">Accent colour</string>

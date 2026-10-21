@@ -332,9 +332,26 @@
     <string name="widget_as_of">A las %1$s</string>
     <!-- Modos de situación (nombres y descripciones en shared-ui) -->
     <string name="sec_mode">Modo</string>
+    <string name="sec_headphone_mode">Modo auriculares</string>
+    <string name="hp_mode_choice_auto">Auto</string>
+    <string name="hp_mode_choice_on">Activado</string>
+    <string name="hp_mode_choice_off">Apagado</string>
+    <string name="hp_mode_blurb_auto">Se activa solo cuando se detectan auriculares en el reloj o, con la sincronización de escucha activa, en este móvil.</string>
+    <string name="hp_mode_blurb_on">Sigue activo hasta que lo cambies. El reloj manda con el nivel de escucha estimado.</string>
+    <string name="hp_mode_blurb_off">Nunca cambia solo. La escucha con auriculares se sigue estimando y guardando.</string>
+    <string name="hp_mode_rule">En modo auriculares el sonido a tu alrededor se sigue midiendo y guardando, y sus alertas siguen funcionando.</string>
     <string name="mode_selected_cd">Seleccionado</string>
     <string name="watch_mode">Modo en el reloj: %1$s</string>
     <string name="watch_mode_auto">Auto · %1$s</string>
+    <string name="mode_plus_headphones">%1$s + Auriculares</string>
+    <string name="home_mode_cd">Modo en el reloj: %1$s</string>
+    <string name="hp_mode_how">Cómo se activa</string>
+    <string name="hp_state_on">El modo auriculares está activado</string>
+    <string name="hp_state_off">El modo auriculares está apagado</string>
+    <string name="hp_source_watch">detectado por el reloj</string>
+    <string name="hp_source_phone">informado por este móvil</string>
+    <string name="hp_source_manual">cambiado a mano</string>
+    <string name="hp_state_detail">%1$s · %2$s</string>
     <!-- Ajustes → Apariencia (solo en el teléfono, nunca se sincroniza con el reloj) -->
     <string name="sec_appearance">Apariencia</string>
     <string name="set_accent">Color de acento</string>
