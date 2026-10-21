@@ -30,15 +30,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
-import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.FilledTonalButton
-import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.example.voxara.R
 import com.example.voxara.core.calibration.CalibrationRecord
+import com.example.voxara.core.format.formatDecimal
 import com.example.voxara.core.calibration.CalibrationRules
 import com.example.voxara.core.calibration.CaptureCheck
 import com.example.voxara.core.calibration.Consistency
@@ -55,6 +53,8 @@ import com.example.voxara.data.ExposureState
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.SectionLabel
+import com.example.voxara.ui.design.VoxList
+import com.example.voxara.ui.design.row
 import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VType
 import com.example.voxara.ui.design.VSpace
@@ -91,6 +91,7 @@ fun CalibrationScreen(
     onClose: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val progressCd = stringResource(R.string.cal_progress_cd)
     val source = state.activeSource
     val existing = state.calibrationFor(source)
@@ -192,35 +193,29 @@ fun CalibrationScreen(
         step = Step.SAVED
     }
 
-    val listState = rememberTransformingLazyColumnState()
     val dialFocus = remember { FocusRequester() }
     var crownAccum by remember { mutableFloatStateOf(0f) }
 
-    ScreenScaffold(scrollState = listState) { padding ->
-        TransformingLazyColumn(
-            state = listState,
-            contentPadding = padding,
-            // Side insets keep text inside the round display (about 6% of the width).
-            modifier = Modifier.fillMaxSize().padding(horizontal = VSpace.roundInset),
-        ) {
-            item { HeroStatus(stringResource(R.string.cal_title)) }
-            item {
+    run {
+        VoxList {
+            row { HeroStatus(stringResource(R.string.cal_title)) }
+            row {
                 SectionLabel(
                     text = if (existing != null) stringResource(R.string.cal_status_calibrated, formatDate(existing.calibratedAtMs))
                     else stringResource(R.string.cal_status_uncalibrated),
-                    color = if (existing != null) VColor.AccentInk else VColor.Caution,
+                    color = if (existing != null) VColor.AccentInk else VColor.TextSecondary,
                 )
             }
 
             when (step) {
                 Step.INTRO -> {
-                    captureProblem?.let { item { BodyText(stringResource(it), color = VColor.Caution) } }
-                    item { BodyText(stringResource(R.string.cal_step_1), color = VColor.Text, maxLines = 6) }
-                    item { BodyText(stringResource(R.string.cal_step_2), color = VColor.Text, maxLines = 6) }
-                    item { BodyText(stringResource(R.string.cal_step_3), color = VColor.Text, maxLines = 6) }
-                    item { SectionLabel(stringResource(R.string.cal_reference_type), color = VColor.TextSecondary) }
+                    captureProblem?.let { row { BodyText(stringResource(it), color = VColor.Caution) } }
+                    row { BodyText(stringResource(R.string.cal_step_1), color = VColor.Text, maxLines = 6) }
+                    row { BodyText(stringResource(R.string.cal_step_2), color = VColor.Text, maxLines = 6) }
+                    row { BodyText(stringResource(R.string.cal_step_3), color = VColor.Text, maxLines = 6) }
+                    row { SectionLabel(stringResource(R.string.cal_reference_type), color = VColor.TextSecondary) }
                     ReferenceType.entries.forEach { t ->
-                        item {
+                        row {
                             ChoiceButton(
                                 label = stringResource(
                                     if (t == ReferenceType.SOUND_LEVEL_METER) R.string.cal_ref_meter
@@ -231,19 +226,19 @@ fun CalibrationScreen(
                             )
                         }
                     }
-                    item {
+                    row {
                         SectionLabel(
                             stringResource(R.string.cal_source_line, source.name.lowercase().replace('_', ' ')),
                             color = VColor.TextSecondary,
                         )
                     }
-                    item {
+                    row {
                         Button(
                             onClick = { measure() },
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.cal_start)) }
                     }
-                    item {
+                    row {
                         FilledTonalButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.action_close))
                         }
@@ -251,7 +246,7 @@ fun CalibrationScreen(
                 }
 
                 Step.MEASURING -> {
-                    item {
+                    row {
                         Box(
                             Modifier.size(96.dp).semantics {
                                 contentDescription = progressCd
@@ -260,19 +255,19 @@ fun CalibrationScreen(
                         ) {
                             CircularProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxSize())
                             Text(
-                                text = liveDbfs?.let { "%.1f".format(it) } ?: "…",
+                                text = liveDbfs?.let { formatDecimal(it, 1, locale) } ?: "…",
                                 style = VType.Numeral,
                                 color = VColor.Text,
                             )
                         }
                     }
-                    item { SectionLabel(stringResource(R.string.cal_measuring), color = VColor.TextSecondary) }
-                    item { BodyText(stringResource(R.string.cal_hold_still), color = VColor.TextSecondary) }
+                    row { SectionLabel(stringResource(R.string.cal_measuring), color = VColor.TextSecondary) }
+                    row { BodyText(stringResource(R.string.cal_hold_still), color = VColor.TextSecondary) }
                 }
 
                 Step.REFERENCE -> {
                     val c = captured
-                    item {
+                    row {
                         SectionLabel(
                             stringResource(
                                 R.string.cal_measured_line,
@@ -282,8 +277,8 @@ fun CalibrationScreen(
                             color = VColor.TextSecondary,
                         )
                     }
-                    item { SectionLabel(stringResource(R.string.cal_enter_reference), color = VColor.Text) }
-                    item {
+                    row { SectionLabel(stringResource(R.string.cal_enter_reference), color = VColor.Text) }
+                    row {
                         // The crown moves the reference in 0.5 dB steps; -/+ do the same.
                         Row(
                             modifier = Modifier
@@ -313,16 +308,16 @@ fun CalibrationScreen(
                         LaunchedEffect(Unit) { runCatching { dialFocus.requestFocus() } }
                     }
                     if (checkReference(reference) == ReferenceCheck.LouderThanAdvised) {
-                        item { BodyText(stringResource(R.string.cal_louder_than_advised), color = VColor.Caution) }
+                        row { BodyText(stringResource(R.string.cal_louder_than_advised), color = VColor.Caution) }
                     }
-                    referenceProblem?.let { item { BodyText(stringResource(it), color = VColor.Danger) } }
-                    item {
+                    referenceProblem?.let { row { BodyText(stringResource(it), color = VColor.Danger) } }
+                    row {
                         Button(onClick = { confirmReference() }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.cal_confirm))
                         }
                     }
                     if (referenceProblem == R.string.cal_too_quiet || referenceProblem == R.string.cal_too_loud) {
-                        item {
+                        row {
                             FilledTonalButton(onClick = { measure() }, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.cal_measure_again))
                             }
@@ -332,7 +327,7 @@ fun CalibrationScreen(
 
                 Step.RESULT -> {
                     val m = first!!
-                    item {
+                    row {
                         Text(
                             text = stringResource(R.string.cal_offset_value, m.offsetDb),
                             style = VType.Display,
@@ -340,19 +335,19 @@ fun CalibrationScreen(
                             textAlign = TextAlign.Center,
                         )
                     }
-                    item {
+                    row {
                         SectionLabel(
                             stringResource(R.string.cal_offset_was, source.provisionalOffsetDb),
                             color = VColor.TextSecondary,
                         )
                     }
-                    item { BodyText(stringResource(R.string.cal_second_hint), color = VColor.TextSecondary, maxLines = 5) }
-                    item {
+                    row { BodyText(stringResource(R.string.cal_second_hint), color = VColor.TextSecondary, maxLines = 5) }
+                    row {
                         Button(onClick = { save(m.offsetDb, null) }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.cal_save))
                         }
                     }
-                    item {
+                    row {
                         FilledTonalButton(onClick = { measure() }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.cal_second))
                         }
@@ -363,32 +358,32 @@ fun CalibrationScreen(
                     val a = first!!
                     val b = second!!
                     val levelGap = abs(a.referenceDba - b.referenceDba)
-                    item {
+                    row {
                         SectionLabel(
                             stringResource(R.string.cal_two_offsets, a.offsetDb, b.offsetDb),
                             color = VColor.Text,
                         )
                     }
                     if (levelGap < 6.0) {
-                        item { BodyText(stringResource(R.string.cal_levels_close), color = VColor.TextSecondary) }
+                        row { BodyText(stringResource(R.string.cal_levels_close), color = VColor.TextSecondary) }
                     }
                     when (val cmp = comparison) {
                         is Consistency.Consistent -> {
-                            item { BodyText(stringResource(R.string.cal_consistent, cmp.differenceDb), color = VColor.AccentInk) }
-                            item {
+                            row { BodyText(stringResource(R.string.cal_consistent, cmp.differenceDb), color = VColor.AccentInk) }
+                            row {
                                 Button(onClick = { save(cmp.offsetDb, b.offsetDb) }, modifier = Modifier.fillMaxWidth()) {
                                     Text(stringResource(R.string.cal_save))
                                 }
                             }
                         }
                         is Consistency.Inconsistent -> {
-                            item { BodyText(stringResource(R.string.cal_inconsistent, cmp.differenceDb), color = VColor.Danger, maxLines = 6) }
-                            item {
+                            row { BodyText(stringResource(R.string.cal_inconsistent, cmp.differenceDb), color = VColor.Danger, maxLines = 6) }
+                            row {
                                 FilledTonalButton(onClick = { save(cmp.averageDb, b.offsetDb) }, modifier = Modifier.fillMaxWidth()) {
                                     Text(stringResource(R.string.cal_save_average))
                                 }
                             }
-                            item {
+                            row {
                                 Button(
                                     onClick = { first = null; second = null; comparison = null; step = Step.INTRO },
                                     modifier = Modifier.fillMaxWidth(),
@@ -400,15 +395,15 @@ fun CalibrationScreen(
                 }
 
                 Step.SAVED -> {
-                    item {
+                    row {
                         BodyText(
                             stringResource(R.string.cal_saved, formatDate(savedAt)),
                             color = VColor.AccentInk,
                             maxLines = 4,
                         )
                     }
-                    item { BodyText(stringResource(R.string.cal_saved_note), color = VColor.TextSecondary, maxLines = 6) }
-                    item {
+                    row { BodyText(stringResource(R.string.cal_saved_note), color = VColor.TextSecondary, maxLines = 6) }
+                    row {
                         Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.action_done))
                         }
@@ -439,5 +434,7 @@ private fun StepButton(label: String, onClick: () -> Unit) {
     }
 }
 
+/** The date in the language the app is showing (not necessarily the system's). */
+@androidx.compose.runtime.Composable
 private fun formatDate(ms: Long): String =
-    DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(ms))
+    DateFormat.getDateInstance(DateFormat.MEDIUM, androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(Date(ms))
