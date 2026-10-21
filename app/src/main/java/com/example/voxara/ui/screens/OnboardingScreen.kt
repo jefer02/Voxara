@@ -30,6 +30,7 @@ import com.example.voxara.ui.design.SectionLabel
 import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.VoxList
+import com.example.voxara.ui.design.row
 
 private enum class OnbStep { WELCOME, PRIVACY, ESTIMATES, PERMISSIONS, ALERT_LEVEL, TONO, KEEP_RUNNING }
 
@@ -48,7 +49,7 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
     val a = env.state.alertSettings
 
     VoxList {
-        item {
+        row {
             // Dots for the eye, the "Step n of m" words for TalkBack and for anyone who reads them.
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(VSpace.xs)) {
                 PageDots(steps.size, index)
@@ -57,23 +58,23 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
         }
         when (step) {
             OnbStep.WELCOME -> {
-                item { IconTile(VoxIcons.Waves, VColor.AccentInk) }
-                item { HeroStatus(stringResource(R.string.onb_welcome_title), modifier = Modifier.semantics { heading() }) }
-                item { BodyText(stringResource(R.string.onb_welcome_body, name), color = VColor.Text) }
+                row { IconTile(VoxIcons.Waves, VColor.AccentInk) }
+                row { HeroStatus(stringResource(R.string.onb_welcome_title), modifier = Modifier.semantics { heading() }) }
+                row { BodyText(stringResource(R.string.onb_welcome_body, name), color = VColor.Text) }
             }
             OnbStep.PRIVACY -> {
-                item { IconTile(VoxIcons.Shield, VColor.AccentInk) }
-                item { HeroStatus(stringResource(R.string.onb_privacy_title), modifier = Modifier.semantics { heading() }) }
-                item { BodyText(stringResource(R.string.onb_privacy_body), color = VColor.Text) }
+                row { IconTile(VoxIcons.Shield, VColor.AccentInk) }
+                row { HeroStatus(stringResource(R.string.onb_privacy_title), modifier = Modifier.semantics { heading() }) }
+                row { BodyText(stringResource(R.string.onb_privacy_body), color = VColor.Text) }
             }
             OnbStep.ESTIMATES -> {
-                item { IconTile(VoxIcons.Info, VColor.AccentInk) }
-                item { HeroStatus(stringResource(R.string.onb_estimates_title), modifier = Modifier.semantics { heading() }) }
-                item { BodyText(stringResource(R.string.onb_estimates_body), color = VColor.Text) }
+                row { IconTile(VoxIcons.Info, VColor.AccentInk) }
+                row { HeroStatus(stringResource(R.string.onb_estimates_title), modifier = Modifier.semantics { heading() }) }
+                row { BodyText(stringResource(R.string.onb_estimates_body), color = VColor.Text) }
             }
             OnbStep.PERMISSIONS -> {
-                item { HeroStatus(stringResource(R.string.onb_permissions_title), modifier = Modifier.semantics { heading() }) }
-                item {
+                row { HeroStatus(stringResource(R.string.onb_permissions_title), modifier = Modifier.semantics { heading() }) }
+                row {
                     Panel {
                         BodyText(stringResource(R.string.onb_mic_reason), color = VColor.Text)
                         PillButton(
@@ -83,7 +84,7 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
                         )
                     }
                 }
-                item {
+                row {
                     Panel {
                         BodyText(stringResource(R.string.onb_notif_reason), color = VColor.Text)
                         PillButton(
@@ -95,7 +96,7 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
                     }
                 }
                 if (env.bluetoothNeeded) {
-                    item {
+                    row {
                         Panel {
                             BodyText(stringResource(R.string.onb_bt_reason), color = VColor.Text)
                             PillButton(stringResource(R.string.hp_allow_bluetooth), onClick = actions.onRequestBluetooth, style = PillStyle.TONAL)
@@ -104,9 +105,9 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
                 }
             }
             OnbStep.ALERT_LEVEL -> {
-                item { HeroStatus(stringResource(R.string.onb_alert_title), modifier = Modifier.semantics { heading() }) }
-                item { BodyText(stringResource(R.string.onb_alert_body, AlertDefaults.SUSTAINED_WINDOW_MIN), color = VColor.Text) }
-                item {
+                row { HeroStatus(stringResource(R.string.onb_alert_title), modifier = Modifier.semantics { heading() }) }
+                row { BodyText(stringResource(R.string.onb_alert_body, AlertDefaults.SUSTAINED_WINDOW_MIN), color = VColor.Text) }
+                row {
                     ChoiceList(
                         listOf(80, 85, 90, 95).map {
                             it to stringResource(if (it == AlertDefaults.THRESHOLD_DBA) R.string.onb_alert_option_default else R.string.onb_alert_option, it)
@@ -117,10 +118,10 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
                 }
             }
             OnbStep.TONO -> {
-                item { IconTile(VoxIcons.Sparkle, VColor.AccentInk) }
-                item { HeroStatus(stringResource(R.string.onb_tono_title, name), modifier = Modifier.semantics { heading() }) }
-                item { BodyText(stringResource(R.string.tono_consent_body, name), color = VColor.Text) }
-                item {
+                row { IconTile(VoxIcons.Sparkle, VColor.AccentInk) }
+                row { HeroStatus(stringResource(R.string.onb_tono_title, name), modifier = Modifier.semantics { heading() }) }
+                row { BodyText(stringResource(R.string.tono_consent_body, name), color = VColor.Text) }
+                row {
                     ChoiceList(
                         listOf(true to stringResource(R.string.onb_tono_yes), false to stringResource(R.string.onb_tono_no)),
                         selected = env.state.aiConsent,
@@ -129,12 +130,12 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
                 }
             }
             OnbStep.KEEP_RUNNING -> {
-                item { HeroStatus(stringResource(R.string.keep_running_title_plain), modifier = Modifier.semantics { heading() }) }
-                item { BodyText(stringResource(R.string.keep_running_body), color = VColor.Text) }
-                item { BodyText(stringResource(R.string.onb_calibrate_later), color = VColor.TextSecondary) }
+                row { HeroStatus(stringResource(R.string.keep_running_title_plain), modifier = Modifier.semantics { heading() }) }
+                row { BodyText(stringResource(R.string.keep_running_body), color = VColor.Text) }
+                row { BodyText(stringResource(R.string.onb_calibrate_later), color = VColor.TextSecondary) }
             }
         }
-        item {
+        row {
             PillButton(
                 label = stringResource(if (index == steps.lastIndex) R.string.onb_start else R.string.onb_next),
                 onClick = next,
@@ -143,10 +144,10 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
             )
         }
         if (step == OnbStep.PERMISSIONS && !env.micGranted) {
-            item { BodyText(stringResource(R.string.onb_mic_required), color = VColor.TextSecondary) }
+            row { BodyText(stringResource(R.string.onb_mic_required), color = VColor.TextSecondary) }
         }
         if (index > 0) {
-            item { PillButton(stringResource(R.string.onb_back), onClick = { index-- }, style = PillStyle.OUTLINED) }
+            row { PillButton(stringResource(R.string.onb_back), onClick = { index-- }, style = PillStyle.OUTLINED) }
         }
     }
 }
