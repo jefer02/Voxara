@@ -11,6 +11,7 @@ import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.calibration.appliesTo
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_ADULT
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_SENSITIVE
+import com.example.voxara.core.headphones.ListeningLayerState
 import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.monitoring.monitoringStatus
 import com.example.voxara.core.situation.Situation
@@ -101,6 +102,8 @@ object CompanionLink {
         val calibration = p.calibrations[source]?.takeIf { it.appliesTo(device.deviceKey) }
         val power = PowerPolicy.read(app)
         val last = runCatching { ExposureDb.get(app).alerts.latest() }.getOrNull()
+        // The listening layer in force: the live one while the dosimeter runs; otherwise only a manual On can hold.
+        val layer = if (active) live.listening else ListeningLayerState().withChoice(p.headphoneMode)
         fun granted(permission: String) = app.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
         return WatchStatus(
             atMs = now,
@@ -130,6 +133,8 @@ object CompanionLink {
             lastAlertValue = last?.value,
             // The mode in force (Auto resolved). While the dosimeter runs, its live copy.
             situationMode = if (active) live.mode else Situation.resolve(p.situationChoice),
+            headphonesMode = layer.active,
+            headphonesSource = layer.source,
         )
     }
 

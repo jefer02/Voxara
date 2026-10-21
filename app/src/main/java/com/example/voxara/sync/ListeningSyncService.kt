@@ -44,7 +44,10 @@ class ListeningSyncService : WearableListenerService() {
                 output = runCatching { OutputKind.valueOf(map.getString(PhoneSyncContract.KEY_OUTPUT).orEmpty()) }
                     .getOrDefault(OutputKind.OTHER),
             )
-            for (minute in phoneSampleToMinutes(sample, usual)) {
+            val minutes = phoneSampleToMinutes(sample, usual)
+            // Headphones were playing on the phone: headphones mode reads this (labelled "from the phone").
+            if (minutes.isNotEmpty()) ExposureRepository.phoneHeadphonesAtMs = maxOf(ExposureRepository.phoneHeadphonesAtMs, sample.endMs)
+            for (minute in minutes) {
                 val ambient = db.range(minute.minute, minute.minute + 1, ExposureKind.AMBIENT).firstOrNull()
                 val decision = resolvePhoneMinute(minute, ambient)
                 if (decision.dropAmbient) db.clear(minute.minute, minute.minute + 1, ExposureKind.AMBIENT)
