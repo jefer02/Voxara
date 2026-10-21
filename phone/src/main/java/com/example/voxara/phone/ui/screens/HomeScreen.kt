@@ -49,6 +49,7 @@ import com.example.voxara.phone.ui.components.SkeletonCard
 import com.example.voxara.phone.ui.components.StatCard
 import com.example.voxara.phone.ui.components.VoxCard
 import com.example.voxara.phone.ui.components.VoxScreen
+import com.example.voxara.phone.ui.components.WatchModePill
 import com.example.voxara.phone.ui.components.ZoneStrip
 import com.example.voxara.phone.ui.components.contentWidth
 import com.example.voxara.phone.ui.components.zoneWordText
@@ -211,6 +212,8 @@ private fun HomeHero(s: PhoneUiState, modifier: Modifier) {
         if (tono && s.coach.source == ReplySource.CLOUD_AI) {
             Text(stringResource(R.string.tono_source_ai), style = MaterialTheme.typography.labelSmall, color = c.text3)
         }
+        // The watch's situation with its headphones layer ("Auto · Street + Headphones").
+        WatchModePill(s)
         Row(
             Modifier.semantics(mergeDescendants = true) { contentDescription = scoreCd },
             verticalAlignment = Alignment.CenterVertically,
