@@ -39,6 +39,51 @@ class DesignSystemTest {
     }
 
     @Test
+    fun `the headphones indigo and the page names read on black and on the cards`() {
+        for (bg in watchSurfaces) assertContrast(Palette.SECONDARY_INK_DARK, bg, 4.5, "indigo ink on ${bg.toString(16)}")
+    }
+
+    @Test
+    fun `the indigo fill is a visible graphic on black and on the cards`() {
+        // The split ring, its arcs and the chip border are drawn in the indigo fill (WCAG 1.4.11, non-text).
+        for (bg in watchSurfaces) assertContrast(Palette.SECONDARY, bg, 3.0, "indigo fill on ${bg.toString(16)}")
+    }
+
+    @Test
+    fun `the headphones chip text reads on its own indigo tint`() {
+        // The chip: indigo at 18 % over black; its title is the indigo ink, its second line the secondary text.
+        val tint = Palette.over(Palette.SECONDARY, 0.18f, Palette.BLACK)
+        assertContrast(Palette.SECONDARY_INK_DARK, tint, 4.5, "chip title")
+        assertContrast(Palette.DARK_TEXT_2, tint, 4.5, "chip second line")
+    }
+
+    @Test
+    fun `the moon figure reads on its disc in every zone`() {
+        // The moon is black under a 22 % tier tint, with the figure in the main text colour.
+        RiskZone.entries.forEach { z ->
+            val t = Palette.level(z, Accent.PURPLE, dark = true)
+            val disc = Palette.over(t.fill, 0.22f, Palette.BLACK)
+            assertContrast(Palette.DARK_TEXT, disc, 4.5, "moon figure in $z")
+            assertContrast(t.fill, Palette.BLACK, 3.0, "moon ring in $z")
+        }
+    }
+
+    /**
+     * The zone tag sits over the wave rings: worst case, the brightest ring colour (the tier fill at
+     * the rings' top opacity, 0.52) under the tag's dark scrim (black at 62 %) and its tier tint (15 %).
+     */
+    @Test
+    fun `the zone tag text stays readable over the brightest part of the waves`() {
+        RiskZone.entries.forEach { z ->
+            val t = Palette.level(z, Accent.PURPLE, dark = true)
+            val waves = Palette.over(t.fill, 0.52f, Palette.BLACK)
+            val scrimmed = Palette.over(Palette.BLACK, 0.62f, waves)
+            val tag = Palette.over(t.fill, Palette.SOFT_ALPHA, scrimmed)
+            assertContrast(t.ink, tag, 4.5, "$z tag text over waves")
+        }
+    }
+
+    @Test
     fun `the three tiers differ in hue and lightness, so caution and danger never look like the accent`() {
         val a = Palette.accent(Accent.PURPLE, true).fill
         val c = Palette.caution(true).fill

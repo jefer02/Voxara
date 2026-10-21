@@ -14,24 +14,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
 import com.example.voxara.core.risk.RiskZone
-import com.example.voxara.ui.design.AlertSheet
 import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
-import com.example.voxara.ui.design.ProgressRing
 import com.example.voxara.ui.design.ReplyChip
 import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VSpace
 import com.example.voxara.ui.design.VType
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.WeekBars
-import com.example.voxara.ui.design.ZoneBadge
-import com.example.voxara.ui.design.EditorialHeader
-import com.example.voxara.ui.design.GlowNumber
-import com.example.voxara.ui.design.LevelBezel
+import com.example.voxara.ui.design.ZoneTag
+import com.example.voxara.ui.design.GroupLabel
+import com.example.voxara.ui.design.LevelNumber
+import com.example.voxara.ui.design.LevelScale
+import com.example.voxara.ui.design.OrbitStage
 import com.example.voxara.ui.design.PageDots
-import com.example.voxara.ui.design.SourcePill
-import com.example.voxara.ui.design.WaveHalo
+import com.example.voxara.ui.design.ResumePill
+import com.example.voxara.ui.design.ScreenTitle
+import com.example.voxara.ui.design.TabularNumber
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -47,12 +47,23 @@ class DesignSystemScreenshotTest {
     @Test
     fun gauges() = ScreenshotHarness.captureAll("ds_gauges") {
         Column(Modifier.fillMaxSize().background(VColor.Black), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(150.dp).padding(top = 20.dp), contentAlignment = Alignment.Center) {
-                WaveHalo(0.73f, VColor.tone(RiskZone.LOUD).fill, Modifier.fillMaxSize())
-                LevelBezel(dba = 88f, modifier = Modifier.fillMaxSize())
-                GlowNumber("88", VColor.tone(RiskZone.LOUD).fill)
+            OrbitStage(
+                wave = 0.73f, waveColor = VColor.tone(RiskZone.LOUD).fill, modifier = Modifier.size(180.dp),
+                picture = { LevelScale(88f) },
+            ) {
+                LevelNumber(88, VColor.tone(RiskZone.LOUD).fill, VType.Display, Modifier.align(Alignment.Center), suffix = "dBA")
             }
-            ProgressRing(0.56f, Modifier.size(64.dp)) { Text("56%", style = VType.Label, color = VColor.Text) }
+        }
+    }
+
+    /** Plain zeros, equal-width digits: "30", "100", "0" and "88" side by side. */
+    @Test
+    fun numerals() = ScreenshotHarness.captureAll("ds_numerals") {
+        Column(
+            Modifier.fillMaxSize().background(VColor.Black).padding(vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            listOf("30", "100", "0%", "88", "11").forEach { TabularNumber(it, VType.Display, VColor.Text) }
         }
     }
 
@@ -63,10 +74,11 @@ class DesignSystemScreenshotTest {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(VSpace.xs),
         ) {
-            EditorialHeader("Voxara", title = "Loud café")
-            SourcePill("Auto · Street", VColor.AccentInk)
+            ScreenTitle("Loud café")
+            GroupLabel("Alerts")
             PageDots(7, 2)
-            RiskZone.entries.forEach { ZoneBadge(it) }
+            ResumePill(onClick = {})
+            RiskZone.entries.forEach { ZoneTag(it) }
         }
     }
 
@@ -83,18 +95,6 @@ class DesignSystemScreenshotTest {
             PillButton("Not now", onClick = {}, style = PillStyle.TONAL)
             ReplyChip("My week?", onClick = {})
             WeekBars(listOf(0.2f, 0.5f, 0.1f, 0f, 0.8f, 0.4f, 0.6f), listOf("M", "T", "W", "T", "F", "S", "S"), "week")
-        }
-    }
-
-    @Test
-    fun alertSheet() = ScreenshotHarness.captureAll("ds_alert") {
-        Column(
-            Modifier.fillMaxSize().background(VColor.Black).padding(horizontal = VSpace.roundInset, vertical = 24.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            AlertSheet(RiskZone.DANGEROUS, "Today's sound allowance is used up", "Protect your ears or move somewhere quieter.") {
-                PillButton("Got it", onClick = {})
-            }
         }
     }
 }
