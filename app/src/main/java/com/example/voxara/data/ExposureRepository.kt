@@ -9,6 +9,8 @@ import com.example.voxara.core.alerts.AlertSettings
 import com.example.voxara.core.alerts.HapticPrefs
 import com.example.voxara.core.calibration.CalibrationRecord
 import com.example.voxara.core.headphones.HeadphoneCategory
+import com.example.voxara.core.headphones.HeadphoneModeChoice
+import com.example.voxara.core.headphones.ListeningLayerState
 import com.example.voxara.core.headphones.ListeningEstimate
 import com.example.voxara.core.ledger.DaySummary
 import com.example.voxara.core.calibration.MicSource
@@ -24,6 +26,7 @@ import com.example.voxara.core.scene.Scene
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.core.situation.SituationMode
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -102,6 +105,15 @@ data class ExposureState(
     val headphoneDays: List<DaySummary> = emptyList(),
     /** "My headphones are usually…" (earbuds / over-ear), or null. */
     val usualHeadphones: HeadphoneCategory? = null,
+    /** Headphones mode: the wearer's choice (Auto follows the detection). */
+    val headphoneMode: HeadphoneModeChoice = HeadphoneModeChoice.DEFAULT,
+    /**
+     * The listening layer over the situation mode (headphones mode): on or off, and why. It only changes
+     * what is shown: measuring, the ledgers and the alerts do not read it ([com.example.voxara.core.headphones.ListeningLayerPolicy]).
+     */
+    val listening: ListeningLayerState = ListeningLayerState.OFF,
+    /** When the last alert was delivered (0 = none this run): a transition never plays over an alert. */
+    val lastAlertAtMs: Long = 0L,
     /** Explicit opt-in to cloud AI (Tono); OFF by default. */
     val aiConsent: Boolean = false,
     /** Whether this watch exposes the system battery-optimisation list. */
@@ -156,6 +168,22 @@ object ExposureRepository {
     @Volatile var serviceActive = false
 
     /**
+     * When the phone companion last reported headphone listening (the end of its latest span, ms), 0
+     * = never. Headphones mode reads it as "headphones on the phone", labelled as coming from the phone.
+     */
+    @Volatile var phoneHeadphonesAtMs = 0L
+        set(value) {
+            field = value
+            layerWake.trySend(Unit)
+        }
+
+    /**
+     * Wakes headphones mode's loop in the dosimeter: a device appeared or went, the phone reported, or the wearer
+     * changed the choice. Without it the loop looks every few seconds on its own.
+     */
+    val layerWake = Channel<Unit>(Channel.CONFLATED)
+
+    /**
      * Bumped when minutes were written from outside the dosimeter (phone companion sync), so it
      * reloads its ledgers and re-derives today's dose from them.
      */
@@ -199,6 +227,8 @@ object ExposureRepository {
             hapticPrefs = p.hapticPrefs,
             snoozeMinutes = p.snoozeMinutes,
             tonoEnabled = p.tonoEnabled,
+            headphoneMode = p.headphoneMode,
+            listening = it.listening.withChoice(p.headphoneMode),
             situationChoice = p.situationChoice,
             detectedMode = if (p.situationChoice == SituationChoice.AUTO) it.detectedMode else null,
             mode = Situation.resolve(p.situationChoice, it.detectedMode),
@@ -234,6 +264,8 @@ object ExposureRepository {
                 hapticPrefs = p.hapticPrefs,
                 snoozeMinutes = p.snoozeMinutes,
                 tonoEnabled = p.tonoEnabled,
+                headphoneMode = p.headphoneMode,
+                listening = it.listening.withChoice(p.headphoneMode),
                 headphoneWeeklyPa2h = p.headphoneWeeklyPa2h,
                 headphoneWeeklyFraction = p.headphoneWeeklyPa2h /
                     (if (p.sensitiveListener) WHO_WEEKLY_PA2H_SENSITIVE else WHO_WEEKLY_PA2H_ADULT),
@@ -242,6 +274,12 @@ object ExposureRepository {
     }
 
     fun update(transform: (ExposureState) -> ExposureState) = _state.update(transform)
+
+    /** The wearer picked [choice]: the layer follows at once (the service keeps tracking the detection). */
+    fun setHeadphoneMode(choice: HeadphoneModeChoice) {
+        _state.update { it.copy(headphoneMode = choice, listening = it.listening.withChoice(choice)) }
+        layerWake.trySend(Unit)
+    }
 
     /** Manual reset of today's dose. The service notices [resetGeneration] and clears its copy. */
     fun resetDay() {

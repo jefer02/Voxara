@@ -23,6 +23,7 @@ import com.example.voxara.core.calibration.CalibrationRecord
 import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.calibration.ReferenceType
 import com.example.voxara.core.headphones.HeadphoneCategory
+import com.example.voxara.core.headphones.HeadphoneModeChoice
 import com.example.voxara.core.ledger.LedgerSnapshot
 import com.example.voxara.core.ledger.acceptsWrite
 import com.example.voxara.core.ledger.rollover
@@ -63,6 +64,7 @@ class VoxaraStore(context: Context) {
         /** Set while Concert is chosen: when it started (for the 6 h cap) and what to go back to. */
         val concertStartedAt = longPreferencesKey("concert_started_at")
         val choiceBeforeConcert = stringPreferencesKey("situation_before_concert")
+        val headphoneMode = stringPreferencesKey("headphone_mode")
         val sensitive = booleanPreferencesKey("sensitive_listener")
         val alertCap = intPreferencesKey("daily_alert_cap")
         val monitoring = booleanPreferencesKey("monitoring_enabled")
@@ -106,6 +108,8 @@ class VoxaraStore(context: Context) {
         val concertStartedAtMs: Long? = null,
         /** What leaving Concert returns to; null = Auto. */
         val choiceBeforeConcert: SituationChoice? = null,
+        /** Headphones mode: Auto (follow the detection), On or Off (synced with the phone). */
+        val headphoneMode: HeadphoneModeChoice = HeadphoneModeChoice.DEFAULT,
         val sensitiveListener: Boolean = false,
         val monitoringEnabled: Boolean = true,
         val lastDba: Double = 0.0,
@@ -143,6 +147,7 @@ class VoxaraStore(context: Context) {
                 ?: Situation.migrateLegacyMode(p[Keys.legacyMode]) ?: SituationChoice.DEFAULT,
             concertStartedAtMs = p[Keys.concertStartedAt],
             choiceBeforeConcert = SituationChoice.parse(p[Keys.choiceBeforeConcert]),
+            headphoneMode = HeadphoneModeChoice.parse(p[Keys.headphoneMode]) ?: HeadphoneModeChoice.DEFAULT,
             sensitiveListener = p[Keys.sensitive] ?: false,
             monitoringEnabled = p[Keys.monitoring] ?: true,
             lastDba = p[Keys.lastDba] ?: 0.0,
@@ -299,6 +304,12 @@ class VoxaraStore(context: Context) {
         }
         p[Keys.situationChoice] = next.name
     }
+    /** The wearer chose [choice] for headphones mode (on the watch). Stamped, so it syncs to the phone. */
+    suspend fun setHeadphoneMode(choice: HeadphoneModeChoice) = ds.edit {
+        it[Keys.headphoneMode] = choice.name
+        it[Keys.stamp(SettingField.HEADPHONE_MODE)] = now()
+    }
+
     suspend fun setSensitive(v: Boolean) = ds.edit { it[Keys.sensitive] = v; it[Keys.stamp(SettingField.SENSITIVE)] = now() }
     suspend fun setMonitoring(v: Boolean) = ds.edit { it[Keys.monitoring] = v }
     suspend fun setAiConsent(v: Boolean) = ds.edit { it[Keys.aiConsent] = v; it[Keys.stamp(SettingField.CLOUD_AI)] = now() }
@@ -411,6 +422,7 @@ class VoxaraStore(context: Context) {
                 SettingField.TONO_ENABLED -> p[Keys.tonoEnabled] = v.toBoolean()
                 SettingField.CLOUD_AI -> p[Keys.aiConsent] = v.toBoolean()
                 SettingField.SITUATION_MODE -> applyChoice(p, SituationChoice.valueOf(v), now())
+                SettingField.HEADPHONE_MODE -> p[Keys.headphoneMode] = v
             }
             p[Keys.stamp(f)] = stamped.atMs
         }
@@ -445,6 +457,7 @@ class VoxaraStore(context: Context) {
                 tonoEnabled = p.tonoEnabled,
                 cloudAi = p.aiConsent,
                 situationChoice = p.situationChoice,
+                headphoneMode = p.headphoneMode,
             )
             return SettingField.entries.fold(SettingsDoc()) { doc, f ->
                 doc.with(f, typed.valueOf(f), p.settingStamps[f] ?: 0L)
