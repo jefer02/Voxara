@@ -24,7 +24,7 @@ import com.example.voxara.core.ai.CoachTask
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
-import com.example.voxara.ui.design.EditorialHeader
+import com.example.voxara.ui.design.ScreenTitle
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
@@ -34,6 +34,7 @@ import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VSpace
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.VoxList
+import com.example.voxara.ui.design.row
 import com.example.voxara.ui.theme.LocalReduceMotion
 import com.example.voxara.voice.VoiceTurn
 
@@ -55,13 +56,13 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
     val reply = coach.reply
 
     VoxList {
-        item {
-            EditorialHeader(if (tono) stringResource(R.string.home_ask, name) else stringResource(R.string.voice_title))
+        row {
+            ScreenTitle(if (tono) stringResource(R.string.home_ask, name) else stringResource(R.string.voice_title))
         }
         if (turn.heard.isNotBlank()) {
-            item { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary, maxLines = 3) }
+            row { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary, maxLines = 3) }
         }
-        item {
+        row {
             val text = when {
                 listening -> stringResource(R.string.voice_listening)
                 turn.phase == VoiceTurn.Phase.THINKING || coach.loading -> stringResource(R.string.tono_loading, name)
@@ -74,11 +75,11 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
-        if (listening) item { ListeningWave(turn.amplitude) }
+        if (listening) row { ListeningWave(turn.amplitude) }
         if (showCoach && reply != null && !coach.loading && !listening) {
-            if (reply.why.isNotBlank()) item { BodyText(reply.why, color = VColor.TextSecondary) }
-            item { BodyText(reply.suggestion, color = VColor.AccentInk) }
-            item {
+            if (reply.why.isNotBlank()) row { BodyText(reply.why, color = VColor.TextSecondary) }
+            row { BodyText(reply.suggestion, color = VColor.AccentInk) }
+            row {
                 SectionLabel(
                     stringResource(
                         when (coach.source) {
@@ -90,9 +91,9 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                     color = VColor.TextTertiary,
                 )
             }
-            if (coach.cloudFailed) item { BodyText(stringResource(R.string.tono_cloud_failed), color = VColor.TextSecondary) }
+            if (coach.cloudFailed) row { BodyText(stringResource(R.string.tono_cloud_failed), color = VColor.TextSecondary) }
             if (reply.chips.isNotEmpty()) {
-                item {
+                row {
                     FlowRow(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(VSpace.xs, Alignment.CenterHorizontally),
@@ -103,7 +104,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 }
             }
         }
-        item {
+        row {
             PillButton(
                 label = stringResource(if (listening) R.string.action_stop else R.string.ask_speak),
                 onClick = actions.onVoiceArm,
@@ -112,7 +113,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
             )
         }
         if (tono) {
-            item {
+            row {
                 PillButton(
                     label = stringResource(R.string.ask_today),
                     onClick = { actions.onAsk(CoachTask.DAILY_INSIGHT, null) },
@@ -121,7 +122,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 )
             }
         }
-        item { BodyText(stringResource(R.string.tono_not_medical), color = VColor.TextTertiary) }
+        row { BodyText(stringResource(R.string.tono_not_medical), color = VColor.TextTertiary) }
     }
 }
 
