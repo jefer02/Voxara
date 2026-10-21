@@ -2,6 +2,7 @@ package com.example.voxara.sync
 
 import com.example.voxara.core.ai.MiniJson
 import com.example.voxara.core.alerts.AlertKind
+import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.core.monitoring.MonitoringStatus
 
@@ -34,6 +35,10 @@ data class WatchStatus(
     val lastAlertValue: Double? = null,
     /** The situation mode the watch is in right now (Auto already resolved); null from older watches. */
     val situationMode: SituationMode? = null,
+    /** Headphones mode (the listening layer over the situation) is on right now; false from older watches. */
+    val headphonesMode: Boolean = false,
+    /** Why it is on: the watch's own detection, the phone's report or the wearer's switch ([LayerSource.NONE] when off). */
+    val headphonesSource: LayerSource = LayerSource.NONE,
 ) {
     fun toJson(): String = MiniJson.write(
         linkedMapOf(
@@ -59,6 +64,8 @@ data class WatchStatus(
             "last_alert_at" to lastAlertAtMs,
             "last_alert_value" to lastAlertValue,
             "situation_mode" to situationMode?.name,
+            "hp_mode" to headphonesMode,
+            "hp_source" to headphonesSource.name,
         )
     )
 
@@ -92,6 +99,8 @@ data class WatchStatus(
                 lastAlertAtMs = l("last_alert_at"),
                 lastAlertValue = d("last_alert_value"),
                 situationMode = runCatching { SituationMode.valueOf(m["situation_mode"] as String) }.getOrNull(),
+                headphonesMode = b("hp_mode"),
+                headphonesSource = runCatching { LayerSource.valueOf(m["hp_source"] as String) }.getOrDefault(LayerSource.NONE),
             )
         }
     }
