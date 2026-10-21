@@ -16,7 +16,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.risk.RiskZone
-import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.link.LinkState
 import com.example.voxara.link.SyncProblem
 import com.example.voxara.link.WatchNode
@@ -35,12 +34,13 @@ import com.example.voxara.phone.ui.components.PillButton
 import com.example.voxara.phone.ui.components.VoxCard
 import com.example.voxara.phone.ui.components.VoxScreen
 import com.example.voxara.phone.ui.components.contentWidth
+import com.example.voxara.phone.ui.components.headphonesSourceText
+import com.example.voxara.phone.ui.components.watchModeName
 import com.example.voxara.phone.ui.dateText
 import com.example.voxara.phone.ui.dateTimeText
 import com.example.voxara.phone.ui.freshnessText
 import com.example.voxara.phone.ui.theme.Vox
 import com.example.voxara.ui.design.VoxIcons
-import com.example.voxara.ui.design.labelRes
 
 @Composable
 fun WatchScreen(s: PhoneUiState, actions: PhoneActions) {
@@ -156,16 +156,20 @@ private fun LinkedCard(s: PhoneUiState, watch: WatchNode, problem: SyncProblem?,
             style = MaterialTheme.typography.bodyMedium, color = c.text2,
         )
         // The mode the watch is in (as of its last status); Auto shows what it resolved to.
-        s.status?.situationMode?.let { mode ->
-            val name = stringResource(mode.labelRes())
-            Text(
-                stringResource(
-                    R.string.watch_mode,
-                    if (s.settings.situationChoice == SituationChoice.AUTO)
-                        stringResource(R.string.watch_mode_auto, name) else name,
-                ),
-                style = MaterialTheme.typography.bodyMedium, color = c.text2,
-            )
+        // With its headphones layer: "Auto · Street + Headphones", and why the layer is on.
+        watchModeName(s)?.let { name ->
+            Text(stringResource(R.string.watch_mode, name), style = MaterialTheme.typography.bodyMedium, color = c.text2)
+        }
+        s.status?.takeIf { it.headphonesMode }?.let { st ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(VoxIcons.Headphones, null, tint = c.secondary, modifier = Modifier.size(16.dp))
+                val on = stringResource(R.string.hp_state_on)
+                val source = headphonesSourceText(st.headphonesSource)
+                Text(
+                    if (source != null) stringResource(R.string.hp_state_detail, on, source) else on,
+                    style = MaterialTheme.typography.labelLarge, color = c.secondary,
+                )
+            }
         }
         if (problem != null) {
             Text(

@@ -21,6 +21,7 @@ import com.example.voxara.core.alerts.AlertDefaults
 import com.example.voxara.core.design.Accent
 import com.example.voxara.core.alerts.AlertPolicy
 import com.example.voxara.core.alerts.HapticStrength
+import com.example.voxara.core.headphones.HeadphoneModeChoice
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.designsystem.R as DsR
 import com.example.voxara.phone.R
@@ -41,6 +42,9 @@ import com.example.voxara.phone.ui.components.StepperRow
 import com.example.voxara.phone.ui.components.SwitchRow
 import com.example.voxara.phone.ui.components.VoxScreen
 import com.example.voxara.phone.ui.components.contentWidth
+import com.example.voxara.phone.ui.components.headphonesSourceText
+import com.example.voxara.phone.ui.components.watchModeName
+import com.example.voxara.phone.ui.freshnessText
 import com.example.voxara.phone.ui.theme.Vox
 import com.example.voxara.settings.LanguageChoice
 import com.example.voxara.settings.SettingField
@@ -87,6 +91,32 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
             }
         }
         item { GroupNote(stringResource(DsR.string.situation_rule), Modifier.contentWidth()) }
+
+        // ------------------------------------------------------------------ headphones mode
+        item { GroupHeader(stringResource(R.string.sec_headphone_mode), Modifier.contentWidth()) }
+        item {
+            Group(Modifier.contentWidth()) {
+                // What the watch is doing now (its last status), so the choice below has its effect in view.
+                val live = s.status
+                if (live != null) {
+                    GroupRow(
+                        stringResource(if (live.headphonesMode) R.string.hp_state_on else R.string.hp_state_off),
+                        subtitle = listOfNotNull(
+                            watchModeName(s), headphonesSourceText(live.headphonesSource), freshnessText(live.atMs, s.nowMs),
+                        ).joinToString(" · "),
+                        icon = VoxIcons.Headphones, iconTint = if (live.headphonesMode) Vox.colors.secondary else Vox.colors.text3,
+                    )
+                    GroupDivider()
+                }
+                ChoiceRow(
+                    stringResource(R.string.hp_mode_how),
+                    HeadphoneModeChoice.entries.map { it to stringResource(it.labelRes()) },
+                    set.headphoneMode, { change(SettingField.HEADPHONE_MODE, it.name) },
+                    subtitle = stringResource(set.headphoneMode.blurbRes()), pending = SettingField.HEADPHONE_MODE in p,
+                )
+            }
+        }
+        item { GroupNote(stringResource(R.string.hp_mode_rule), Modifier.contentWidth()) }
 
         // ------------------------------------------------------------------ alerts
         item { GroupHeader(stringResource(R.string.sec_alerts), Modifier.contentWidth()) }
@@ -300,4 +330,16 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
+}
+
+private fun HeadphoneModeChoice.labelRes(): Int = when (this) {
+    HeadphoneModeChoice.AUTO -> R.string.hp_mode_choice_auto
+    HeadphoneModeChoice.ON -> R.string.hp_mode_choice_on
+    HeadphoneModeChoice.OFF -> R.string.hp_mode_choice_off
+}
+
+private fun HeadphoneModeChoice.blurbRes(): Int = when (this) {
+    HeadphoneModeChoice.AUTO -> R.string.hp_mode_blurb_auto
+    HeadphoneModeChoice.ON -> R.string.hp_mode_blurb_on
+    HeadphoneModeChoice.OFF -> R.string.hp_mode_blurb_off
 }
