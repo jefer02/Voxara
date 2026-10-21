@@ -53,9 +53,15 @@ class HeadphoneMonitor(context: Context) {
     /** The wearer's "my headphones are usually…" setting. */
     @Volatile var usualCategory: HeadphoneCategory? = null
 
+    /**
+     * Called (on the main thread) when an audio output appears or disappears, so headphones mode can
+     * look at once instead of waiting for the next burst, which can be a minute away when it is quiet.
+     */
+    @Volatile var onDevicesChanged: (() -> Unit)? = null
+
     private val callback = object : AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) = Unit
-        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) = Unit
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) { onDevicesChanged?.invoke() }
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) { onDevicesChanged?.invoke() }
     }
 
     fun start() {
@@ -65,6 +71,15 @@ class HeadphoneMonitor(context: Context) {
 
     fun stop() {
         runCatching { am?.unregisterAudioDeviceCallback(callback) }
+    }
+
+    /**
+     * Headphones are connected right now: the raw, un-debounced view that headphones mode applies its
+     * own hysteresis to (3 s in, 10 s out). Cheap: one read of the platform's device list.
+     */
+    fun rawConnected(): Boolean {
+        val manager = am ?: return false
+        return connectedCategory(manager) != null
     }
 
     /** Reads the current state. Cheap: called once per dosimeter burst. */
