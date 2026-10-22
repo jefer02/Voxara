@@ -4,11 +4,9 @@ build/
 **/build/
 !gradle/wrapper/gradle-wrapper.jar
 
-# Android Studio and IntelliJ IDEA (only the shared run configurations are kept)
+# Android Studio and IntelliJ IDEA (any depth, e.g. phone/.idea/; no IDE file is tracked)
 *.iml
-.idea/*
-!.idea/.gitignore
-!.idea/runConfigurations/
+.idea/
 
 # Local SDK and machine-specific configuration
 local.properties
