@@ -46,18 +46,20 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Text
 import com.example.voxara.R
 import com.example.voxara.core.ai.CoachTask
-import com.example.voxara.core.ai.HearingCareScore
 import com.example.voxara.core.ai.daysToWeeklyLimit
+import com.example.voxara.core.ai.STREAK_WORTH_SAYING
+import com.example.voxara.core.ai.keepsStreak
 import com.example.voxara.core.ai.streakDays
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_ADULT
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_SENSITIVE
 import com.example.voxara.core.format.formatClock
-import com.example.voxara.core.format.formatTwa
+import com.example.voxara.core.format.formatLevel
 import com.example.voxara.core.risk.RiskZone
+import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
-import com.example.voxara.ui.design.DoseMorph
+import com.example.voxara.ui.design.DoseArc
 import com.example.voxara.ui.design.EmptyState
 import com.example.voxara.ui.design.HeroList
 import com.example.voxara.ui.design.HeroStatus
@@ -73,6 +75,7 @@ import com.example.voxara.ui.design.WeekBars
 import com.example.voxara.ui.design.ZoneTag
 import com.example.voxara.ui.design.animationsActive
 import com.example.voxara.ui.design.heroScaled
+import com.example.voxara.ui.design.pressable
 import com.example.voxara.ui.design.row
 import com.example.voxara.ui.design.zoneWord
 import com.example.voxara.ui.theme.LocalAmbient
@@ -82,9 +85,8 @@ import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** How long the Today to Week morph takes (ms); with reduced motion the two pictures cross-fade in [FADE_MS]. */
+/** How long the arc takes to run from one view's share to the other's (ms); with reduced motion it jumps. */
 private const val MORPH_MS = 520
-private const val FADE_MS = 200
 
 /** Crown movement (pixels) that flips the view, and the quiet (ms) after a flip and between two strokes. */
 private const val ROTARY_FLIP_PX = 24f
@@ -92,28 +94,31 @@ private const val ROTARY_HOLD_MS = 380L
 private const val ROTARY_IDLE_MS = 250L
 
 /**
- * DOSE — how much of your allowance you have used, today or over the week, on ONE ring that morphs between
- * the two pictures.
+ * DOSE — how much of your limit you have used, today or over the week, on ONE progress ring.
  *
- * TODAY (the default): 24 hourly bars from the ledger around the ring (midnight bottom-left, noon at the top),
- * each as long and as coloured as that hour was loud, with a marker on this hour; in the middle the day's dose
- * as a rolling percentage, its zone and "of your allowance". WEEK: the rolling 7 days as seven segments, oldest
- * first and today last, each filled to that day's share of the weekly allowance; in the middle the worse of the
- * room and the headphones as a rolling percentage, its zone and "of your weekly limit".
+ * THE RING. It starts at 12 o'clock and fills clockwise; the faint track is what is left; a full ring is 100 % of
+ * the limit ([DoseArc]). In the middle the same share as a rolling percentage, what it is a share of ("of today's
+ * limit" / "of this week's limit") and the zone as a word and an icon. Nothing else is drawn on the ring and the
+ * breathing waves of Now are left out here (they follow the live sound, not the dose), so nothing reads as data
+ * that is not. A tap on the number opens a two-sentence explanation of the ring ([Routes.DOSE_HELP]); the info
+ * icon beside the caption says it can be tapped.
+ *
+ * TODAY (the default) shows today's dose; WEEK the worse of the room and the headphones over the rolling 7 days.
  *
  * THE SWITCH. [view] says which is showing and [onView] changes it, two ways: a small "Today | Week" switch in
  * the ring's gap, where the current view is both the label and the selected segment, or the crown. The crown
  * flips the view while the page rests at its top: clockwise goes to Week, counter-clockwise back to Today;
  * once the page is scrolled (or, on Week, once the crown keeps turning clockwise) the crown scrolls the details
  * as on any list, so it never fights the pager (that is a swipe) nor the scrolling. On the smallest displays and
- * at large fonts the switch is the first detail row and the gap carries only the view's name.
+ * at large fonts the switch is the first detail row and the gap carries only the view's name. Changing view runs
+ * the arc from one share to the other (520 ms); with reduced motion it jumps.
  *
  * Below the fold, per view. Today: how the day adds up (equivalent level), the hourly capsules, coverage and how
  * the dose works. Week: where the share comes from (around you and headphones), the daily bars, the pace, the
- * streak, the score, Tono's summary and the headphones group (listening history and its estimate's details).
+ * streak (only when it is worth saying), the score, Tono's summary and the headphones group.
  */
 @Composable
-internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onView: (DoseView) -> Unit) {
+internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onView: (DoseView) -> Unit, navigate: (String) -> Unit = {}) {
     val s = env.state
     val week = view == DoseView.WEEK
     val compact = isCompactFont()
@@ -127,8 +132,8 @@ internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onVi
     val hourly = today?.hourly ?: List(24) { 0f }
     val todaySpoken = stringResource(R.string.cd_today, s.dosePercent.roundToInt(), zoneWord(dayZone)) + " " +
         stringResource(R.string.cd_hours, hourly.count { it >= 85f })
-    val twaLine = formatTwa(s.twaDba, locale)?.let { stringResource(R.string.today_twa, it) } ?: stringResource(R.string.no_dose_logged)
-    val nowHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    // Whole decibels: a decimal would claim more than an uncalibrated estimate knows.
+    val twaLine = s.twaDba?.let { stringResource(R.string.today_twa, formatLevel(it)) } ?: stringResource(R.string.no_dose_logged)
 
     // ------------------------------------------------------------------ week
     val budget = if (s.sensitiveListener) WHO_WEEKLY_PA2H_SENSITIVE else WHO_WEEKLY_PA2H_ADULT
@@ -150,21 +155,16 @@ internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onVi
     val weekSpoken = stringResource(R.string.cd_week, ambient.roundToInt(), listening.roundToInt()) + ". " +
         stringResource(R.string.cd_week_days, perDay)
     val breakdown = stringResource(R.string.week_breakdown, ambient.roundToInt(), listening.roundToInt())
-    // One segment per day, oldest first and today last; a day fills with its share of the weekly allowance and takes the
-    // colour of its own dose zone. A day counts as measured when either ledger has minutes for it (dotted: no data).
+    // The daily bars below the fold: one per day, oldest first and today last, each its share of the weekly limit.
     val dayValues = dayShares.map { weekDayFill(it) }
-    val dayTones = days.reversed().map { VColor.tone(RiskZone.ofPercent(it.nioshDosePercent)) }
-    val dayMeasured = days.indices.reversed().map { i ->
-        days[i].measuredMinutes > 0.0 || (s.headphoneDays.getOrNull(i)?.measuredMinutes ?: 0.0) > 0.0
-    }
 
     // ------------------------------------------------------------------ the morph
     val mix = remember { Animatable(if (week) 1f else 0f) }
     LaunchedEffect(week, canAnimate, still) {
         val goal = if (week) 1f else 0f
         when {
-            !canAnimate -> mix.snapTo(goal)
-            still -> mix.animateTo(goal, tween(FADE_MS))
+            // Reduced motion: the arc jumps to the other share (nothing travels round the ring).
+            !canAnimate || still -> mix.snapTo(goal)
             else -> mix.animateTo(goal, tween(MORPH_MS, easing = FastOutSlowInEasing))
         }
     }
@@ -173,6 +173,9 @@ internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onVi
     val spoken = (if (week) weekSpoken else todaySpoken)
     val todayName = stringResource(R.string.page_today)
     val weekName = stringResource(R.string.page_week)
+    val helpLabel = stringResource(R.string.dose_help_title)
+    val todayTone = zoneTone(dayZone)
+    val weekTone = zoneTone(weekZone)
 
     // ------------------------------------------------------------------ the crown
     val hapticView = LocalView.current
@@ -209,18 +212,33 @@ internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onVi
         hero = { m ->
             PageStage(
                 identity = identity, wave = waveOf(s.dba), waveTone = zoneTone(RiskZone.of(s.dba)), description = spoken,
-                modifier = m,
+                modifier = m, waves = false,
                 // The gap's one control: the switch (its selected half is the view's name). Where there is no room for a
                 // 48 dp switch the gap carries the name and the switch is the first detail.
                 nameSlot = {
                     if (compact) {
-                        PageName(if (week) weekName else todayName, if (week) VoxIcons.Chart else VoxIcons.Calendar, VColor.AccentInk)
+                        // On a dark backing: past half the arc runs under this slot, and the name must stay readable.
+                        PageName(
+                            if (week) weekName else todayName, if (week) VoxIcons.Chart else VoxIcons.Calendar, VColor.AccentInk,
+                            Modifier.clip(RoundedCornerShape(percent = 50)).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.85f))
+                                .padding(horizontal = 10.dp, vertical = 2.dp),
+                        )
                     } else DoseSwitch(view, onView, todayName, weekName)
                 },
-                picture = { DoseMorph(hourly, nowHour, dayValues, dayTones, dayMeasured, week = { mix.value }) },
+                picture = {
+                    DoseArc(
+                        today = (s.dosePercent / 100.0).toFloat(), week = (worst / 100.0).toFloat(),
+                        todayTone = todayTone, weekTone = weekTone, mix = { mix.value },
+                    )
+                },
             ) { isCompact ->
-                HeroFigure(if (week) worst.roundToInt() else s.dosePercent.roundToInt(), tone.fill, isCompact, suffix = "%")
-                if (!isCompact) {
+                // The number and what it is a share of: one tap target that explains the ring (the info icon says so).
+                // The caption stays at every size: without it the ring has no meaning.
+                Column(
+                    Modifier.pressable(onClick = { navigate(Routes.DOSE_HELP) }, onClickLabel = helpLabel),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    HeroFigure(if (week) worst.roundToInt() else s.dosePercent.roundToInt(), tone.fill, isCompact, suffix = "%")
                     AnimatedContent(
                         targetState = week,
                         transitionSpec = {
@@ -228,7 +246,7 @@ internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onVi
                             else fadeIn(tween(160)) togetherWith fadeOut(tween(100))
                         },
                         label = "doseCaption",
-                    ) { w -> FigureCaption(stringResource(if (w) R.string.week_caption else R.string.allowance_caption)) }
+                    ) { w -> FootNote(stringResource(if (w) R.string.week_caption else R.string.allowance_caption)) }
                 }
                 ZoneTag(if (week) weekZone else dayZone)
             }
@@ -236,7 +254,7 @@ internal fun DoseScreen(env: UiEnv, actions: VoxaraActions, view: DoseView, onVi
         details = {
             if (compact) row { DoseSwitch(view, onView, todayName, weekName, fill = true) }
             if (!week) todayRows(today?.let { formatClock(it.measuredMinutes) }, today?.measuredMinutes ?: 0.0, hourly, twaLine)
-            else weekRows(env, actions, shares, days.size, locale, breakdown, ambient, listening, worst, days.drop(1).map { it.nioshDosePercent < 100.0 }, dayValues)
+            else weekRows(env, actions, shares, days.size, locale, breakdown, ambient, listening, worst, days.drop(1).map { keepsStreak(it.measuredMinutes, it.nioshDosePercent) }, dayValues)
         },
     )
 }
@@ -257,7 +275,7 @@ private fun DoseSwitch(view: DoseView, onView: (DoseView) -> Unit, todayName: St
             .then(if (fill) Modifier.fillMaxWidth() else Modifier)
             .height(48.dp)
             .clip(shape)
-            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.62f))
+            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.85f))
             .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.14f), shape)
             .padding(3.dp)
             .selectableGroup(),
@@ -291,28 +309,29 @@ private fun DoseSwitch(view: DoseView, onView: (DoseView) -> Unit, todayName: St
 private fun androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope.todayRows(
     measured: String?, measuredMinutes: Double, hourly: List<Float>, twaLine: String,
 ) {
-    row { FootLine(twaLine, color = VColor.Text) }
-    row {
-        if (measured == null || measuredMinutes <= 0.0) EmptyState(VoxIcons.Waves, stringResource(R.string.today_empty))
-        else HourBars(hourly)
+    // Nothing measured yet: one line says so (not three: no level, no bars, no "measured 0s").
+    if (measured == null || measuredMinutes <= 0.0) {
+        row { EmptyState(VoxIcons.Waves, stringResource(R.string.today_empty)) }
+    } else {
+        row { FootLine(twaLine, color = VColor.Text) }
+        row { HourBars(hourly) }
+        row { SectionLabel(stringResource(R.string.day_measured_plain, measured)) }
     }
-    measured?.let { row { SectionLabel(stringResource(R.string.day_measured_plain, it)) } }
     row { BodyText(stringResource(R.string.today_note), color = VColor.TextSecondary) }
 }
 
 /**
  * Below Week's hero: where the share comes from, the daily bars with their weekday letters, the pace
- * projection, the streak, the score and Tono's weekly summary (the numbers are deterministic; Tono only words
+ * projection, the streak and Tono's weekly summary (the Hearing Care Score is on the phone only) (the numbers are deterministic; Tono only words
  * them), then the headphones group.
  */
 private fun androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope.weekRows(
     env: UiEnv, actions: VoxaraActions, shares: List<Double>, dayCount: Int, locale: java.util.Locale, breakdown: String,
-    ambient: Double, listening: Double, worst: Double, withinLimit: List<Boolean>, dayValues: List<Float>,
+    ambient: Double, listening: Double, worst: Double, keptStreak: List<Boolean>, dayValues: List<Float>,
 ) {
-    val streak = streakDays(withinLimit)
+    val streak = streakDays(keptStreak)
     val pace = daysToWeeklyLimit(worst, shares.drop(1).ifEmpty { shares })
     val days = env.state.days.take(7)
-    val score = HearingCareScore.of(ambient, listening, days.count { it.nioshDosePercent >= 100.0 })
     row { FootLine(breakdown, color = VColor.Text) }
     if (shares.isNotEmpty()) {
         row { WeekBars(dayValues, weekdayLabels(dayCount, locale), stringResource(R.string.cd_week_bars, shares.first().roundToInt())) }
@@ -320,9 +339,8 @@ private fun androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope.we
     row {
         BodyText(pace?.let { stringResource(R.string.week_pace, it) } ?: stringResource(R.string.week_pace_none), color = VColor.Text)
     }
-    row { BodyText(stringResource(R.string.week_streak, streak), color = VColor.TextSecondary) }
-    row { MetricCard(VoxIcons.Shield, stringResource(R.string.score_title), "$score / 100", detail = stringResource(R.string.score_sub)) }
-    row { BodyText(stringResource(R.string.score_explain), color = VColor.TextSecondary) }
+    // Only when it is true and worth saying: measured days in a row within the limit, three or more.
+    if (streak >= STREAK_WORTH_SAYING) row { BodyText(stringResource(R.string.week_streak, streak), color = VColor.TextSecondary) }
     if (env.state.tonoEnabled) {
         row {
             PillButton(
@@ -333,7 +351,7 @@ private fun androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope.we
             )
         }
         env.coach.reply?.let { r ->
-            row { HeroStatus(r.insight, maxLines = 4) }
+            row { HeroStatus(r.insight) }
             row { BodyText(r.suggestion, color = VColor.AccentInk) }
         }
     }

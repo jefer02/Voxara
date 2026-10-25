@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -33,9 +35,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.remember
-import com.example.voxara.ui.design.shortenToFit
+import com.example.voxara.ui.design.wholeSentencesToFit
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.Text
@@ -133,6 +134,7 @@ internal fun PageStage(
     listening: Boolean = false,
     stereo: () -> Float = { 0f },
     stereoColor: Color = Color.Unspecified,
+    waves: Boolean = true,
     nameSlot: (@Composable () -> Unit)? = null,
     picture: @Composable () -> Unit,
     foot: (@Composable ColumnScope.(room: Dp) -> Unit)? = null,
@@ -144,7 +146,7 @@ internal fun PageStage(
     OrbitStage(
         wave = wave, waveColor = waveTone.fill,
         modifier = modifier.semantics(mergeDescendants = true) { contentDescription = spoken },
-        listening = listening, stereo = stereo, stereoColor = stereoColor, picture = picture,
+        listening = listening, stereo = stereo, stereoColor = stereoColor, waves = waves, picture = picture,
     ) {
         val d = minOf(maxWidth, maxHeight)
         // With a foot, the page is exactly one screen and the foot takes what the centre leaves; without one (large
@@ -194,28 +196,26 @@ internal fun HeroFigure(value: Int?, glow: Color, compact: Boolean, suffix: Stri
 /** A caption under a figure: what the figure is a share of. */
 @Composable
 internal fun FigureCaption(text: String) {
-    Text(
-        text, style = VType.Caption.heroScaled(), color = VColor.TextSecondary, textAlign = TextAlign.Center,
-        maxLines = 2, overflow = TextOverflow.Ellipsis,
-    )
+    Text(text, style = VType.Caption.heroScaled(), color = VColor.TextSecondary, textAlign = TextAlign.Center)
 }
 
+/** Tono's line as it will be drawn on the hero: the words and the type step they fit at. */
+internal data class FittedLine(val text: String, val style: TextStyle)
+
 /**
- * TONO'S LINE ON THE HERO — never ends in an ellipsis. It takes the space it is given in at most [maxLines]
- * (two) lines, at the [style] size first (Title small), then one and two steps down (never under 12 sp), and if the sentence still
- * does not fit, a shorter whole piece of it ([shortenToFit]). The full text is on Ask.
+ * TONO'S LINE ON THE HERO — a whole sentence or nothing, never an ellipsis. Tries the text in at most [maxLines]
+ * lines of [maxWidth] at the [style] size (Title small), then one and two steps down (never under 12 sp); if it
+ * still does not fit, the longest run of whole sentences from its start ([wholeSentencesToFit]); otherwise null,
+ * and the caller puts the full line under the hero instead. Held at 1.3 times the wearer's font size, like the figure.
  */
 @Composable
-internal fun FittedStatus(
-    text: String, maxWidth: Dp, color: Color, modifier: Modifier = Modifier,
-    style: TextStyle = VType.TitleSmall, maxLines: Int = 2,
-) {
+internal fun rememberFittedStatus(text: String, maxWidth: Dp, style: TextStyle = VType.TitleSmall, maxLines: Int = 2): FittedLine? {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    // Held at 1.3 times the wearer's font (like the figure): past it the line stops growing and gets shorter instead.
     val capped = if (density.fontScale > STATUS_MAX_FONT_SCALE) STATUS_MAX_FONT_SCALE / density.fontScale else 1f
     val base = style.heroScaled().scaled(capped)
-    val fitted = remember(text, maxWidth, density.density, density.fontScale, base) {
+    return remember(text, maxWidth, density.density, density.fontScale, base, maxLines) {
+        if (maxLines <= 0) return@remember null
         val widthPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
         fun styled(step: Float): TextStyle {
             val size = maxOf(base.fontSize.value * step, 12f)
@@ -224,19 +224,16 @@ internal fun FittedStatus(
         fun fits(style: TextStyle, t: String): Boolean =
             !measurer.measure(t, style, maxLines = maxLines, constraints = Constraints(maxWidth = widthPx)).hasVisualOverflow
         val steps = listOf(1f, 0.92f, 0.85f).map(::styled)
-        val whole = steps.firstOrNull { fits(it, text) }
-        if (whole != null) text to whole else steps.last().let { st -> shortenToFit(text) { fits(st, it) } to st }
+        steps.firstOrNull { fits(it, text) }?.let { return@remember FittedLine(text, it) }
+        val smallest = steps.last()
+        wholeSentencesToFit(text) { fits(smallest, it) }?.let { FittedLine(it, smallest) }
     }
-    Text(
-        fitted.first, style = fitted.second, color = color, textAlign = TextAlign.Center,
-        maxLines = maxLines, overflow = TextOverflow.Clip, modifier = modifier,
-    )
 }
 
 /**
- * TONO'S TAG — Tono's one line as a small tag under the hero (a sparkle marks wording from the cloud AI):
- * a tap opens Ask. Whole clauses only, at most [maxLines] lines, never an ellipsis ([FittedStatus]); the full
- * text is on Ask. [maxWidth] is the width the tag may take, [minHeight] makes it a full 48 dp target where
+ * TONO'S TAG — Tono's one line as a small tag (a sparkle marks wording from the cloud AI): a tap opens Ask.
+ * On the hero it shows a [fitted] line (whole sentences only, [rememberFittedStatus]); under the hero ([fitted]
+ * null) the whole [status] wraps on as many lines as it needs. [minHeight] makes it a full 48 dp target where
  * there is room (on the hero the platform widens the touch area of a smaller tag to 48 dp).
  */
 @Composable
@@ -244,8 +241,7 @@ internal fun TonoTag(
     status: String,
     cloud: Boolean,
     askLabel: String,
-    maxWidth: Dp,
-    maxLines: Int,
+    fitted: FittedLine?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     minHeight: Dp = 0.dp,
@@ -268,16 +264,21 @@ internal fun TonoTag(
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
     ) {
         Icon(if (cloud) VoxIcons.Sparkle else VoxIcons.Ask, contentDescription = null, tint = VColor.AccentInk, modifier = Modifier.size(icon))
-        FittedStatus(status, maxWidth - padH * 2 - icon - 4.dp, VColor.Text, style = VType.Label, maxLines = maxLines)
+        if (fitted != null) Text(fitted.text, style = fitted.style, color = VColor.Text, textAlign = TextAlign.Center)
+        else Text(status, style = VType.Label, color = VColor.Text, textAlign = TextAlign.Center)
     }
 }
+
+/** The width Tono's words get inside a tag [tagWidth] wide (its padding and icon taken off). */
+@Composable
+internal fun tonoTextWidth(tagWidth: Dp): Dp = tagWidth - 10.dp * 2 - 14.dp * LocalTextScale.current - 4.dp
 
 /** A foot line: one short sentence under the figure. */
 @Composable
 internal fun FootLine(text: String, modifier: Modifier = Modifier, color: Color = VColor.TextSecondary) {
     Text(
-        text, style = VType.Caption.heroScaled(), color = color, textAlign = TextAlign.Center, maxLines = 4,
-        overflow = TextOverflow.Ellipsis, modifier = modifier.fillMaxWidth(),
+        text, style = VType.Caption.heroScaled(), color = color, textAlign = TextAlign.Center,
+        modifier = modifier.fillMaxWidth(),
     )
 }
 
@@ -287,14 +288,23 @@ internal fun FootLine(text: String, modifier: Modifier = Modifier, color: Color 
  */
 @Composable
 internal fun FootNote(text: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-    ) {
-        Icon(VoxIcons.Info, contentDescription = null, tint = VColor.TextSecondary, modifier = Modifier.size(14.dp * LocalTextScale.current))
-        Text(text, style = VType.Caption.heroScaled(), color = VColor.TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    // The icon is part of the text (inline, before the first word), so when the line wraps it stays beside the
+    // words instead of drifting to the edge of a wide box.
+    val style = VType.Caption.heroScaled()
+    val annotated = androidx.compose.ui.text.buildAnnotatedString {
+        appendInlineContent("info", "ⓘ")
+        append(" ")
+        append(text)
     }
+    val inline = mapOf(
+        "info" to androidx.compose.foundation.text.InlineTextContent(
+            androidx.compose.ui.text.Placeholder(style.fontSize, style.fontSize, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter),
+        ) { Icon(VoxIcons.Info, contentDescription = null, tint = VColor.TextSecondary, modifier = Modifier.fillMaxSize()) },
+    )
+    Text(
+        annotated, style = style, color = VColor.TextSecondary, textAlign = TextAlign.Center, inlineContent = inline,
+        modifier = modifier.semantics { contentDescription = text },
+    )
 }
 
 /** The foot as the first detail row, shown only at large font sizes where the hero drops it. */
