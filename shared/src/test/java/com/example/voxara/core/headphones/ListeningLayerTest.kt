@@ -157,6 +157,6 @@ class ListeningLayerTest {
         val tiePhone = SettingsDoc().with(SettingField.HEADPHONE_MODE, "OFF", now - 58_000)
         assertEquals("ON", SettingsMerge.watchReceives(watch, tiePhone, now).merged[SettingField.HEADPHONE_MODE]?.value)
         val futurePhone = SettingsDoc().with(SettingField.HEADPHONE_MODE, "OFF", now + 60_000)
-        assertTrue(SettingField.HEADPHONE_MODE in SettingsMerge.watchReceives(watch, futurePhone, now).refusedFuture)
+        assertTrue(SettingField.HEADPHONE_MODE in SettingsMerge.watchReceives(watch, futurePhone, now).clampedFuture)
     }
 }
