@@ -34,8 +34,10 @@ interface HttpTransport {
 }
 
 class UrlConnectionTransport(
-    private val connectTimeoutMs: Int = 8_000,
-    private val readTimeoutMs: Int = 12_000,
+    // The watch reaches the internet through the phone's Bluetooth proxy when there is no Wi-Fi: slower than a
+    // phone on Wi-Fi (a request that takes about a second on a laptop can take several seconds there).
+    private val connectTimeoutMs: Int = 15_000,
+    private val readTimeoutMs: Int = 25_000,
 ) : HttpTransport {
     override fun postJson(url: String, headers: Map<String, String>, body: String): Pair<Int, String> {
         val c = URL(url).openConnection() as HttpURLConnection
@@ -93,6 +95,8 @@ class OpenAiCompatibleCoachClient(
 
     override suspend fun reply(request: CoachRequest): CoachResult {
         if (apiKey.isBlank()) return CoachResult.Failure("no key")
+        val startedAt = System.currentTimeMillis()
+        fun took() = " (${System.currentTimeMillis() - startedAt} ms)"
         // Main-safe: callers launch from the UI thread, and a blocking socket there is a crash.
         val (code, body) = try {
             withContext(Dispatchers.IO) {
@@ -105,12 +109,13 @@ class OpenAiCompatibleCoachClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
-            return CoachResult.Failure("network")
+            // The class name (UnknownHostException, SocketTimeoutException, ...) says what failed; never the key or the text.
+            return CoachResult.Failure("network:${e.javaClass.simpleName}${took()}")
         } catch (e: RuntimeException) {
             // e.g. SecurityException without INTERNET, a malformed base URL: the offline coach answers.
-            return CoachResult.Failure("transport")
+            return CoachResult.Failure("transport:${e.javaClass.simpleName}")
         }
-        if (code !in 200..299) return CoachResult.Failure("http $code")
+        if (code !in 200..299) return CoachResult.Failure("http $code${took()}")
         val content = runCatching {
             val root = MiniJson.parse(body) as Map<*, *>
             val choice = (root["choices"] as List<*>).first() as Map<*, *>
@@ -118,7 +123,7 @@ class OpenAiCompatibleCoachClient(
         }.getOrNull() ?: return CoachResult.Failure("malformed response")
         return when (val v = ReplyValidator.validate(content, request.snapshot)) {
             is Validation.Valid -> CoachResult.Success(v.reply)
-            is Validation.Invalid -> CoachResult.Failure("invalid reply: ${v.reason}")
+            is Validation.Invalid -> CoachResult.Failure("invalid reply: ${v.reason}${took()}")
         }
     }
 }
