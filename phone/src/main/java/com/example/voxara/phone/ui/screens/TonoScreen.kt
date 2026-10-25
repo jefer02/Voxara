@@ -49,7 +49,6 @@ import com.example.voxara.phone.ui.PhoneActions
 import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.components.Banner
 import com.example.voxara.phone.ui.components.ContentMaxWidth
-import com.example.voxara.phone.ui.components.EditorialLabel
 import com.example.voxara.phone.ui.components.EmptyState
 import com.example.voxara.phone.ui.components.GroupNote
 import com.example.voxara.phone.ui.components.PillButton
@@ -62,7 +61,7 @@ import com.example.voxara.ui.design.VoxIcons
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TonoScreen(s: PhoneUiState, actions: PhoneActions) {
+fun TonoScreen(s: PhoneUiState, actions: PhoneActions, onBack: (() -> Unit)? = null) {
     val tono = s.settings.tonoEnabled
     var question by rememberSaveable { mutableStateOf("") }
     val send = {
@@ -71,6 +70,7 @@ fun TonoScreen(s: PhoneUiState, actions: PhoneActions) {
     }
     VoxScreen(
         title = stringResource(R.string.tono_title),
+        onBack = onBack,
         bottomBar = { if (tono) AskBar(question, { question = it }, send) },
     ) {
         if (!tono) {
@@ -102,7 +102,6 @@ fun TonoScreen(s: PhoneUiState, actions: PhoneActions) {
         }
         item {
             VoxCard(Modifier.contentWidth()) {
-                EditorialLabel(stringResource(R.string.tono_title))
                 Text(stringResource(R.string.tono_weekly_title), style = MaterialTheme.typography.titleMedium, color = Vox.colors.text)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PillButton(stringResource(R.string.tono_weekly_button), { actions.onAsk(CoachTask.WEEKLY_SUMMARY, null) }, icon = VoxIcons.Sparkle, tonal = true)
@@ -178,10 +177,10 @@ private fun AskBar(value: String, onChange: (String) -> Unit, onSend: () -> Unit
             OutlinedTextField(
                 value = value,
                 onValueChange = { onChange(it.take(200)) },
-                placeholder = { Text(stringResource(R.string.tono_placeholder), maxLines = 1) },
+                placeholder = { Text(stringResource(R.string.tono_placeholder), maxLines = 2) },
                 modifier = Modifier.weight(1f, fill = true).widthIn(max = ContentMaxWidth),
                 shape = CircleShape,
-                singleLine = true,
+                singleLine = false, maxLines = 3,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSend() }),
                 colors = OutlinedTextFieldDefaults.colors(

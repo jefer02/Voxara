@@ -43,7 +43,6 @@ import com.example.voxara.phone.R
 import com.example.voxara.phone.ui.PhoneActions
 import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.components.ContentMaxWidth
-import com.example.voxara.phone.ui.components.EditorialLabel
 import com.example.voxara.phone.ui.components.IconTile
 import com.example.voxara.phone.ui.components.Group
 import com.example.voxara.phone.ui.components.LinkButton
@@ -68,6 +67,7 @@ fun HowItWorksScreen(onBack: () -> Unit) {
         Triple(VoxIcons.Calendar, R.string.how_niosh_title, R.string.how_niosh_body),
         Triple(VoxIcons.Chart, R.string.how_who_title, R.string.how_who_body),
         Triple(VoxIcons.Headphones, R.string.how_headphones_title, R.string.how_headphones_body),
+        Triple(VoxIcons.Phone, R.string.how_sharing_title, R.string.how_sharing_body),
         Triple(VoxIcons.Tune, R.string.how_accuracy_title, R.string.how_accuracy_body),
         Triple(VoxIcons.Lock, R.string.how_privacy_title, R.string.how_privacy_body),
         Triple(VoxIcons.Shield, R.string.how_medical_title, R.string.how_medical_body),
@@ -108,7 +108,7 @@ fun SetupScreen(s: PhoneUiState, actions: PhoneActions, initialStep: Int = 0) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth().weight(1f)) {
-                EditorialLabel(stringResource(R.string.setup_step, step + 1, STEPS))
+                Text(stringResource(R.string.setup_step, step + 1, STEPS), style = MaterialTheme.typography.labelLarge, color = c.text2)
                 Spacer(Modifier.size(10.dp))
                 LinearProgressIndicator(
                     progress = { (step + 1f) / STEPS }, modifier = Modifier.fillMaxWidth().height(6.dp),
