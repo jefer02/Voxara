@@ -13,7 +13,16 @@ import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.MinuteRecord
 import com.example.voxara.core.ledger.energyOf
 import com.example.voxara.core.ledger.nioshDoseOf
+import com.example.voxara.audio.HeadphoneWatcher
+import com.example.voxara.core.headphones.HeadphoneAlert
+import com.example.voxara.core.headphones.HeadphoneCategory
 import com.example.voxara.core.headphones.HeadphoneModeChoice
+import com.example.voxara.core.headphones.HeadphoneRoute
+import com.example.voxara.core.headphones.LowerUi
+import com.example.voxara.core.headphones.OutputKind
+import com.example.voxara.link.LinkHealth
+import com.example.voxara.phone.listening.PhoneListeningRuntime
+import com.example.voxara.sync.LowerOutcome
 import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.situation.SituationMode
@@ -65,13 +74,13 @@ class PhoneScreenshotTest {
     private val outDir by lazy { File(System.getProperty("user.dir"), "build/screenshots").apply { mkdirs() } }
 
     private fun capture(
-        name: String, size: Size, scale: Float, dark: Boolean = false, accent: Accent? = null,
+        name: String, size: Size, scale: Float, dark: Boolean = false, accent: Accent? = null, locale: String = "",
         content: @Composable () -> Unit,
     ) {
-        RuntimeEnvironment.setQualifiers("${size.screen}-${if (dark) "night" else "notnight"}-${size.density}")
+        RuntimeEnvironment.setQualifiers("${if (locale.isEmpty()) "" else "$locale-"}${size.screen}-${if (dark) "night" else "notnight"}-${size.density}")
         RuntimeEnvironment.setFontScale(scale)
         val tag = accent?.let { "_" + it.name.lowercase() } ?: ""
-        val file = File(outDir, "${name}_${size.name}_x$scale$tag${if (dark) "_dark" else ""}.png")
+        val file = File(outDir, "${if (locale.isEmpty()) "" else "${locale}_"}${name}_${size.name}_x$scale$tag${if (dark) "_dark" else ""}.png")
         captureRoboImage(file.path) {
             VoxaraPhoneTheme(darkTheme = dark, accent = accent ?: Accent.DEFAULT, reduceMotion = true) { content() }
         }
@@ -116,7 +125,7 @@ class PhoneScreenshotTest {
     )
     private val reply = CoachReply(
         status = "A busy afternoon for your ears",
-        insight = "You are at 83% of today's sound allowance and 64% of this week's.",
+        insight = "You are at 83% of today's limit and 64% of this week's.",
         why = "Most of it came from two loud hours after lunch.",
         suggestion = "A quieter evening keeps the week on track.",
         chips = listOf("My week?", "Why estimated?", "Tips"),
@@ -160,6 +169,7 @@ class PhoneScreenshotTest {
         capture("home_hp", phone, 1.0f, dark = true) { HomeScreen(hp, actions) {} }
         capture("settings_hp", tall, 1.0f) { SettingsScreen(hp, actions) {} }
         capture("settings_hp", tall, 1.0f, dark = true) { SettingsScreen(hp, actions) {} }
+        // Headphones mode is automatic: whatever an older app left in the synced field, there is nothing to switch here.
         capture("settings_hp", tall, 2.0f) { SettingsScreen(hp.copy(settings = hp.settings.copy(headphoneMode = HeadphoneModeChoice.ON)), actions) {} }
     }
 
@@ -187,6 +197,54 @@ class PhoneScreenshotTest {
     }
     @Test fun alerts() = all("alerts") { AlertsScreen(state, {}, {}) }
     @Test fun headphones() = all("headphones") { HeadphonesScreen(state, actions, {}) }
+
+    // ------------------------------------------------------------------ headphones on the phone, the link, battery
+
+    private val hpSnapshot = HeadphoneWatcher.Snapshot(
+        route = HeadphoneRoute(HeadphoneCategory.UNKNOWN, OutputKind.BLUETOOTH_A2DP, 0, possibleSpeaker = true),
+        playing = true, volumeDb = -14.0, volumeIndex = 11, volumeMax = 15, fixedVolume = false, btDetailsAvailable = false,
+    )
+    private val liveOver = PhoneListeningRuntime.Live(
+        running = true, snapshot = hpSnapshot,
+        alert = HeadphoneAlert(1, 86.0, now, LayerSource.PHONE),
+    )
+
+    /** The phone's own headphones: playing, a possible speaker, the alert and each answer to "lower the volume". */
+    @Test fun phoneHeadphonesLive() {
+        val hp = state.copy(phoneSampling = true, bluetoothGranted = false)
+        for (locale in listOf("", "es")) for (scale in listOf(1.0f, 1.3f)) {
+            capture("hp_live", phone, scale, locale = locale) { HeadphonesScreen(hp.copy(phoneLive = liveOver), actions, {}) }
+            capture("hp_live_working", phone, scale, locale = locale) {
+                HeadphonesScreen(hp.copy(phoneLive = liveOver.copy(lower = LowerUi.Working)), actions, {})
+            }
+            capture("hp_live_lowered", phone, scale, locale = locale) {
+                HeadphonesScreen(hp.copy(phoneLive = liveOver.copy(lower = LowerUi.Done(LowerOutcome.LOWERED, 79.0))), actions, {})
+            }
+            capture("hp_live_fixed", phone, scale, locale = locale) {
+                HeadphonesScreen(hp.copy(phoneLive = liveOver.copy(lower = LowerUi.Done(LowerOutcome.FIXED_VOLUME, null))), actions, {})
+            }
+            capture("hp_live_calm", phone, scale, locale = locale) {
+                val calm = hpSnapshot.copy(volumeIndex = 6, volumeDb = -30.0)
+                HeadphonesScreen(hp.copy(phoneLive = PhoneListeningRuntime.Live(running = true, snapshot = calm)), actions, {})
+            }
+            capture("hp_live_none", phone, scale, locale = locale) {
+                HeadphonesScreen(hp.copy(phoneLive = PhoneListeningRuntime.Live(running = true)), actions, {})
+            }
+        }
+        capture("hp_live", phone, 1.0f, dark = true) { HeadphonesScreen(hp.copy(phoneLive = liveOver), actions, {}) }
+    }
+
+    /** Reconnecting, disconnected for how long, and the battery guidance (Samsung's background limits). */
+    @Test fun linkHealthAndBattery() {
+        for (locale in listOf("", "es")) for (scale in listOf(1.0f, 1.3f)) {
+            val reconnecting = state.copy(linkHealth = LinkHealth.Reconnecting(now - 20_000), pendingSpans = 3)
+            val gone = state.copy(linkHealth = LinkHealth.Disconnected(now - 47 * 60_000L), link = LinkState.NoWatch, pendingSpans = 3, batteryRestricted = true)
+            capture("link_reconnecting_watch", phone, scale, locale = locale) { WatchScreen(reconnecting, actions) }
+            capture("link_disconnected_watch", phone, scale, locale = locale) { WatchScreen(gone, actions) }
+            capture("link_disconnected_home", phone, scale, locale = locale) { HomeScreen(gone, actions) {} }
+            capture("battery_guide_home", phone, scale, locale = locale) { HomeScreen(state.copy(batteryRestricted = true), actions) {} }
+        }
+    }
 
     @Test fun tono() {
         all("tono") { TonoScreen(state, actions) }
