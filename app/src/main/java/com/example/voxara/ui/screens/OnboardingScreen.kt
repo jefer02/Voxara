@@ -20,7 +20,7 @@ import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.VSpace
 import com.example.voxara.ui.design.PageDots
-import com.example.voxara.ui.design.ChoiceList
+import com.example.voxara.ui.design.choiceRows
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.IconTile
 import com.example.voxara.ui.design.Panel
@@ -40,8 +40,9 @@ private enum class OnbStep { WELCOME, PRIVACY, ESTIMATES, PERMISSIONS, ALERT_LEV
  * reason), the alert level, the cloud-AI choice, and how to keep monitoring running.
  */
 @Composable
-fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
-    var index by rememberSaveable { mutableIntStateOf(0) }
+fun OnboardingScreen(env: UiEnv, actions: VoxaraActions, initialStep: Int = 0) {
+    // [initialStep] is always 0 in the app; the review renders open each step directly.
+    var index by rememberSaveable { mutableIntStateOf(initialStep) }
     val steps = OnbStep.entries.filter { it != OnbStep.TONO || env.cloudAvailable }
     val step = steps[index.coerceIn(0, steps.lastIndex)]
     val name = stringResource(R.string.ai_name)
@@ -107,26 +108,16 @@ fun OnboardingScreen(env: UiEnv, actions: VoxaraActions) {
             OnbStep.ALERT_LEVEL -> {
                 row { HeroStatus(stringResource(R.string.onb_alert_title), modifier = Modifier.semantics { heading() }) }
                 row { BodyText(stringResource(R.string.onb_alert_body, AlertDefaults.SUSTAINED_WINDOW_MIN), color = VColor.Text) }
-                row {
-                    ChoiceList(
-                        listOf(80, 85, 90, 95).map {
-                            it to stringResource(if (it == AlertDefaults.THRESHOLD_DBA) R.string.onb_alert_option_default else R.string.onb_alert_option, it)
-                        },
-                        selected = a.thresholdDba,
-                        onSelect = { actions.onAlertSettings(a.copy(thresholdDba = it)) },
-                    )
+                choiceRows(listOf(80, 85, 90, 95), a.thresholdDba, { actions.onAlertSettings(a.copy(thresholdDba = it)) }) {
+                    stringResource(if (it == AlertDefaults.THRESHOLD_DBA) R.string.onb_alert_option_default else R.string.onb_alert_option, it)
                 }
             }
             OnbStep.TONO -> {
                 row { IconTile(VoxIcons.Sparkle, VColor.AccentInk) }
                 row { HeroStatus(stringResource(R.string.onb_tono_title, name), modifier = Modifier.semantics { heading() }) }
                 row { BodyText(stringResource(R.string.tono_consent_body, name), color = VColor.Text) }
-                row {
-                    ChoiceList(
-                        listOf(true to stringResource(R.string.onb_tono_yes), false to stringResource(R.string.onb_tono_no)),
-                        selected = env.state.aiConsent,
-                        onSelect = actions.onAiConsent,
-                    )
+                choiceRows(listOf(true, false), env.state.aiConsent, actions.onAiConsent) {
+                    stringResource(if (it) R.string.onb_tono_yes else R.string.onb_tono_no)
                 }
             }
             OnbStep.KEEP_RUNNING -> {

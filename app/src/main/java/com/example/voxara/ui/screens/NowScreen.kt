@@ -47,7 +47,6 @@ import com.example.voxara.ai.ReplySource
 import com.example.voxara.core.ai.CoachTask
 import com.example.voxara.core.dose.DOSE_THRESHOLD_DBA
 import com.example.voxara.core.format.formatHeadroom
-import com.example.voxara.core.headphones.quickToggleChoice
 import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.core.situation.SituationChoice
@@ -63,6 +62,8 @@ import com.example.voxara.ui.design.LocalDisplay
 import com.example.voxara.ui.design.LocalTextScale
 import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.NowRing
+import com.example.voxara.ui.design.PillButton
+import com.example.voxara.ui.design.PillStyle
 import com.example.voxara.ui.design.ResumePill
 import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VMotion
@@ -127,7 +128,8 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
     val tono = s.tonoEnabled
     val name = stringResource(R.string.ai_name)
     // Refresh Tono's status line when the page appears (automatic calls are rate-limited to hourly).
-    LaunchedEffect(tono) { if (tono) actions.onAsk(CoachTask.STATUS, null) }
+    // (Also when cloud consent flips: turning Tono's cloud on must not wait for the next visit.)
+    LaunchedEffect(tono, s.aiConsent) { if (tono) actions.onAsk(CoachTask.STATUS, null) }
 
     val zone = RiskZone.of(s.dba)
     val liveTone = zoneTone(zone)
@@ -153,7 +155,6 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
     val loudListening = (estZone ?: RiskZone.OK) >= RiskZone.LOUD
     val listenColor = if (loudListening) VColor.tone(estZone!!).fill else VColor.SecondaryFill
     val listenFraction = est?.let { gaugeFraction(it.dba.toFloat()) } ?: s.headphoneWeeklyFraction.toFloat()
-    val toggle: () -> Unit = { actions.onHeadphoneMode(quickToggleChoice(wantOn = !layerOn, detected = s.listening.detected)) }
     val progress = rememberLayerProgress(layerOn, s.lastAlertAtMs)
     // The chip (and the foot it replaces) takes over once the label has faded (halfway through its settle); at rest it is simply there.
     val showChip by remember { derivedStateOf { progress.target && (progress.label.value >= 1.5f || (progress.label.value == 0f && progress.moon.value >= 0.999f)) } }
@@ -178,9 +179,9 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
     val doseOnHero = !compact && !layerOn && plan.dose
     val detailFoot: @Composable ColumnScope.() -> Unit = {
         FootLine(doseLine, color = VColor.Text)
-        if (uncalibrated) FootNote(uncalibratedLine)
     }
 
+    Box {
     HeroList(
         hero = { m ->
             PageStage(
@@ -191,7 +192,9 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
                 modifier = m, listening = s.headphoneListening,
                 stereo = { progress.waves.value }, stereoColor = VColor.SecondaryFill,
                 // The bottom slot: Tono's tag over today's dose; in headphones mode, the chip.
-                nameSlot = if (showChip) { { HeadphonesChip(s.listening, progress, interactive = !compact, onClick = toggle) } } else null,
+                nameSlot = if (showChip) {
+                    { HeadphonesChip(s.listening, s.headphonePossibleSpeaker, progress, interactive = !compact, onClick = { navigate(Routes.HP_EXIT) }) }
+                } else null,
                 picture = {
                     Box(Modifier.fillMaxSize()) {
                         NowRing(
@@ -212,7 +215,10 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
                         val px = measurer.measure(shortDoseLine, doseStyle, maxLines = 4, constraints = Constraints(maxWidth = with(density) { width.roundToPx() })).size.height
                         with(density) { px.toDp() }
                     }
-                    val fit = footPlan(room, doseHeight, LocalTextScale.current)
+                    val planned = footPlan(room, doseHeight, LocalTextScale.current)
+                    // Tono's line on the hero is a whole sentence or nothing: when not even one fits it goes under the hero.
+                    val fittedTag = rememberFittedStatus(status, tonoTextWidth(d * 0.76f), VType.Label, planned.tagLines)
+                    val fit = if (fittedTag == null) planned.copy(tagLines = 0) else planned
                     SideEffect { if (plan != fit) plan = fit }
                     // While headphones mode comes in, the foot fades under the label that curves round the bottom.
                     Column(
@@ -221,7 +227,7 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         // The tag sits higher than the dose line, where the ring's gap is wider: it may take more of the width.
-                        if (fit.tagLines > 0) TonoTag(status, cloud, askLabel, d * 0.76f, fit.tagLines, onClick = { navigate(Routes.ASK) }, modifier = Modifier.requiredWidthIn(max = d * 0.76f))
+                        if (fittedTag != null) TonoTag(status, cloud, askLabel, fittedTag, onClick = { navigate(Routes.ASK) }, modifier = Modifier.requiredWidthIn(max = d * 0.76f))
                         if (fit.dose) FootLine(shortDoseLine, color = VColor.Text)
                     }
                 },
@@ -246,7 +252,8 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             if (paused) ResumePill(actions.onResume) else ZoneTag(zone)
-                            if (!isCompact && uncalibrated) FootNote(uncalibratedLine, Modifier.requiredWidthIn(max = LocalDisplay.current * 0.82f))
+                            // A required notice: on the hero at every size and font scale (it wraps; the page grows if it must).
+                            if (uncalibrated) FootNote(uncalibratedLine, Modifier.requiredWidthIn(max = LocalDisplay.current * 0.82f))
                         }
                     }
                     if (layerVisible) {
@@ -256,7 +263,8 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             if (est != null) {
-                                if (!isCompact) FigureCaption(stringResource(R.string.estimated_word))
+                                // "estimated" is part of the number's meaning: kept at every size.
+                                FigureCaption(stringResource(R.string.estimated_word))
                                 ZoneTag(estZone!!)
                             } else if (!isCompact) FigureCaption(stringResource(R.string.hp_week_share_caption))
                         }
@@ -266,20 +274,25 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
         },
         details = {
             if (layerOn) {
+                // The way out, first: detection stays automatic, but the wearer can say this is not headphones.
+                row {
+                    PillButton(
+                        stringResource(R.string.hp_not_headphones), onClick = { navigate(Routes.HP_EXIT) },
+                        icon = VoxIcons.Headphones, style = PillStyle.TONAL,
+                    )
+                }
                 row { FootLine(outsideLine, color = VColor.Text) }
                 headphonesLiveRows(env)
             }
             // Tono's line, when the hero had no room for the tag (or headphones mode has the chip).
             if (!tagOnHero) {
                 row {
-                    TonoTag(
-                        status, cloud, askLabel, androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp - VSpace.roundInset * 2,
-                        maxLines = 3, onClick = { navigate(Routes.ASK) }, minHeight = VSize.touch,
-                    )
+                    TonoTag(status, cloud, askLabel, fitted = null, onClick = { navigate(Routes.ASK) }, minHeight = VSize.touch)
                 }
             }
             footDetail(!layerOn && !doseOnHero, detailFoot)
-            row { HeadphonesModeCard(s.listening, onClick = toggle) }
+            // Off: one line of information (nothing to switch: it turns on by itself).
+            if (!layerOn) row { HeadphonesStatusCard(s.listening, s.headphonePossibleSpeaker) }
             row { MetricCard(VoxIcons.Waves, stringResource(R.string.scene_label), scene, accent = VColor.AccentInk) }
             // One tap to the mode picker. Auto's conclusions morph the chip.
             row { ModeChip(modeValue(s.situationChoice, s.mode, s.listening), concert) { navigate(Routes.MODE) } }
@@ -291,6 +304,9 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
             }
         },
     )
+    // The headphone-volume alert, inside the headphones view (the same two actions as its notification).
+    HeadphoneAlertPanel(env, actions, navigate)
+    }
 }
 
 /**
@@ -329,7 +345,7 @@ private fun ModeChip(label: String, concert: Boolean, onClick: () -> Unit) {
             },
             label = "modeLabel",
         ) { t ->
-            Text(t, style = VType.TitleSmall, color = content, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(t, style = VType.TitleSmall, color = content)
         }
     }
 }
