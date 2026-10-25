@@ -15,6 +15,8 @@ import com.example.voxara.debug.DebugTools
 import com.example.voxara.ui.screens.AmbientScreen
 import com.example.voxara.ui.screens.AskScreen
 import com.example.voxara.ui.screens.CalibrationScreen
+import com.example.voxara.ui.screens.DoseHelpScreen
+import com.example.voxara.ui.screens.HeadphonesExitScreen
 import com.example.voxara.ui.screens.HomeScreen
 import com.example.voxara.ui.screens.LimitAlertScreen
 import com.example.voxara.ui.screens.LimitKind
@@ -78,13 +80,15 @@ fun VoxaraApp(
         composable(Routes.HOME) { HomeScreen(currentEnv, currentActions, navigate = go) }
         // The glance pages are pages of the Home pager; their own routes open it on that page.
         composable(Routes.NOW) { HomeScreen(currentEnv, currentActions, initialPage = Routes.NOW, navigate = go) }
-        composable(Routes.MODE) { ModeScreen(currentEnv, currentActions) }
+        composable(Routes.MODE) { ModeScreen(currentEnv, currentActions, go) }
         if (DebugTools.available) composable(DebugTools.HAPTICS_ROUTE) { DebugTools.HapticsScreen() }
         composable(Routes.HEADPHONES) { HomeScreen(currentEnv, currentActions, initialPage = Routes.HEADPHONES, navigate = go) }
         composable(Routes.MENU) { HomeScreen(currentEnv, currentActions, initialPage = Routes.MENU, navigate = go) }
         composable(Routes.TODAY) { HomeScreen(currentEnv, currentActions, initialPage = Routes.TODAY, navigate = go) }
         composable(Routes.WEEK) { HomeScreen(currentEnv, currentActions, initialPage = Routes.WEEK, navigate = go) }
         composable(Routes.ASK) { AskScreen(currentEnv, currentActions) }
+        composable(Routes.DOSE_HELP) { DoseHelpScreen(onDone = { nav.popBackStack() }) }
+        composable(Routes.HP_EXIT) { HeadphonesExitScreen(currentEnv, currentActions, onDone = { nav.popBackStack() }) }
         composable(Routes.SETTINGS) { SettingsScreen(currentEnv, currentActions, go) }
         composable(Routes.CALIBRATION) {
             CalibrationScreen(

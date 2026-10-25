@@ -6,7 +6,6 @@ import com.example.voxara.core.alerts.AlertSettings
 import com.example.voxara.core.calibration.CalibrationRecord
 import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.headphones.HeadphoneCategory
-import com.example.voxara.core.headphones.HeadphoneModeChoice
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.ExposureState
@@ -29,6 +28,10 @@ object Routes {
     const val SETTINGS = "settings"
     const val CALIBRATION = "calibration"
     const val MODE = "mode"
+    /** What the Dose ring means (a tap on its number). */
+    const val DOSE_HELP = "dose_help"
+    /** "Not headphones": the way out of headphones mode (its chip on Now, or the row under it). */
+    const val HP_EXIT = "hp_exit"
 }
 
 /** Everything a screen may read. */
@@ -52,8 +55,17 @@ data class VoxaraActions(
     val onResume: () -> Unit = {},
     /** The wearer picked Auto or a fixed situation mode on the watch. */
     val onSituationChoice: (SituationChoice) -> Unit = {},
-    /** The wearer picked Auto, On or Off for headphones mode (Mode screen, Overview). */
-    val onHeadphoneMode: (HeadphoneModeChoice) -> Unit = {},
+    /** "Dismiss" on the headphone-volume alert: closes it for this tier, never switches alerts off. */
+    val onDismissHeadphoneAlert: () -> Unit = {},
+    /** "Lower to safe volume": brings the music volume to the recommended level (watch or phone headphones). */
+    val onLowerHeadphones: () -> Unit = {},
+    /**
+     * "Not headphones": headphones mode leaves and ignores the current output until it disconnects; with
+     * `rememberSpeaker` a Bluetooth device is remembered as a speaker. The room's alerts are never affected.
+     */
+    val onNotHeadphones: (rememberSpeaker: Boolean) -> Unit = {},
+    /** Forgets every output remembered as a speaker. */
+    val onForgetSpeakers: () -> Unit = {},
     val onCalibrationTrim: (Double) -> Unit = {},
     val onSaveCalibration: (CalibrationRecord) -> Unit = {},
     val onEnsureMonitoring: () -> Unit = {},
