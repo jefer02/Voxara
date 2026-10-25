@@ -1,5 +1,9 @@
 package com.example.voxara.phone.ui.theme
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -22,15 +26,15 @@ import androidx.compose.ui.unit.sp
 import com.example.voxara.core.design.Accent
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.risk.RiskZone
+import androidx.compose.runtime.getValue
 import com.example.voxara.ui.design.JakartaFamily
-import com.example.voxara.ui.design.MonoFamily
-import com.example.voxara.ui.design.TABULAR
 import com.example.voxara.ui.design.VoxTone
 
 /**
- * VOXARA PHONE THEME — the template style (docs/design/STYLE.md) on Material 3: paper-white and
+ * VOXARA PHONE THEME — the Orbit language (docs/design/STYLE.md) on Material 3: paper-white and
  * deep blue-black neutrals, one user-chosen accent (Purple by default) and the level-reactive
  * tiers. Dynamic colour is off by design, so zones and the accent never change with the wallpaper.
+ * Colours crossfade when the theme or the accent changes ([animateVox]).
  */
 @Immutable
 data class VoxColors(
@@ -118,21 +122,20 @@ object Vox {
 }
 
 private fun style(
-    size: Int, line: Int, weight: FontWeight, tracking: Double = 0.0,
-    family: FontFamily = JakartaFamily, tabular: Boolean = false,
+    size: Int, line: Int, weight: FontWeight, tracking: Double = 0.0, family: FontFamily = JakartaFamily,
 ) = TextStyle(
-    fontFamily = family, fontWeight = weight, fontSize = size.sp, lineHeight = line.sp,
-    letterSpacing = tracking.em, fontFeatureSettings = if (tabular) TABULAR else null,
+    fontFamily = family, fontWeight = weight, fontSize = size.sp, lineHeight = line.sp, letterSpacing = tracking.em,
 )
 
 /**
- * Plus Jakarta Sans for words (extra-bold, tight headings), JetBrains Mono with tabular figures for
- * the display numbers. All in sp: the font scale applies.
+ * Plus Jakarta Sans for everything, words and numbers alike (extra-bold, tight headings). No font feature is asked for:
+ * a standalone figure is set in fixed-width digit cells instead ([com.example.voxara.ui.design.RollingDigits]), with the
+ * plain zero and the plain one the watch has. All in sp: the font scale applies.
  */
 val VoxTypography = Typography(
-    displayLarge = style(56, 60, FontWeight.Bold, -0.04, MonoFamily, tabular = true),
-    displayMedium = style(44, 48, FontWeight.Bold, -0.03, MonoFamily, tabular = true),
-    displaySmall = style(32, 38, FontWeight.Bold, -0.03, MonoFamily, tabular = true),
+    displayLarge = style(56, 58, FontWeight.ExtraBold, -0.03),
+    displayMedium = style(44, 48, FontWeight.ExtraBold, -0.03),
+    displaySmall = style(32, 38, FontWeight.ExtraBold, -0.02),
     headlineLarge = style(32, 38, FontWeight.ExtraBold, -0.02),
     headlineMedium = style(26, 32, FontWeight.ExtraBold, -0.02),
     headlineSmall = style(22, 28, FontWeight.ExtraBold, -0.02),
@@ -147,15 +150,22 @@ val VoxTypography = Typography(
     labelSmall = style(12, 16, FontWeight.SemiBold, 0.01),
 )
 
-/** Numbers outside the display styles: JetBrains Mono, tabular. */
+/** Numbers inside a row or a label (not the big figures): Plus Jakarta Sans, bold. */
 object VoxNum {
-    val large = style(24, 28, FontWeight.Bold, -0.02, MonoFamily, tabular = true)
-    val medium = style(17, 22, FontWeight.Bold, -0.01, MonoFamily, tabular = true)
-    val small = style(12, 16, FontWeight.SemiBold, 0.0, MonoFamily, tabular = true)
+    val large = style(24, 28, FontWeight.ExtraBold, -0.02)
+    val medium = style(17, 22, FontWeight.Bold, -0.01)
+    val small = style(12, 16, FontWeight.SemiBold)
 }
 
-/** The template's small uppercase labels: extra-bold, letter-spaced (callers upper-case the text). */
-val EyebrowStyle = style(12, 16, FontWeight.ExtraBold, 0.12)
+/** A big standalone figure (the dose, a share): extra-bold, tight; drawn in digit cells by RollingDigits/TabularDigits. */
+fun figureStyle(sizeSp: Int, weight: FontWeight = FontWeight.ExtraBold) = TextStyle(
+    fontFamily = JakartaFamily, fontWeight = weight, fontSize = sizeSp.sp, lineHeight = (sizeSp * 1.02f).sp, letterSpacing = (-0.03).em,
+)
+
+/** A line of words at [sizeSp] (an annotation, a caption, a sentence). */
+fun wordsStyle(sizeSp: Int, weight: FontWeight = FontWeight.Medium, lineHeight: Float = 1.35f) = TextStyle(
+    fontFamily = JakartaFamily, fontWeight = weight, fontSize = sizeSp.sp, lineHeight = (sizeSp * lineHeight).sp,
+)
 
 /** Cards 22 dp, hero 26 dp, pills fully round. */
 val VoxShapes = Shapes(
@@ -166,6 +176,25 @@ val VoxShapes = Shapes(
     extraLarge = RoundedCornerShape(26.dp),
 )
 
+/** How long the colours take to settle after the theme or the accent changes. */
+const val THEME_CROSSFADE_MS = 360
+
+/** [target] with every colour animated to it (instant when [instant]): the theme and the accent crossfade. */
+@Composable
+fun animateVox(target: VoxColors, instant: Boolean): VoxColors {
+    val spec: AnimationSpec<Color> = if (instant) snap() else tween(THEME_CROSSFADE_MS)
+    @Composable fun a(c: Color): Color = animateColorAsState(c, spec, label = "vox").value
+    return VoxColors(
+        dark = target.dark,
+        background = a(target.background), surface = a(target.surface), surface2 = a(target.surface2),
+        outline = a(target.outline), track = a(target.track),
+        text = a(target.text), text2 = a(target.text2), text3 = a(target.text3),
+        accent = VoxTone(a(target.accent.fill), a(target.accent.ink), a(target.accent.onFill)),
+        secondary = a(target.secondary),
+        accentChoice = target.accentChoice,
+    )
+}
+
 @Composable
 fun VoxaraPhoneTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -174,7 +203,8 @@ fun VoxaraPhoneTheme(
     levelZone: RiskZone = RiskZone.OK,
     content: @Composable () -> Unit,
 ) {
-    val vox = remember(darkTheme, accent) { VoxColors.of(darkTheme, accent) }
+    val target = remember(darkTheme, accent) { VoxColors.of(darkTheme, accent) }
+    val vox = animateVox(target, instant = reduceMotion)
     val a = vox.accent
     val scheme = if (darkTheme) {
         darkColorScheme(
