@@ -117,20 +117,25 @@ fun daysToWeeklyLimit(weeklyPercent: Double, dailySharesLast7: List<Double>): In
 }
 
 /**
- * Gentle streak: consecutive days (newest first, today excluded while it is still running) under
- * the daily limit. One slip per 7 days is forgiven, so a single loud evening does not reset weeks
- * of good habits.
+ * A past day counts toward the streak only when it was really measured (at least this many minutes): a day
+ * the watch was off or not worn is not "a day within the limit", it is a day nobody knows about.
  */
-fun streakDays(daysUnderLimitNewestFirst: List<Boolean>): Int {
-    var streak = 0
-    var forgivenAt = -100
-    for ((i, ok) in daysUnderLimitNewestFirst.withIndex()) {
-        if (ok) { streak++; continue }
-        if (i - forgivenAt >= 7 && streak > 0) { forgivenAt = i; continue }
-        break
-    }
-    return streak
-}
+const val STREAK_MIN_MEASURED_MINUTES = 60.0
+
+/** Below this a streak is not worth saying out loud (Tono and the Week page stay quiet about it). */
+const val STREAK_WORTH_SAYING = 3
+
+/** Whether a finished day keeps the streak going: measured for at least an hour and under the daily limit. */
+fun keepsStreak(measuredMinutes: Double, nioshDosePercent: Double): Boolean =
+    measuredMinutes >= STREAK_MIN_MEASURED_MINUTES && nioshDosePercent < 100.0
+
+/**
+ * Days in a row (newest first, today excluded while it is still running) that kept the streak ([keepsStreak]).
+ * Strictly consecutive: a day over the limit, or a day without enough measurement, ends it, so "N days in a
+ * row" is always literally true. Only as long as the days it is given (the app passes the last week), so it
+ * can undercount a longer run but never overcount.
+ */
+fun streakDays(daysKeptNewestFirst: List<Boolean>): Int = daysKeptNewestFirst.takeWhile { it }.size
 
 // ============================================================================ guardrails
 
@@ -163,6 +168,8 @@ data class CoachReply(
 
 object ReplyLimits {
     const val STATUS = 60
+    /** The status line is the one sentence a glance page shows: at most this many words. */
+    const val STATUS_WORDS = 12
     const val INSIGHT = 140
     const val WHY = 120
     const val SUGGESTION = 80
@@ -199,7 +206,8 @@ object ReplyValidator {
             if (v.isNullOrEmpty()) return if (required) null else ""
             return v.takeIf { it.length <= max }
         }
-        val status = field("status", ReplyLimits.STATUS) ?: return Validation.Invalid("status")
+        val status = field("status", ReplyLimits.STATUS)
+            ?.takeIf { it.split(Regex("""\s+""")).size <= ReplyLimits.STATUS_WORDS } ?: return Validation.Invalid("status")
         val insight = field("insight", ReplyLimits.INSIGHT) ?: return Validation.Invalid("insight")
         val why = field("why", ReplyLimits.WHY, required = false) ?: return Validation.Invalid("why")
         val suggestion = field("suggestion", ReplyLimits.SUGGESTION) ?: return Validation.Invalid("suggestion")
@@ -240,20 +248,25 @@ object CoachPrompt {
     /** The system prompt: voice, guardrails and the exact JSON contract (with the word "json"). */
     fun system(language: String): String = """
         You are Tono, the calm coach inside Voxara, a hearing-care app on a smartwatch.
-        Voice: calm, clear, warm, never alarmist, never judgmental. Second person. Plain words.
+        Voice: calm, clear, warm, never alarmist, never judgmental. Second person. Plain, natural words.
         Say one fact, then at most one gentle suggestion.
         You are NOT a medical device and you never diagnose, treat or make medical claims.
         If the user mentions symptoms, say you cannot assess them and suggest a hearing professional.
         Use ONLY numbers that appear in the data provided. Never invent figures.
+        What is cared for is the wearer's hearing (their ears), never "their sound".
+        Call the daily and weekly amounts a "limit" (Spanish: "límite"), never an "allowance" or "lo permitido".
+        data.streak_days counts past days in a row, each measured for at least an hour and under the daily limit.
+        Mention it only when it is 3 or more, as "N days in a row within your daily limit"; otherwise never mention it.
         data.situation_mode (if present) only sets your tone: quiet = calm and reflective; street = brief and
         practical; transport = brief, mention headphone volume if relevant; concert = very short; work = neutral,
         about the shift. It never changes the numbers, the limits or the safety advice.
         All sound levels from the watch are estimates; headphone levels are rough estimates.
-        Reply in ${if (language == "es") "Spanish" else "English"}.
+        "status" is shown alone on a glance screen: ONE short statement of at most 12 words, no question.
+        Reply in ${if (language == "es") "Latin American Spanish (say \"audífonos\" for headphones, \"oídos\" for ears, \"teléfono\" for phone)" else "English"}.
         Output ONLY a json object with exactly these keys and limits:
-        {"status": "<=60 chars, live status line", "insight": "<=140 chars", "why": "<=120 chars, may be empty",
+        {"status": "<=60 chars and <=12 words, live status line", "insight": "<=140 chars", "why": "<=120 chars, may be empty",
          "suggestion": "<=80 chars", "chips": ["<=20 chars", "up to 3 follow-up questions"]}
-        Example json: {"status":"Quiet morning so far","insight":"You are at 12% of today's sound allowance.",
+        Example json: {"status":"Quiet morning so far","insight":"You are at 12% of today's limit.",
         "why":"","suggestion":"Keep the volume where it is.","chips":["My week?","Why estimated?"]}
     """.trimIndent()
 
