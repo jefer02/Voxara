@@ -8,7 +8,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.voxara.ai.CoachUi
+import com.example.voxara.core.headphones.OutputKind
+import com.example.voxara.link.LinkHealth
 import com.example.voxara.link.LinkState
+import com.example.voxara.phone.listening.PhoneAlerts
+import com.example.voxara.phone.listening.PhoneListeningRuntime
+import com.example.voxara.phone.listening.PhoneListeningService
+import com.example.voxara.phone.listening.WatchBridge
 import com.example.voxara.phone.data.PhoneStoreState
 import com.example.voxara.core.ai.CoachTask
 import com.example.voxara.core.ai.SymptomGuard
@@ -49,6 +55,7 @@ sealed interface PhoneEvent {
     data object OpenWearableApp : PhoneEvent
     data object RequestNotifications : PhoneEvent
     data object RequestBluetooth : PhoneEvent
+    data object OpenBatterySettings : PhoneEvent
     data class LanguageChanged(val language: LanguageChoice) : PhoneEvent
 }
 
@@ -88,7 +95,9 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             combine(store.flow, sync.link, sync.syncing, tono.ui, chat) { st, link, syncing, coach, turns ->
                 Sources(st, link, syncing, coach, turns)
-            }.combine(tick) { src, now -> src to now }
+            }.combine(PhoneListeningRuntime.live) { src, live -> src.copy(live = live) }
+                .combine(sync.health) { src, health -> src.copy(health = health) }
+                .combine(tick) { src, now -> src to now }
                 .combine(history) { (src, now), h -> Triple(src, now, h) }
                 .collect { (src, now, h) ->
                     val st = src.store
@@ -111,6 +120,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                             deletePending = st.deletePending,
                             accent = st.accent,
                             themeMode = st.themeMode,
+                            phoneLive = src.live,
+                            linkHealth = src.health,
                         )
                     }
                 }
@@ -133,9 +144,29 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        // The first time something connects over Bluetooth while the app is in front, ask for the optional
+        // Bluetooth permission in context (it tells a speaker or a car kit from headphones).
+        viewModelScope.launch {
+            PhoneListeningRuntime.live.collect { live ->
+                val kind = live.snapshot.route?.kind
+                val overBluetooth = kind == OutputKind.BLUETOOTH_A2DP || kind == OutputKind.BLE_HEADSET || kind == OutputKind.BLE_BROADCAST
+                if (foreground && overBluetooth && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    !_state.value.bluetoothGranted && !PhonePrefs.btAsked(ctx)
+                ) {
+                    PhonePrefs.setBtAsked(ctx, true)
+                    _events.tryEmit(PhoneEvent.RequestBluetooth)
+                }
+            }
+        }
+        // "Reconnecting" turns into "disconnected for ..." with time.
+        viewModelScope.launch { while (true) { delay(15_000); sync.tickHealth() } }
         refreshLocal()
         viewModelScope.launch { sync.sync(); askStatus() }
     }
+
+    @Volatile private var foreground = false
+
+    fun onPause() { foreground = false }
 
     private suspend fun reloadHistory() {
         val now = System.currentTimeMillis()
@@ -159,12 +190,20 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
                 lastListeningSentMs = PhonePrefs.lastSyncMs(ctx),
                 notificationsGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || granted(Manifest.permission.POST_NOTIFICATIONS),
                 bluetoothGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || granted(Manifest.permission.BLUETOOTH_CONNECT),
+                batteryRestricted = runCatching {
+                    !ctx.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName)
+                }.getOrDefault(false),
+                batteryHintDismissed = PhonePrefs.batteryHintDismissedAt(ctx).let { it > 0L && System.currentTimeMillis() - it < BATTERY_HINT_QUIET_MS },
+                pendingSpans = WatchBridge.pendingSpans(ctx),
             )
         }
     }
 
     /** Back in the foreground: refresh local state, and sync when the last one is not recent. */
     fun onResume() {
+        foreground = true
+        // In front is the moment Android lets the foreground service start: make sure the headphones are watched.
+        if (PhonePrefs.enabled(ctx)) PhoneListeningService.ensureRunning(ctx)
         refreshLocal()
         tick.value = System.currentTimeMillis()
         val last = _state.value.lastSyncMs ?: 0L
@@ -215,9 +254,15 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         onPhoneSampling = { on ->
             PhonePrefs.setEnabled(ctx, on)
             if (on) {
+                // The service is the detector (events); the periodic worker is only the safety net.
+                PhoneListeningService.ensureRunning(ctx)
                 ListeningSampler.schedule(ctx)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !_state.value.bluetoothGranted) _events.tryEmit(PhoneEvent.RequestBluetooth)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !_state.value.bluetoothGranted) {
+                    PhonePrefs.setBtAsked(ctx, true)
+                    _events.tryEmit(PhoneEvent.RequestBluetooth)
+                }
             } else {
+                PhoneListeningService.stop(ctx)
                 ListeningSampler.cancel(ctx)
             }
             refreshLocal()
@@ -238,6 +283,8 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         onExport = { _events.tryEmit(PhoneEvent.Export) },
         onDeleteAll = {
             viewModelScope.launch {
+                // First the listening still on its way to the watch, or "delete all" would bring it back.
+                withContext(Dispatchers.IO) { WatchBridge.discardPending(ctx) }
                 val r = sync.deleteAll()
                 chat.value = emptyList()
                 _events.tryEmit(
@@ -257,6 +304,13 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         // Appearance: stored on the phone only; the widget is re-rendered in the new colours.
         onAccent = { a -> viewModelScope.launch { store.setAccent(a); runCatching { DoseWidget.refresh(ctx) } } },
         onThemeMode = { m -> viewModelScope.launch { store.setThemeMode(m); runCatching { DoseWidget.refresh(ctx) } } },
+        onDismissHeadphoneAlert = {
+            PhoneAlerts.cancelNotification(ctx)
+            PhoneListeningRuntime.dismissAlert()
+        },
+        onLowerHeadphones = { viewModelScope.launch { PhoneListeningService.lower(ctx) } },
+        onOpenBatterySettings = { _events.tryEmit(PhoneEvent.OpenBatterySettings) },
+        onDismissBatteryHint = { PhonePrefs.setBatteryHintDismissedAt(ctx, System.currentTimeMillis()); refreshLocal() },
     )
 
     private fun open(uri: String) {
@@ -275,5 +329,12 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
         val syncing: Boolean,
         val coach: CoachUi,
         val chat: List<ChatTurn>,
+        val live: PhoneListeningRuntime.Live = PhoneListeningRuntime.Live(),
+        val health: LinkHealth = LinkHealth.Unknown,
     )
+
+    private companion object {
+        /** A dismissed battery hint stays away this long, then comes back if the app is still restricted. */
+        const val BATTERY_HINT_QUIET_MS = 7L * 24 * 60 * 60_000
+    }
 }
