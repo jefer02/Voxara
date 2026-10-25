@@ -5,88 +5,43 @@
 
     <!-- Unidades y metadatos compartidos. Solo mayúsculas. -->
     <string name="unit_dba">dBA</string>
-    <string name="unit_dbc_value">%1$d dBC</string>
     <string name="label_dose">Dosis</string>
-    <string name="no_dose_accruing">SIN ACUMULAR DOSIS</string>
-    <string name="headroom_left">QUEDAN %1$s</string>
     <string name="headroom_suffix">%1$s de margen</string>
-    <string name="limit_reached">LÍMITE ALCANZADO</string>
-    <string name="dose_percent">%1$d%% DE DOSIS</string>
     <string name="bench_source">Fuente simulada</string>
     <string name="value_none">—</string>
 
     <!-- Medidor en vivo -->
-    <string name="daily_limit_reached">LÍMITE DIARIO ALCANZADO</string>
-    <string name="dba_and_dose">dBA · %1$d%% DE DOSIS</string>
-    <string name="protect_or_leave">PROTÉGETE O SAL</string>
-    <string name="cd_live">%1$d decibelios, %2$s, %3$d por ciento de la dosis de hoy consumida</string>
-    <string name="cd_breach">Límite diario alcanzado. Protege tus oídos o sal del lugar.</string>
 
     <!-- Registro del día -->
-    <string name="day_today">HOY</string>
-    <string name="day_yesterday">AYER</string>
-    <string name="day_n_ago">HACE %1$d DÍAS</string>
-    <string name="twa_8h">TWA 8H</string>
-    <string name="no_dose_logged">Sin dosis registrada</string>
-    <string name="niosh_twa">NIOSH %1$s</string>
-    <string name="cd_day">%1$s, promedio ponderado en el tiempo %2$d decibelios, %3$d por ciento de dosis</string>
+    <string name="no_dose_logged">Aún sin mediciones</string>
 
     <!-- Modo concierto -->
-    <string name="concert_title">CONCIERTO / CLUB</string>
-    <string name="concert_blurb">Muestreo continuo, con tope de 6 horas. Vuelve a Urbano tras 20 minutos en silencio.</string>
-    <string name="action_start">Iniciar</string>
     <string name="action_stop">Detener</string>
-    <string name="cd_concert_on">Modo concierto. %1$d decibelios, quedan %2$s.</string>
-    <string name="cd_concert_off">Modo concierto desactivado</string>
 
     <!-- Voz -->
     <string name="voice_listening">Escuchando</string>
-    <string name="voice_thinking">PENSANDO</string>
-    <string name="voice_no_asr">SIN RECONOCIMIENTO LOCAL</string>
-    <string name="voice_ask_title">PREGUNTA A VOXARA</string>
-    <string name="voice_example">«¿Es seguro aquí dentro?»</string>
     <string name="voice_quoted">«%1$s»</string>
-    <string name="action_ask">PREGUNTAR</string>
-    <string name="cd_voice_idle">Modo de voz. Toca para preguntar.</string>
 
     <!-- Modos y ajustes -->
-    <string name="modes_title">MODOS</string>
-    <string name="mode_concert_index">MODO 01</string>
-    <string name="mode_urban_index">MODO 02 · POR DEFECTO</string>
-    <string name="mode_voice_index">MODO 03</string>
-    <string name="mode_concert_title">CONCIERTO / CLUB</string>
-    <string name="mode_urban_title">ENFOQUE / URBANO</string>
-    <string name="mode_voice_title">VOZ / IA</string>
-    <string name="mode_concert_blurb">Continuo, tope de 6 h. Cuenta atrás, no porcentaje.</string>
-    <string name="mode_urban_blurb">Ciclo adaptativo del 1,7 al 20%%. En silencio hasta 80 dBA.</string>
-    <string name="mode_voice_blurb">Una frase, hablada y escrita. Solo el micro del reloj.</string>
 
     <string name="monitoring">Monitoreo</string>
     <string name="on">Activo</string>
     <string name="off">Inactivo</string>
-    <string name="calibration_offset">AJUSTE DE CALIBRACIÓN</string>
     <string name="calibration_value">%1$+.1f dB</string>
-    <string name="calibration_note">Ajuste fino sobre el desfase del micrófono. Indicativo, no médico: espera ±3–5 dB.</string>
-    <string name="decrease">−</string>
-    <string name="increase">+</string>
-    <string name="daily_dose">DOSIS DIARIA</string>
-    <string name="who_week">SEMANA OMS</string>
-    <string name="peak">PICO</string>
-    <string name="reset_dose">Reiniciar dosis</string>
-    <string name="disclaimer">Medición indicativa, no es un dispositivo médico. El audio nunca sale del reloj.</string>
+    <string name="calibration_note">Ajuste fino sobre la calibración del micrófono. Margen: ±3–5 dB.</string>
+    <string name="disclaimer">Solo una estimación. No es un dispositivo médico.</string>
 
     <!-- Idioma -->
     <string name="language">Idioma</string>
     <string name="language_system">Sistema</string>
     <string name="language_english">English</string>
     <string name="language_spanish">Español</string>
-    <string name="language_note">La interfaz, las respuestas habladas y los comandos de voz siguen este ajuste.</string>
 
     <!-- Estados de riesgo. El color nunca informa solo: estas palabras siempre lo acompañan. -->
-    <string name="risk_calm">Seguro</string>
-    <string name="risk_accruing">Elevado</string>
-    <string name="risk_hazard">Alto</string>
-    <string name="risk_critical">Crítico</string>
+    <string name="risk_calm">Bien</string>
+    <string name="risk_accruing">Moderado</string>
+    <string name="risk_hazard">Fuerte</string>
+    <string name="risk_critical">Peligroso</string>
     <string name="risk_recover">Recuperando</string>
 
     <!-- Escenas clasificadas -->
@@ -112,17 +67,17 @@
     <string name="scenario_cafe">Café</string>
     <string name="scenario_traffic">Tráfico</string>
     <string name="scenario_club">Club</string>
-    <string name="scenario_jackhammer">Martillo</string>
+    <string name="scenario_jackhammer">Martillo neumático</string>
 
     <!-- Notificación persistente -->
-    <string name="notification_content">%1$d dBA · %2$d%% de dosis</string>
+    <string name="notification_content">%1$d dBA · %2$d%% del límite de hoy</string>
 
     <!-- Tarjeta -->
     <string name="tile_todays_dose">Dosis de hoy</string>
     <string name="tile_dose_value">%1$d%%</string>
 
     <!-- Complicación -->
-    <string name="complication_cd">%1$d por ciento de la dosis de ruido de hoy consumida</string>
+    <string name="complication_cd">%1$d por ciento del límite de hoy usado</string>
 
     <!--
         GRAMÁTICA DE CONSEJOS: primero el hecho, luego una sola acción. Nunca más de una
@@ -130,10 +85,10 @@
     -->
     <string name="advice_fine">Todo bien. Hoy no tienes que hacer nada.</string>
     <string name="advice_comfortable">Nivel cómodo. Nada que hacer.</string>
-    <string name="advice_critical_music">Límite diario alcanzado. Ponte tapones o sal fuera.</string>
+    <string name="advice_critical_music">Límite diario alcanzado. Ponte tapones o sal un rato.</string>
     <string name="advice_critical_machinery">Límite diario alcanzado. Ponte protección ahora.</string>
     <string name="advice_critical_generic">Límite diario alcanzado. Sal o protege tus oídos.</string>
-    <string name="advice_hazard_music">Quedan %1$s. Aléjate de los altavoces.</string>
+    <string name="advice_hazard_music">Quedan %1$s. Aléjate de los parlantes.</string>
     <string name="advice_hazard_machinery">Quedan %1$s. Apártate o usa protección.</string>
     <string name="advice_hazard_transit">Quedan %1$s. Camina hasta el otro extremo del andén.</string>
     <string name="advice_hazard_traffic">Quedan %1$s. Cruza al lado más tranquilo.</string>
@@ -142,7 +97,7 @@
     <string name="advice_accruing_transit">Vagón ruidoso. Avanza un vagón.</string>
     <string name="advice_accruing_music">Llevas %1$d%%. Descansa entre canciones.</string>
     <string name="advice_accruing_machinery">La dosis corre. Ponte protección antes de la próxima hora.</string>
-    <string name="advice_accruing_generic">%1$d dBA, la dosis corre. Descansa pronto en silencio.</string>
+    <string name="advice_accruing_generic">%1$d dBA, la dosis corre. Tómate pronto un descanso en un lugar tranquilo.</string>
     <string name="advice_recover">Otra vez bajo el límite. Nada más que hacer.</string>
     <string name="advice_calm">Llevas %1$d%% hoy. Sigue así.</string>
 
@@ -168,21 +123,20 @@
     <string name="cal_progress_cd">Progreso de la medición de calibración</string>
     <string name="cal_title">Calibración</string>
     <string name="cal_status_calibrated">Calibrado (%1$s)</string>
-    <string name="cal_status_uncalibrated">Estimación sin calibrar</string>
-    <string name="cal_open">Calibrar</string>
-    <string name="cal_step_1">1. Apunta el micrófono del reloj hacia un sonido constante: un ventilador, una aspiradora o ruido constante de un altavoz.</string>
+    <string name="cal_status_uncalibrated">Sin calibrar</string>
+    <string name="cal_step_1">1. Apunta el reloj hacia un sonido constante: un ventilador, una aspiradora o ruido fijo de un parlante.</string>
     <string name="cal_step_2">2. Coloca el medidor de referencia a la misma distancia del sonido que el reloj.</string>
-    <string name="cal_step_3">3. Mantenlo moderado, nunca por encima de unos 85 dB. Quédate quieto mientras el reloj escucha 10 segundos.</string>
+    <string name="cal_step_3">3. Que sea moderado, nunca más de unos 85 dB. No muevas el reloj mientras escucha 10 segundos.</string>
     <string name="cal_reference_type">Referencia</string>
     <string name="cal_ref_meter">Sonómetro</string>
     <string name="cal_ref_phone">App del teléfono (aprox., ±3–5 dB)</string>
     <string name="cal_source_line">Ruta del micrófono: %1$s</string>
     <string name="cal_start">Empezar a medir</string>
-    <string name="cal_measuring">ESCUCHANDO · dBFS(A) BRUTO</string>
+    <string name="cal_measuring">Midiendo · dBFS(A) sin procesar</string>
     <string name="cal_hold_still">Mantén el sonido constante y el reloj quieto.</string>
-    <string name="cal_unsteady">El nivel no fue lo bastante estable. Usa un sonido constante, quédate quieto e inténtalo de nuevo.</string>
+    <string name="cal_unsteady">El nivel no fue estable. Usa un sonido constante, no muevas el reloj e inténtalo de nuevo.</string>
     <string name="cal_no_data">El micrófono no entregó suficientes lecturas. Revisa el permiso e inténtalo de nuevo.</string>
-    <string name="cal_measured_line">Crudo %1$.1f dBFS(A) · ajuste %2$+.1f dB</string>
+    <string name="cal_measured_line">Sin procesar %1$.1f dBFS(A) · desfase %2$+.1f dB</string>
     <string name="cal_enter_reference">¿Qué marca la referencia?</string>
     <string name="cal_reference_value">%1$.1f</string>
     <string name="cal_louder_than_advised">Es más fuerte de lo recomendado. Por tus oídos, calibra con sonidos de 85 dB o menos.</string>
@@ -192,23 +146,21 @@
     <string name="cal_confirm">Usar este valor</string>
     <string name="cal_measure_again">Medir de nuevo</string>
     <string name="cal_offset_value">%1$+.1f dB</string>
-    <string name="cal_offset_was">DESFASE · EL PROVISIONAL ERA %1$+.1f dB</string>
+    <string name="cal_offset_was">Desfase · antes %1$+.1f dB</string>
     <string name="cal_second_hint">Opcional: mide otra vez a un nivel claramente distinto (al menos 6 dB de diferencia) para comprobar la coherencia.</string>
     <string name="cal_save">Guardar calibración</string>
     <string name="cal_second">Segunda medición</string>
-    <string name="cal_two_offsets">DESFASES %1$+.1f / %2$+.1f dB</string>
+    <string name="cal_two_offsets">Desfases %1$+.1f / %2$+.1f dB</string>
     <string name="cal_levels_close">Los dos niveles están muy cerca; una diferencia mayor da una mejor comprobación.</string>
     <string name="cal_consistent">Coherente: los dos desfases difieren %1$.1f dB. Se guardará su promedio.</string>
     <string name="cal_inconsistent">Los dos desfases difieren %1$.1f dB (más de 3 dB). Comprueba que el medidor y el reloj estaban a la misma distancia y que el sonido era constante.</string>
     <string name="cal_save_average">Guardar el promedio igualmente</string>
     <string name="cal_start_over">Empezar de nuevo</string>
     <string name="cal_saved">Calibrado (%1$s).</string>
-    <string name="cal_saved_note">Guardado para esta ruta de micrófono en este reloj. Las lecturas siguen siendo orientativas, no médicas, y solo tan precisas como tu referencia.</string>
+    <string name="cal_saved_note">Guardado para este micrófono en este reloj. Sigue siendo una estimación, tan precisa como tu referencia.</string>
     <string name="paused_resume">Monitoreo en pausa · Reanudar</string>
-    <string name="keep_running_title">Mantener el monitoreo activo</string>
-    <string name="paused_body">El monitoreo se detuvo sin que lo apagaras. Puede que el reloj haya puesto Voxara en reposo.</string>
-    <string name="power_save_on">El ahorro de energía está activado. Limita las apps en segundo plano, así que el monitoreo puede pausarse.</string>
-    <string name="keep_running_body">Para que Voxara siga escuchando: deja desactivado el ahorro de energía del reloj mientras monitoreas. En tu teléfono, pon la batería de la app Galaxy Wearable en Sin restricciones (Ajustes &gt; Aplicaciones &gt; Galaxy Wearable &gt; Batería). Si el monitoreo se pausa, Voxara te avisa y un toque lo reanuda.</string>
+    <string name="power_save_on">El ahorro de energía está activado: el monitoreo puede pausarse.</string>
+    <string name="keep_running_body">Deja el ahorro de energía apagado mientras mide. En tu teléfono, pon la batería de Galaxy Wearable en Sin restricciones (Ajustes › Aplicaciones › Galaxy Wearable › Batería). Si el monitoreo se detiene, Voxara te avisa.</string>
     <string name="battery_settings">Optimización de batería</string>
     <string name="resume_text_paused">Voxara dejó de escuchar. Toca para reanudar el monitoreo de ruido.</string>
 
@@ -217,88 +169,73 @@
     <string name="alert_action_ack">Entendido</string>
     <string name="alert_action_snooze">Posponer 1 h</string>
     <string name="alert_action_snooze_min">Posponer %1$d min</string>
-    <string name="tono_enabled_on">Tono: activado</string>
-    <string name="tono_enabled_off">Tono: desactivado</string>
-    <string name="tono_enabled_note">Desactivado oculta a Tono en el reloj. Los comandos de voz siguen funcionando y las preguntas sobre síntomas reciben igualmente la respuesta segura.</string>
+    <string name="tono_enabled_note">Desactivado oculta a Tono. Los comandos de voz y la respuesta sobre síntomas siguen funcionando.</string>
     <string name="voice_title">Voz</string>
     <string name="alert_action_open">Abrir</string>
-    <string name="alert_ambient_loud_title">Mucho ruido a tu alrededor</string>
-    <string name="alert_ambient_loud_body">Unos %1$d dBA en los últimos minutos. Un lugar más tranquilo o protección auditiva ayudan.</string>
-    <string name="alert_daily_50_title">Usaste la mitad del sonido permitido hoy</string>
-    <string name="alert_daily_50_body">%1$d%% de la dosis de hoy. Planea un rato de calma.</string>
-    <string name="alert_daily_80_title">Usaste el 80%% de lo permitido hoy</string>
-    <string name="alert_daily_80_body">%1$d%% de la dosis de hoy. Un entorno más tranquilo la frena.</string>
-    <string name="alert_daily_100_title">Agotaste el sonido permitido hoy</string>
-    <string name="alert_daily_100_body">%1$d%% de la dosis de hoy. Protege tus oídos o ve a un lugar más tranquilo.</string>
-    <string name="alert_week_80_title">80%% de lo permitido esta semana</string>
-    <string name="alert_week_80_body">Últimos 7 días: %1$d%% de lo permitido por semana. Los días tranquilos lo recuperan.</string>
-    <string name="alert_week_100_title">Agotaste el sonido permitido esta semana</string>
-    <string name="alert_week_100_body">Últimos 7 días: %1$d%% de lo permitido por semana. Dale a tus oídos un tiempo tranquilo.</string>
-    <string name="alert_hp_week_80_title">80%% de la escucha permitida esta semana</string>
-    <string name="alert_hp_week_80_body">Estimado: %1$d%% de lo permitido por semana con auriculares (últimos 7 días). Bajar el volumen ayuda.</string>
-    <string name="alert_hp_week_100_title">Agotaste la escucha permitida esta semana</string>
-    <string name="alert_hp_week_100_body">Estimado: %1$d%% de lo permitido por semana con auriculares. Considera bajar el volumen o descansar.</string>
+    <string name="alert_ambient_loud_title">Mucho ruido alrededor</string>
+    <string name="alert_ambient_loud_body">Unos %1$d dBA desde hace unos minutos: busca un lugar tranquilo o protege tus oídos.</string>
+    <string name="alert_daily_50_title">50 %% del límite diario</string>
+    <string name="alert_daily_50_body">Llevas %1$d%%: planea un rato de calma.</string>
+    <string name="alert_daily_80_title">80 %% del límite diario</string>
+    <string name="alert_daily_80_body">Llevas %1$d%%: un lugar más tranquilo lo frena.</string>
+    <string name="alert_daily_100_title">Límite de hoy alcanzado</string>
+    <string name="alert_daily_100_body">%1$d%%: protege tus oídos o busca un lugar más tranquilo.</string>
+    <string name="alert_week_80_title">80 %% del límite semanal</string>
+    <string name="alert_week_80_body">Últimos 7 días: %1$d%%; los días tranquilos lo bajan.</string>
+    <string name="alert_week_100_title">Límite semanal alcanzado</string>
+    <string name="alert_week_100_body">Últimos 7 días: %1$d%%; dales a tus oídos un tiempo tranquilo.</string>
+    <string name="alert_hp_week_80_title">Escucha semanal al 80 %%</string>
+    <string name="alert_hp_week_80_body">Estimado: %1$d%% en 7 días; bajar el volumen ayuda.</string>
+    <string name="alert_hp_week_100_title">Límite semanal de escucha</string>
+    <string name="alert_hp_week_100_body">Estimado: %1$d%%; baja el volumen o descansa.</string>
     <string name="alert_hp_loud_title">Escucha muy fuerte</string>
-    <string name="alert_hp_loud_body">Estimado: unos %1$d dBA en los últimos minutos. Bajar el volumen ayuda.</string>
+    <string name="alert_hp_loud_body">Unos %1$d dBA (estimado) desde hace unos minutos; baja el volumen.</string>
     <string name="alerts_title">Alertas</string>
     <string name="alerts_threshold_value">%1$d dBA</string>
-    <string name="alerts_threshold_note">Avisar cuando el promedio de %1$d minutos llegue a este nivel (80–95). Las alertas de límite diario y semanal siempre suenan.</string>
-    <string name="sensitive_on">Oyente sensible: Sí</string>
-    <string name="sensitive_off">Oyente sensible: No</string>
-    <string name="sensitive_note">Usa el límite semanal más estricto de la OMS (75 dBA durante 40 h) para el presupuesto semanal.</string>
-    <string name="quiet_on">Horas de silencio %1$s–%2$s: Sí</string>
-    <string name="quiet_off">Horas de silencio %1$s–%2$s: No</string>
+    <string name="alerts_threshold_note">Avisa cuando el promedio de %1$d minutos llega a este nivel. Las alertas de límite siempre llegan.</string>
+    <string name="sensitive_note">Usa el límite semanal más estricto de la OMS (75 dBA durante 40 h).</string>
     <string name="quiet_start">Desde</string>
     <string name="quiet_end">Hasta</string>
-    <string name="quiet_note">En horas de silencio solo esperan las alertas menores. Las alertas de límite siempre llegan.</string>
-    <string name="day_measured">Medido %1$s</string>
+    <string name="quiet_note">En horas de silencio solo esperan las alertas menores; las de límite siempre llegan.</string>
 
     <!-- Fase 1: etiqueta de pausa -->
     <string name="paused_label">Monitoreo en pausa</string>
 
-    <!-- Fase 2: seguridad con auriculares -->
-    <string name="hp_not_connected">No hay auriculares conectados a este reloj.</string>
+    <!-- Fase 2: seguridad con audífonos -->
+    <string name="hp_not_connected">No hay audífonos conectados a este reloj.</string>
     <string name="hp_connected">%1$s conectados · sin reproducir</string>
     <string name="hp_listening">Escuchando con %1$s</string>
-    <string name="hp_cat_earbuds">auriculares intraurales</string>
-    <string name="hp_cat_over_ear">auriculares de diadema</string>
-    <string name="hp_cat_wired">auriculares con cable</string>
-    <string name="hp_cat_unknown">auriculares</string>
-    <string name="hp_estimated_low">Estimado · confianza baja · %1$d–%2$d dBA</string>
-    <string name="hp_estimated_very_low">Estimado · confianza muy baja · %1$d–%2$d dBA</string>
-    <string name="hp_week_value">%1$d%%</string>
+    <string name="hp_cat_earbuds">audífonos intraurales</string>
+    <string name="hp_cat_over_ear">audífonos de diadema</string>
+    <string name="hp_cat_wired">audífonos con cable</string>
+    <string name="hp_cat_unknown">audífonos</string>
+    <string name="hp_estimated_low">Podría ser %1$d–%2$d dBA</string>
+    <string name="hp_estimated_very_low">Muy aproximado: %1$d–%2$d dBA</string>
     <string name="hp_time_left">Quedan unas %1$s esta semana a este volumen.</string>
-    <string name="hp_time_left_none">Agotaste la escucha permitida esta semana a este volumen.</string>
-    <string name="hp_week_history">Últimos 7 días</string>
-    <string name="hp_week_history_note">Parte de lo permitido por semana</string>
+    <string name="hp_time_left_none">Llegaste al límite de escucha semanal a este volumen.</string>
+    <string name="hp_week_history_note">Parte del límite semanal</string>
     <string name="hp_allow_bluetooth">Permitir detalles Bluetooth</string>
-    <string name="hp_bluetooth_note">Permite a Voxara distinguir auriculares de un altavoz Bluetooth o del coche. Solo se usa el tipo; no se guardan nombres ni direcciones.</string>
+    <string name="hp_bluetooth_note">Distingue audífonos de un parlante o del auto. Solo se usa el tipo; no se guardan nombres ni direcciones.</string>
     <string name="hp_why">¿Por qué estimado?</string>
     <string name="hp_why_hide">Ocultar explicación</string>
-    <string name="hp_why_body">Voxara no puede medir el sonido dentro de tu oído. Estima el nivel a partir del volumen, suponiendo que los auriculares llegan a unos 100 dBA al máximo (el límite de la UE para reproductores). Los auriculares y la música reales varían 10 dB o más. Nunca se usa el micrófono para esto y no se leen ni guardan nombres de canciones, apps ni dispositivos.</string>
-    <string name="hp_chip_listening">AURICULARES ≈%1$d dBA EST.</string>
-    <string name="hp_chip_connected">AURICULARES CONECTADOS</string>
-    <string name="hp_settings_title">Mis auriculares suelen ser</string>
+    <string name="hp_why_body">Voxara no puede medir el sonido dentro de tu oído. Estima el nivel a partir del volumen, suponiendo que los audífonos llegan a unos 100 dBA al máximo (el límite de la UE para reproductores). Los audífonos y la música reales varían 10 dB o más. Nunca se usa el micrófono para esto y no se leen ni guardan nombres de canciones, apps ni dispositivos.</string>
+    <string name="hp_settings_title">Mis audífonos suelen ser</string>
     <string name="hp_usual_not_set">Sin definir</string>
-    <string name="hp_loud_note">Alerta de escucha muy fuerte: cuando el nivel estimado de %1$d minutos llegue a este valor (95–105).</string>
-    <string name="cd_headphones">%1$s. %2$d por ciento de la escucha estimada permitida esta semana.</string>
+    <string name="hp_loud_note">Avisa cuando el nivel estimado de %1$d minutos llega a este valor.</string>
     <string name="tile_listening_label">Escucha</string>
     <string name="tile_listening_title">Escucha · semana</string>
     <string name="tile_listening_sub">Estimado</string>
     <string name="complication_listening_label">Escucha esta semana</string>
     <string name="complication_listening_title">Escucha</string>
-    <string name="complication_listening_cd">Estimado %1$d por ciento de la escucha permitida esta semana</string>
+    <string name="complication_listening_cd">Estimado %1$d por ciento del límite de escucha de esta semana</string>
 
     <!-- Fase 4: Tono, el asistente -->
     <string name="ai_name">Tono</string>
     <string name="tono_settings_title">Tono · asistente IA</string>
-    <string name="tono_consent_on">IA en la nube: Sí</string>
-    <string name="tono_consent_off">IA en la nube: No</string>
-    <string name="tono_consent_body">Con la IA en la nube activada, %1$s envía solo números al servicio de IA: porcentajes de dosis, dBA redondeados, minutos, franjas del día aproximadas y el tipo de auricular. Nunca audio, nombres de canciones o apps, ubicación ni nada que te identifique. Desactivada: %1$s usa respuestas integradas y funciona sin conexión.</string>
+    <string name="tono_consent_body">Con la IA en la nube activada, %1$s envía solo números al servicio de IA: porcentajes de dosis, dBA redondeados, minutos, franjas del día aproximadas y el tipo de audífono. Nunca audio, nombres de canciones o apps, ubicación ni nada que te identifique. Desactivada: %1$s usa respuestas integradas y funciona sin conexión.</string>
     <string name="tono_consent_unavailable">La IA en la nube no está disponible en esta versión. %1$s usa respuestas integradas.</string>
-    <string name="tono_ask">Preguntar a %1$s por hoy</string>
     <string name="tono_source_ai">IA en la nube</string>
-    <string name="tono_source_offline">Integrada</string>
+    <string name="tono_source_offline">Sin IA</string>
     <string name="tono_source_safety">Seguridad</string>
     <string name="tono_cloud_failed">La IA en la nube no respondió; se muestra la respuesta integrada.</string>
     <string name="tono_loading">%1$s está pensando…</string>
@@ -313,41 +250,37 @@
     <string name="ask_today">¿Cómo va el día?</string>
     <string name="card_now_none">Aún sin lectura</string>
     <string name="card_settings">Ajustes</string>
-    <string name="card_settings_value">Alertas, calibración, Tono</string>
     <string name="cd_hours">Niveles por hora hoy. Horas fuertes: %1$d.</string>
-    <string name="cd_now">%1$d dBA, %2$s. %3$d por ciento de lo permitido hoy.</string>
-    <string name="cd_today">%1$d por ciento de lo permitido hoy, %2$s</string>
-    <string name="cd_week">Alrededor %1$d por ciento, auriculares %2$d por ciento de lo permitido esta semana</string>
-    <string name="cd_week_bars">Parte diaria de lo permitido por semana en los últimos 7 días. Hoy: %1$d por ciento.</string>
-    <string name="concert_off_note">Para eventos ruidosos: mide sin parar hasta 6 horas y se apaga solo cuando hay calma.</string>
+    <string name="cd_now">%1$d dBA, %2$s. %3$d por ciento del límite de hoy.</string>
+    <string name="cd_today">%1$d por ciento del límite de hoy, %2$s</string>
+    <string name="cd_week">Entorno %1$d por ciento, audífonos %2$d por ciento del límite semanal</string>
+    <string name="cd_week_bars">Parte diaria del límite semanal en los últimos 7 días. Hoy: %1$d por ciento.</string>
     <string name="concert_on_note">Midiendo sin parar. Usa más batería; se detiene solo tras 6 horas o 20 minutos de calma.</string>
-    <string name="concert_start">Iniciar modo concierto</string>
-    <string name="concert_stop">Detener modo concierto</string>
     <string name="day_measured_plain">Medido %1$s hoy</string>
     <string name="decrease_cd">Reducir</string>
-    <string name="home_ask">Pregunta a %1$s</string>
+    <string name="home_ask">Preguntar a %1$s</string>
     <string name="home_source_ai">Redactado por IA en la nube</string>
-    <string name="home_status_fallback">Cuidando de tus oídos</string>
+    <string name="home_status_fallback">Cuidando tus oídos</string>
     <string name="hp_cat_earbuds_title">Intraurales</string>
     <string name="hp_cat_over_ear_title">De diadema</string>
-    <string name="hp_empty">Conecta auriculares a este reloj para ver aquí una estimación.</string>
+    <string name="hp_empty">Conecta audífonos a este reloj para ver aquí una estimación.</string>
     <string name="hp_phone_title">Escucha en el teléfono</string>
-    <string name="hp_phone_value">Añádela con la app acompañante de Voxara</string>
+    <string name="hp_phone_value">Requiere la app del teléfono</string>
     <string name="increase_cd">Aumentar</string>
     <string name="keep_running_title_plain">Mantener el monitoreo activo</string>
-    <string name="now_foot_idle">No suma · %1$d%% hoy</string>
-    <string name="now_accruing">Quedan %1$s · %2$d%% hoy</string>
-    <string name="now_not_accruing">No suma dosis · %1$d%% hoy</string>
-    <string name="onb_alert_body">Voxara te avisa con una vibración cuando el promedio de los últimos %1$d minutos llega a este nivel. Puedes cambiarlo cuando quieras.</string>
+    <string name="now_foot_idle">%1$d%% del límite de hoy</string>
+    <string name="now_accruing">Quedan %1$s a este nivel · %2$d%% del límite de hoy</string>
+    <string name="now_not_accruing">Bajo 80 dBA: no suma al límite de hoy</string>
+    <string name="onb_alert_body">Voxara vibra cuando el promedio de los últimos %1$d minutos llega a este nivel. Puedes cambiarlo cuando quieras.</string>
     <string name="onb_alert_option">%1$d dBA</string>
     <string name="onb_alert_option_default">%1$d dBA (recomendado)</string>
     <string name="onb_alert_title">¿Cuándo debe avisarte Voxara?</string>
     <string name="onb_allow_mic">Permitir micrófono</string>
     <string name="onb_allow_notifications">Permitir notificaciones</string>
     <string name="onb_back">Atrás</string>
-    <string name="onb_bt_reason">Opcional: los detalles Bluetooth permiten distinguir auriculares de un altavoz. Solo se usa el tipo.</string>
+    <string name="onb_bt_reason">Opcional: los detalles Bluetooth permiten distinguir audífonos de un parlante. Solo se usa el tipo.</string>
     <string name="onb_calibrate_later">Consejo: calibra más tarde en Ajustes con cualquier medidor de referencia para mejores números.</string>
-    <string name="onb_estimates_body">El micrófono de un reloj da una estimación, no una medición certificada (a menudo con unos dB de diferencia). Voxara no es un dispositivo médico. Puedes calibrarlo después con un medidor de referencia.</string>
+    <string name="onb_estimates_body">El micrófono del reloj da una estimación, a menudo con unos dB de diferencia. Voxara no es un dispositivo médico; puedes calibrarlo después.</string>
     <string name="onb_estimates_title">Estimaciones, no diagnósticos</string>
     <string name="onb_granted">Permitido</string>
     <string name="onb_mic_reason">El micrófono mide cuánto ruido hay a tu alrededor, segundo a segundo. No se graba ni se guarda nada.</string>
@@ -355,26 +288,23 @@
     <string name="onb_next">Siguiente</string>
     <string name="onb_notif_reason">Las notificaciones permiten que las alertas te lleguen con una breve explicación.</string>
     <string name="onb_permissions_title">Dos permisos</string>
-    <string name="onb_privacy_body">Voxara mide NIVELES de sonido en tu reloj. Nunca graba, guarda ni envía audio. Solo guarda números, en tu reloj.</string>
+    <string name="onb_privacy_body">Voxara mide niveles de sonido en tu reloj. Nunca graba, guarda ni envía audio.</string>
     <string name="onb_privacy_title">Niveles, nunca grabaciones</string>
     <string name="onb_progress">%1$d / %2$d</string>
     <string name="onb_start">Empezar</string>
-    <string name="onb_tono_no">Ahora no (funciona sin conexión)</string>
+    <string name="onb_tono_no">Ahora no</string>
     <string name="onb_tono_title">¿Permitir que %1$s use IA en la nube?</string>
     <string name="onb_tono_yes">Sí, activar IA en la nube</string>
-    <string name="onb_welcome_body">Voxara vigila el sonido a tu alrededor y en tus auriculares, y %1$s te ayuda a entenderlo.</string>
+    <string name="onb_welcome_body">Voxara vigila el sonido a tu alrededor y en tus audífonos; %1$s te ayuda a entenderlo.</string>
     <string name="onb_welcome_title">Cuida tu audición</string>
     <string name="reset_dose_body">Esto borra las mediciones de hoy a tu alrededor. Úsalo solo ante una medición errónea.</string>
     <string name="reset_dose_title">Reiniciar la dosis de hoy</string>
-    <string name="score_explain">La puntuación empieza en 100 y baja cuando tu carga sonora semanal pasa de la mitad, y por cada día sobre el límite diario. Trata de hábitos, no es una prueba auditiva ni un diagnóstico.</string>
-    <string name="score_sub">Hábitos de escucha, no una prueba auditiva</string>
-    <string name="score_title">Puntuación de cuidado auditivo</string>
     <string name="set_advanced">Avanzado</string>
     <string name="set_alert_level">Nivel de alerta</string>
-    <string name="set_fine_trim">AJUSTE FINO (dB)</string>
+    <string name="set_fine_trim">Ajuste fino (dB)</string>
     <string name="set_licenses">Plus Jakarta Sans © The Plus Jakarta Sans Project Authors y JetBrains Mono © The JetBrains Mono Project Authors, SIL Open Font License 1.1.</string>
     <string name="set_privacy">Privacidad</string>
-    <string name="set_privacy_body">Guardado solo en este reloj: niveles de sonido por minuto (35 días), tus ajustes y la calibración. Nunca audio, nombres de canciones o apps, nombres de dispositivos ni ubicación.</string>
+    <string name="set_privacy_body">Guardado solo en este reloj: niveles de sonido por minuto (35 días), tus ajustes, la calibración y las salidas que marcaste como parlante (como un código). Nunca audio, nombres de canciones o apps, nombres de dispositivos ni ubicación.</string>
     <string name="set_start_monitoring">Iniciar monitoreo</string>
     <string name="set_stop_monitoring">Detener monitoreo</string>
     <string name="set_very_loud">Escucha muy fuerte</string>
@@ -383,9 +313,8 @@
     <string name="uncalibrated_short">Estimación sin calibrar</string>
     <string name="week_ask_summary">Resumen semanal de %1$s</string>
     <string name="week_pace">A este ritmo llegarías al límite semanal en unos %1$d días.</string>
-    <string name="week_pace_none">A este ritmo te mantienes dentro de lo permitido esta semana.</string>
-    <string name="week_ring_sub">últimos 7 días</string>
-    <string name="week_streak">Días seguidos dentro del límite diario: %1$d</string>
+    <string name="week_pace_none">A este ritmo no llegarás al límite semanal.</string>
+    <string name="week_streak">%1$d días seguidos dentro de tu límite diario</string>
 
     <!-- Fase 6: tarjetas -->
     <string name="tile_updated">Actualizado %1$s</string>
@@ -398,55 +327,94 @@
     <string name="mode_chip">Modo: %1$s</string>
     <string name="mode_auto_value">Auto · %1$s</string>
     <string name="mode_auto_detected">Detectado por el sonido a tu alrededor: %1$s.</string>
-    <string name="mode_auto_listening">Escuchando: %1$s hasta que Voxara esté seguro.</string>
-    <string name="mode_auto_unavailable">La detección automática no está disponible en esta versión, así que Auto usa Calle. Sí cambia a Concierto con música en directo muy alta.</string>
-    <string name="mode_auto_concert_note">Concierto detectado: los avisos vibran dos veces y no tienen tope. Termina tras 20 minutos de calma.</string>
+    <string name="mode_auto_listening">Por ahora %1$s, hasta que Voxara esté seguro.</string>
+    <string name="mode_auto_unavailable">La detección automática no está disponible en esta versión, así que Auto usa Calle. Sí cambia a Concierto con música en vivo muy alta.</string>
+    <string name="mode_auto_concert_note">Concierto detectado: las alertas vibran dos veces y no tienen tope. Termina tras 20 minutos de calma.</string>
     <string name="page_dose">Dosis</string>
     <string name="page_now">Ahora</string>
     <string name="page_today">Hoy</string>
     <string name="page_week">Semana</string>
-    <string name="page_headphones">Auriculares</string>
+    <string name="page_headphones">Audífonos</string>
     <string name="page_more">Más</string>
     <string name="page_cd">Página %1$d de %2$d, %3$s</string>
-    <string name="allowance_caption">de lo permitido</string>
-    <string name="home_today_caption">%1$d%% de hoy</string>
-    <string name="week_breakdown">Entorno %1$d%% · Auriculares %2$d%%</string>
+    <string name="allowance_caption">del límite de hoy</string>
+    <string name="home_today_caption">%1$d%% del límite de hoy</string>
+    <string name="week_breakdown">Entorno %1$d%% · Audífonos %2$d%%</string>
     <string name="scene_label">Entorno</string>
     <string name="estimated_word">estimado</string>
     <string name="hp_week_share_caption">de tu límite semanal de escucha</string>
-    <string name="week_caption">de tu límite semanal</string>
+    <string name="week_caption">del límite semanal</string>
     <string name="cd_week_days">Últimos 7 días, del más antiguo al más reciente. %1$s</string>
     <string name="cd_week_day">%1$s: %2$d%%</string>
     <string name="cd_week_today">hoy</string>
-    <!-- Modo auriculares: una capa de escucha sobre el modo de situación -->
-    <string name="hp_mode_title">Modo auriculares</string>
-    <string name="hp_mode_label">Modo auriculares</string>
-    <string name="hp_mode_chip_title">Auriculares</string>
+    <!-- Modo audífonos: una capa de escucha sobre el modo de situación -->
+    <string name="hp_mode_title">Modo audífonos</string>
+    <string name="hp_mode_label">Modo audífonos</string>
+    <string name="hp_mode_chip_title">Audífonos</string>
     <string name="hp_mode_src_auto">Auto</string>
-    <string name="hp_mode_src_auto_phone">Auto · del móvil</string>
-    <string name="hp_mode_src_manual">Manual</string>
+    <string name="hp_mode_src_auto_phone">Desde el teléfono</string>
     <string name="hp_mode_on_fmt">Activo · %1$s</string>
-    <string name="hp_mode_off_fmt">Apagado · %1$s</string>
-    <string name="hp_mode_off">Apagado</string>
-    <string name="tile_headphones_on">Modo auriculares activo</string>
-    <string name="complication_headphones_cd">El modo auriculares está activo; el sonido a tu alrededor se sigue midiendo.</string>
-    <string name="hp_mode_turn_off">Apagar el modo auriculares</string>
-    <string name="hp_mode_choice_auto">Auto</string>
-    <string name="hp_mode_choice_on">Activado</string>
-    <string name="hp_mode_choice_off">Apagado</string>
-    <string name="hp_mode_blurb_auto">Se activa solo cuando se detectan auriculares en este reloj o, si lo compartes, en tu móvil.</string>
-    <string name="hp_mode_blurb_on">Sigue activo hasta que lo cambies. Manda el nivel de escucha estimado.</string>
-    <string name="hp_mode_blurb_off">Nunca cambia solo. La escucha con auriculares se sigue estimando y guardando.</string>
-    <string name="hp_mode_status_watch">Auriculares detectados en este reloj.</string>
-    <string name="hp_mode_status_phone">Auriculares detectados en tu móvil. El aviso del móvil puede tardar unos minutos.</string>
-    <string name="hp_mode_status_none">No se detectan auriculares.</string>
-    <string name="hp_mode_rule">En modo auriculares el sonido a tu alrededor se sigue midiendo y guardando, y sus alertas siguen funcionando.</string>
-    <string name="hp_mode_announce_on">Modo auriculares activado, el sonido de fuera se sigue midiendo</string>
-    <string name="hp_mode_announce_off">Modo auriculares apagado</string>
-    <string name="hp_mode_outside_line">Fuera %1$d dBA · %2$d%% de hoy</string>
-    <string name="mode_plus_headphones">%1$s + Auriculares</string>
-    <string name="cd_home_headphones">Modo auriculares. Escucha estimada de unos %1$d dBA. Fuera %2$d dBA, %3$s. %4$d por ciento de lo permitido hoy.</string>
-    <string name="cd_home_headphones_idle">Modo auriculares. Nada sonando. %1$d por ciento de tu límite semanal de escucha. Fuera %2$d dBA, %3$s. %4$d por ciento de lo permitido hoy.</string>
-    <string name="notification_content_headphones">Modo auriculares · fuera %1$d dBA · %2$d%% de dosis</string>
-    <string name="menu_ask">Preguntar</string>
+    <string name="hp_mode_off">Inactivo</string>
+    <string name="tile_headphones_on">Modo audífonos activo</string>
+    <string name="complication_headphones_cd">El modo audífonos está activo; el sonido a tu alrededor se sigue midiendo.</string>
+    <string name="hp_mode_status_watch">Audífonos detectados en este reloj.</string>
+    <string name="hp_mode_status_phone">Audífonos detectados en tu teléfono (puede tardar unos minutos).</string>
+    <string name="hp_mode_status_none">No se detectan audífonos.</string>
+    <string name="hp_mode_rule">El sonido a tu alrededor se sigue midiendo y sus alertas siguen activas.</string>
+    <string name="hp_mode_announce_on">Modo audífonos activado; el sonido a tu alrededor se sigue midiendo</string>
+    <string name="hp_mode_announce_off">Modo audífonos inactivo</string>
+    <string name="hp_mode_outside_line">Entorno %1$d dBA · %2$d%% del límite de hoy</string>
+    <string name="mode_plus_headphones">%1$s + Audífonos</string>
+    <string name="cd_home_headphones">Modo audífonos. Escucha estimada de unos %1$d dBA. Entorno %2$d dBA, %3$s. %4$d por ciento del límite de hoy.</string>
+    <string name="cd_home_headphones_idle">Modo audífonos. Nada sonando. %1$d por ciento de tu límite semanal de escucha. Entorno %2$d dBA, %3$s. %4$d por ciento del límite de hoy.</string>
+    <string name="notification_content_headphones">Modo audífonos · entorno %1$d dBA · %2$d%% del límite de hoy</string>
+
+    <!-- Audífonos: totalmente automáticos, la alerta de volumen, bajar el volumen, el enlace con el teléfono -->
+    <string name="hp_mode_src_auto_speaker">Posible parlante</string>
+    <string name="hp_mode_auto_note">El modo audífonos se activa y desactiva solo, en este reloj o en tu teléfono.</string>
+    <string name="hp_possible_speaker_note">Podría ser un parlante. Si lo es, elige No son audífonos.</string>
+    <string name="alert_hp_safe_title">Volumen muy alto</string>
+    <string name="alert_hp_safe_body">Unos %1$d dBA (estimado); se recomienda 80 dBA o menos.</string>
+    <string name="alert_hp_safe_failed_title">El volumen no bajó</string>
+    <string name="hp_lower_action">Bajar volumen</string>
+    <string name="hp_dismiss_action">Entendido</string>
+    <string name="hp_lower_working">Bajando…</string>
+    <string name="hp_lower_lowered_db">Volumen bajado. Ahora unos %1$d dBA (estimado).</string>
+    <string name="hp_lower_lowered">Volumen bajado.</string>
+    <string name="hp_lower_already">Ya está en el volumen recomendado.</string>
+    <string name="hp_lower_fixed">Este dispositivo mantiene el volumen fijo. Bájalo en los audífonos.</string>
+    <string name="hp_lower_not_playing">No se está reproduciendo nada.</string>
+    <string name="hp_lower_unreachable">No se pudo contactar con tu teléfono. Baja el volumen allí.</string>
+    <string name="hp_lower_failed">No se pudo bajar el volumen.</string>
+    <string name="hp_alert_panel_title">Volumen muy alto</string>
+    <string name="hp_alert_level">≈ %1$d dBA</string>
+    <string name="hp_alert_body">Unos %1$d dBA según el volumen; se recomienda 80 dBA o menos.</string>
+    <string name="hp_alert_on_watch">Suena en este reloj</string>
+    <string name="hp_alert_on_phone">Suena en tu teléfono</string>
+    <string name="hp_listening_today">Escucha hoy: %1$s</string>
+    <string name="hp_listening_room_note">Una parte sonó más bajo que el entorno, así que cuenta como Entorno.</string>
+    <string name="link_connected">Conectado</string>
+    <string name="link_reconnecting">Reconectando…</string>
+    <string name="link_disconnected">Sin conexión desde hace %1$s</string>
+    <string name="link_unknown">Buscando tu teléfono…</string>
+
+    <string name="hp_possible_speaker_short">Posible parlante</string>
+    <string name="link_phone_label">Teléfono</string>
+
+    <!-- Pase de UX y textos: el anillo de Dosis explicado, "No son audífonos" -->
+    <string name="dose_help_title">Qué muestra el anillo</string>
+    <string name="dose_help_body">Se llena desde arriba, como las agujas del reloj, a medida que usas tu límite. Lleno significa límite alcanzado.</string>
+    <string name="hp_not_headphones">No son audífonos</string>
+    <string name="hp_exit_title">¿No son audífonos?</string>
+    <string name="hp_exit_body">Voxara no lo contará como audífonos hasta que se desconecte.</string>
+    <string name="hp_exit_ignore">Ignorar por ahora</string>
+    <string name="hp_exit_speaker">Es un parlante</string>
+    <string name="hp_exit_room_note">Las alertas del sonido a tu alrededor siguen activas.</string>
+    <string name="hp_speakers_count">Parlantes guardados: %1$d</string>
+    <string name="hp_forget_speakers">Olvidar parlantes</string>
+    <string name="set_quiet_hours">Horas de silencio</string>
+    <string name="set_quiet_hours_range">%1$s–%2$s</string>
+    <string name="set_sensitive">Oídos sensibles</string>
+    <string name="set_cloud_ai">IA en la nube</string>
+    <string name="alert_limit_short">Protege tus oídos.</string>
 </resources>

@@ -11,6 +11,7 @@ import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.Text
 import com.example.voxara.R
+import com.example.voxara.core.format.formatTimeOfDay
 import com.example.voxara.core.alerts.AlertDefaults
 import com.example.voxara.core.headphones.HeadphoneCategory
 import com.example.voxara.core.monitoring.MonitoringStatus
@@ -25,9 +26,9 @@ import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
 import com.example.voxara.ui.design.GroupLabel
 import com.example.voxara.ui.design.ScreenTitle
-import com.example.voxara.ui.design.ChoiceList
+import com.example.voxara.ui.design.SwitchRow
+import com.example.voxara.ui.design.choiceRows
 import com.example.voxara.ui.design.MetricCard
-import com.example.voxara.ui.design.Panel
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
 import com.example.voxara.ui.design.VColor
@@ -106,10 +107,10 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         }
         row { BodyText(stringResource(R.string.alerts_threshold_note, AlertDefaults.SUSTAINED_WINDOW_MIN)) }
         row {
-            PillButton(
-                label = stringResource(if (a.quietHoursEnabled) R.string.quiet_on else R.string.quiet_off, clock(a.quietStartMin), clock(a.quietEndMin)),
-                onClick = { actions.onAlertSettings(a.copy(quietHoursEnabled = !a.quietHoursEnabled)) },
-                style = if (a.quietHoursEnabled) PillStyle.PRIMARY else PillStyle.TONAL,
+            SwitchRow(
+                stringResource(R.string.set_quiet_hours), a.quietHoursEnabled,
+                { actions.onAlertSettings(a.copy(quietHoursEnabled = it)) },
+                secondary = stringResource(R.string.set_quiet_hours_range, clock(a.quietStartMin), clock(a.quietEndMin)),
             )
         }
         if (a.quietHoursEnabled) {
@@ -132,25 +133,19 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         }
         row { BodyText(stringResource(R.string.quiet_note)) }
         row {
-            PillButton(
-                label = stringResource(if (s.sensitiveListener) R.string.sensitive_on else R.string.sensitive_off),
-                onClick = { actions.onSensitive(!s.sensitiveListener) },
-                style = if (s.sensitiveListener) PillStyle.PRIMARY else PillStyle.TONAL,
-            )
+            SwitchRow(stringResource(R.string.set_sensitive), s.sensitiveListener, actions.onSensitive)
         }
         row { BodyText(stringResource(R.string.sensitive_note)) }
 
         // ------------------------------------------------------------------ headphones
         row { GroupLabel(stringResource(R.string.hp_settings_title)) }
-        row {
-            ChoiceList(
-                listOf<Pair<HeadphoneCategory?, String>>(
-                    HeadphoneCategory.EARBUDS to stringResource(R.string.hp_cat_earbuds_title),
-                    HeadphoneCategory.OVER_EAR to stringResource(R.string.hp_cat_over_ear_title),
-                    null to stringResource(R.string.hp_usual_not_set),
-                ),
-                selected = s.usualHeadphones,
-                onSelect = actions.onUsualHeadphones,
+        choiceRows(listOf(HeadphoneCategory.EARBUDS, HeadphoneCategory.OVER_EAR, null), s.usualHeadphones, actions.onUsualHeadphones) {
+            stringResource(
+                when (it) {
+                    HeadphoneCategory.EARBUDS -> R.string.hp_cat_earbuds_title
+                    HeadphoneCategory.OVER_EAR -> R.string.hp_cat_over_ear_title
+                    else -> R.string.hp_usual_not_set
+                }
             )
         }
         row {
@@ -167,22 +162,12 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         // ------------------------------------------------------------------ Tono
         row { GroupLabel(stringResource(R.string.tono_settings_title)) }
         row {
-            PillButton(
-                label = stringResource(if (s.tonoEnabled) R.string.tono_enabled_on else R.string.tono_enabled_off),
-                onClick = { actions.onTonoEnabled(!s.tonoEnabled) },
-                icon = VoxIcons.Ask,
-                style = if (s.tonoEnabled) PillStyle.PRIMARY else PillStyle.TONAL,
-            )
+            SwitchRow(stringResource(R.string.ai_name), s.tonoEnabled, actions.onTonoEnabled)
         }
         row { BodyText(stringResource(R.string.tono_enabled_note)) }
         if (env.cloudAvailable && s.tonoEnabled) {
             row {
-                PillButton(
-                    label = stringResource(if (s.aiConsent) R.string.tono_consent_on else R.string.tono_consent_off),
-                    onClick = { actions.onAiConsent(!s.aiConsent) },
-                    icon = VoxIcons.Sparkle,
-                    style = if (s.aiConsent) PillStyle.PRIMARY else PillStyle.TONAL,
-                )
+                SwitchRow(stringResource(R.string.set_cloud_ai), s.aiConsent, actions.onAiConsent)
             }
         }
         row { BodyText(stringResource(if (env.cloudAvailable) R.string.tono_consent_body else R.string.tono_consent_unavailable, name)) }
@@ -215,18 +200,13 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
 
         // ------------------------------------------------------------------ language
         row { GroupLabel(stringResource(R.string.language)) }
-        row {
-            ChoiceList(
-                AppLanguage.entries.map { it to stringResource(it.labelRes()) },
-                selected = env.language,
-                onSelect = actions.onLanguage,
-            )
-        }
+        choiceRows(AppLanguage.entries, env.language, actions.onLanguage) { stringResource(it.labelRes()) }
 
         // ------------------------------------------------------------------ privacy & about
         row { GroupLabel(stringResource(R.string.set_privacy)) }
-        row { Panel { BodyText(stringResource(R.string.set_privacy_body), color = VColor.Text) } }
-        row { Panel { BodyText(stringResource(R.string.disclaimer), color = VColor.Text) } }
+        // Information as plain text (a card would look tappable).
+        row { BodyText(stringResource(R.string.set_privacy_body), color = VColor.Text) }
+        row { BodyText(stringResource(R.string.disclaimer), color = VColor.Text) }
         row { BodyText(stringResource(R.string.set_licenses), color = VColor.TextTertiary) }
 
         // ------------------------------------------------------------------ advanced
@@ -250,4 +230,10 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
 }
 
 /** "22:00" for minutes after midnight. */
-fun clock(minuteOfDay: Int): String = "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
+/** A quiet-hours time as the watch's clock shows it (12- or 24-hour, the app's language); storage stays minutes. */
+@Composable
+fun clock(minuteOfDay: Int): String = formatTimeOfDay(
+    minuteOfDay,
+    android.text.format.DateFormat.is24HourFormat(androidx.compose.ui.platform.LocalContext.current),
+    androidx.compose.ui.platform.LocalConfiguration.current.locales[0],
+)
