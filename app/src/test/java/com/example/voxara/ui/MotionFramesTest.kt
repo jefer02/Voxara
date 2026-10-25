@@ -131,11 +131,11 @@ class MotionFramesTest {
 
     private fun headphonesTransition(enter: Boolean) {
         setup()
-        val on = ListeningLayerState(active = true, source = LayerSource.MANUAL, detected = true, detectedBy = LayerSource.WATCH)
+        val on = ListeningLayerState(active = true, source = LayerSource.WATCH, detected = true, detectedBy = LayerSource.WATCH)
         val state = base(68.0).copy(
             headphoneCategory = HeadphoneCategory.EARBUDS, headphoneListening = true,
             headphoneEstimate = ListeningEstimate(84.0, Confidence.LOW), headphoneWeeklyFraction = 0.2,
-            headphoneMode = HeadphoneModeChoice.ON,
+            headphoneMode = HeadphoneModeChoice.AUTO,
             listening = if (enter) ListeningLayerState.OFF else on,
         )
         val env = mutableStateOf(UiEnv(state = state))

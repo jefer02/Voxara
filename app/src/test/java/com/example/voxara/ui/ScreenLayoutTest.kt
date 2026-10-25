@@ -56,7 +56,7 @@ class ScreenLayoutTest {
     private val coach = CoachUi(
         reply = CoachReply(
             status = "Loud café. Your week is on track.",
-            insight = "You are at 46% of today's sound allowance and 56% of this week's.",
+            insight = "You are at 46% of today's limit and 56% of this week's.",
             why = "At this pace you would reach the weekly limit in about 3 days.",
             suggestion = "Lowering the volume a little buys a lot of listening time.",
             chips = listOf("My week?", "Why estimated?", "Tips"),
@@ -68,8 +68,8 @@ class ScreenLayoutTest {
     private val actions = VoxaraActions()
 
     /** Headphones mode on: playing (estimated level), nothing playing, and loud listening. */
-    private val layerOn = ListeningLayerState(active = true, source = LayerSource.MANUAL, detected = true, detectedBy = LayerSource.WATCH)
-    private val hpEnv = env.copy(state = state.copy(headphoneMode = HeadphoneModeChoice.ON, listening = layerOn, dba = 68.0))
+    private val layerOn = ListeningLayerState(active = true, source = LayerSource.WATCH, detected = true, detectedBy = LayerSource.WATCH)
+    private val hpEnv = env.copy(state = state.copy(headphoneMode = HeadphoneModeChoice.AUTO, listening = layerOn, dba = 68.0))
     private val hpIdleEnv = env.copy(state = hpEnv.state.copy(headphoneListening = false, headphoneEstimate = null))
     private val hpLoudEnv = env.copy(
         state = hpEnv.state.copy(headphoneEstimate = ListeningEstimate(98.0, Confidence.LOW), listening = layerOn.copy(source = LayerSource.WATCH)),
