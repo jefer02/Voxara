@@ -7,7 +7,6 @@ import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import com.example.voxara.core.headphones.Confidence
 import com.example.voxara.core.headphones.HeadphoneCategory
-import com.example.voxara.core.headphones.HeadphoneModeChoice
 import com.example.voxara.core.headphones.ListeningEstimate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +26,7 @@ import kotlin.random.Random
  * (src/release), so none of this code ships.
  *
  * It also takes display-only commands over adb, to look at headphones mode without headphones:
- *   adb shell am broadcast -a com.example.voxara.DEBUG --es hp ON|OFF|AUTO
+ *   adb shell am broadcast -a com.example.voxara.DEBUG --es hpalert 2:93.0[:phone]   (show the headphone-volume alert panel)
  *   adb shell am broadcast -a com.example.voxara.DEBUG --ei listen 85      (estimated dBA; -1 = nothing playing)
  *   adb shell am broadcast -a com.example.voxara.DEBUG --ed dba 72.0       (the room level)
  *   adb shell am broadcast -a com.example.voxara.DEBUG --ez alert true     (an alert was delivered just now)
@@ -43,10 +42,24 @@ object Bench {
     private const val ACTION = "com.example.voxara.DEBUG"
 
     private fun command(context: Context, i: Intent) {
-        i.getStringExtra("hp")?.let { raw ->
-            val choice = HeadphoneModeChoice.parse(raw) ?: return@let
-            ExposureRepository.setHeadphoneMode(choice)
-            CoroutineScope(Dispatchers.IO).launch { ExposureRepository.store.setHeadphoneMode(choice) }
+        // Headphones mode is fully automatic now: there is no `hp` switch any more (an old script sending it is ignored).
+        // `hpalert <tier>:<dba>[:phone]` shows the headphone-volume alert panel without hardware (display only).
+        i.getStringExtra("hpalert")?.let { raw ->
+            val p = raw.split(':')
+            val tier = p.getOrNull(0)?.toIntOrNull() ?: return@let
+            val dba = p.getOrNull(1)?.toDoubleOrNull() ?: return@let
+            val src = if (p.getOrNull(2) == "phone") com.example.voxara.core.headphones.LayerSource.PHONE else com.example.voxara.core.headphones.LayerSource.WATCH
+            ExposureRepository.update {
+                it.copy(
+                    headphoneAlert = com.example.voxara.core.headphones.HeadphoneAlert(tier, dba, System.currentTimeMillis(), src),
+                    lowerVolume = com.example.voxara.core.headphones.LowerUi.Idle,
+                )
+            }
+        }
+        // `hplower <outcome>` shows how the panel reads after "Lower to safe volume" (LOWERED, FIXED_VOLUME, UNREACHABLE...).
+        i.getStringExtra("hplower")?.let { raw ->
+            val outcome = runCatching { com.example.voxara.sync.LowerOutcome.valueOf(raw) }.getOrNull() ?: return@let
+            ExposureRepository.setLowerVolume(com.example.voxara.core.headphones.LowerUi.Done(outcome, 79.0))
         }
         if (i.hasExtra("listen")) {
             val dba = i.getIntExtra("listen", -1)
