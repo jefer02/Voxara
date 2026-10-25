@@ -12,6 +12,7 @@ import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
 import com.example.voxara.R
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_ADULT
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_SENSITIVE
+import com.example.voxara.core.format.formatApproxDuration
 import com.example.voxara.core.format.formatClock
 import com.example.voxara.core.headphones.Confidence
 import com.example.voxara.core.headphones.HeadphoneCategory
@@ -54,6 +55,13 @@ internal fun TransformingLazyColumnScope.headphonesLiveRows(env: UiEnv) {
         }
         FootLine(status, color = VColor.Text)
     }
+    if (s.headphonePossibleSpeaker && s.headphoneCategory != null) row { FootLine(stringResource(R.string.hp_possible_speaker_short), color = VColor.TextSecondary) }
+    // Listening minutes at the ears today, whichever ledger owns them (the room can own a loud stretch).
+    if (s.listeningSecondsToday >= 60.0) {
+        row { FootLine(stringResource(R.string.hp_listening_today, formatClock(s.listeningSecondsToday / 60.0)), color = VColor.Text) }
+        val counted = s.headphoneDays.firstOrNull()?.measuredMinutes ?: 0.0
+        if (s.listeningSecondsToday / 60.0 - counted > 1.0) row { BodyText(stringResource(R.string.hp_listening_room_note), color = VColor.TextSecondary) }
+    }
     if (estimate != null) {
         row {
             SectionLabel(
@@ -67,7 +75,7 @@ internal fun TransformingLazyColumnScope.headphonesLiveRows(env: UiEnv) {
     left?.let {
         row {
             BodyText(
-                if (it <= 0.0) stringResource(R.string.hp_time_left_none) else stringResource(R.string.hp_time_left, formatClock(it * 60.0)),
+                if (it <= 0.0) stringResource(R.string.hp_time_left_none) else stringResource(R.string.hp_time_left, formatApproxDuration(it * 60.0)),
                 color = VColor.Text,
             )
         }
@@ -79,7 +87,7 @@ internal fun TransformingLazyColumnScope.headphonesLiveRows(env: UiEnv) {
                 stringResource(if (showWhy) R.string.hp_why_hide else R.string.hp_why),
                 onClick = { showWhy = !showWhy }, icon = VoxIcons.Info, style = PillStyle.OUTLINED,
             )
-            if (showWhy) BodyText(stringResource(R.string.hp_why_body), color = VColor.Text, maxLines = 14)
+            if (showWhy) BodyText(stringResource(R.string.hp_why_body), color = VColor.Text)
         }
     }
 }

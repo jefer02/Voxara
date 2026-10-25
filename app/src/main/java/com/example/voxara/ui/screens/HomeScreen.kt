@@ -3,6 +3,20 @@ package com.example.voxara.ui.screens
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.wear.compose.material3.FilledTonalButton
+import com.example.voxara.ui.design.HeroList
+import com.example.voxara.ui.design.VSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -77,8 +91,9 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, initialPage: String = Routes.
     val still = LocalReduceMotion.current
     var doseView by rememberSaveable { mutableStateOf(target.view) }
     AnnounceHeadphonesMode(env.state.listening.active)
-    // The ring owns the top edge on the glance pages: the system clock steps aside there (it stays on More).
-    HideClock(hide = pages[pagerState.currentPage] != GlancePage.MENU)
+    // The ring owns the top edge on Now and Dose, and More's three pills fill the face: the system clock steps aside
+    // on all three glance pages (it stays on every list screen).
+    HideClock(hide = true)
     HorizontalPagerScaffold(pagerState = pagerState) {
         HorizontalPager(
             state = pagerState,
@@ -106,7 +121,7 @@ fun HomeScreen(env: UiEnv, actions: VoxaraActions, initialPage: String = Routes.
                 AnimatedPage(pageIndex = index, pagerState = pagerState) {
                     when (pages[index]) {
                         GlancePage.NOW -> NowScreen(env, actions, navigate)
-                        GlancePage.DOSE -> DoseScreen(env, actions, doseView, onView = { doseView = it })
+                        GlancePage.DOSE -> DoseScreen(env, actions, doseView, onView = { doseView = it }, navigate = navigate)
                         GlancePage.MENU -> MenuPage(env, navigate)
                     }
                 }
@@ -134,55 +149,60 @@ private fun AnnounceHeadphonesMode(on: Boolean) {
 }
 
 /**
- * MORE — the last page: Ask, the mode and Settings, and the one-line disclaimer. A list with room at
- * the bottom for the page indicator; Ask is a normal button here (an edge button would sit under the
- * indicator).
+ * MORE — the last glance page, built so nothing on its first screen can be cut by the glass at any size or font
+ * scale: three actions as pills stacked in the middle of the round face, each as wide as the circle allows where
+ * it sits (fractions of the display, like every glance page), the clock stepping aside as on the other two pages.
+ * Tono (Ask), Mode, Settings; every one of them opens something. Below the fold, information that looks like
+ * information: the phone link as a line (not a card) and the one-line disclaimer. The page's place is spoken
+ * ("Page 3 of 3, More").
  */
 @Composable
 fun MenuPage(env: UiEnv, navigate: (String) -> Unit) {
     val s = env.state
     val tono = s.tonoEnabled
-    val name = stringResource(R.string.ai_name)
     val info = LocalPageInfo.current
     val title = stringResource(R.string.page_more)
-    val titleSpoken = info?.let { stringResource(R.string.page_cd, it.first + 1, it.second, title) } ?: title
-    VoxList {
-        row { ScreenTitle(title, modifier = Modifier.semantics { contentDescription = titleSpoken }) }
-        row {
-            Button(
-                onClick = { navigate(Routes.ASK) },
-                modifier = Modifier.fillMaxWidth(),
-                icon = { Icon(if (tono) VoxIcons.Ask else VoxIcons.Mic, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                label = {
-                    Text(
-                        if (tono) stringResource(R.string.menu_ask, name) else stringResource(R.string.ask_speak),
-                        style = VType.TitleSmall.capFont(1.5f), maxLines = 2,
-                    )
-                },
-            )
-        }
-        row {
-            MetricCard(
-                icon = VoxIcons.Tune,
-                label = stringResource(R.string.mode_title),
-                value = modeValue(s.situationChoice, s.mode, s.listening),
-                onClick = { navigate(Routes.MODE) },
-            )
-        }
-        row {
-            MetricCard(
-                icon = VoxIcons.Settings,
-                label = stringResource(R.string.card_settings),
-                value = stringResource(R.string.card_settings_value),
-                accent = VColor.TextSecondary,
-                onClick = { navigate(Routes.SETTINGS) },
-            )
-        }
-        row {
-            Text(
-                stringResource(R.string.disclaimer), style = VType.Caption, color = VColor.TextSecondary,
-                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
-            )
-        }
+    val spoken = info?.let { stringResource(R.string.page_cd, it.first + 1, it.second, title) } ?: title
+    HeroList(
+        hero = { m ->
+            BoxWithConstraints(m, contentAlignment = Alignment.Center) {
+                val d = minOf(maxWidth, maxHeight)
+                Column(
+                    Modifier.semantics { contentDescription = spoken },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // The top and bottom pills sit where the circle is narrower: 70 % of the display; the middle one 84 %.
+                    MorePill(
+                        if (tono) stringResource(R.string.ai_name) else stringResource(R.string.ask_speak),
+                        if (tono) VoxIcons.Ask else VoxIcons.Mic, d * 0.70f, primary = true,
+                    ) { navigate(Routes.ASK) }
+                    MorePill(stringResource(R.string.mode_title), VoxIcons.Tune, d * 0.84f) { navigate(Routes.MODE) }
+                    MorePill(stringResource(R.string.card_settings), VoxIcons.Settings, d * 0.70f) { navigate(Routes.SETTINGS) }
+                }
+            }
+        },
+        details = {
+            // The phone link, honestly: connected, reconnecting, or not connected for how long (information only).
+            row { PhoneLinkCard(s.phoneLink) }
+            row {
+                Text(
+                    stringResource(R.string.disclaimer), style = VType.Caption, color = VColor.TextSecondary,
+                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+    )
+}
+
+/** One of More's actions: a 48 dp pill [width] wide, icon and a one-word label held at 1.3 times the font size. */
+@Composable
+private fun MorePill(label: String, icon: ImageVector, width: Dp, primary: Boolean = false, onClick: () -> Unit) {
+    val content: @Composable RowScope.() -> Unit = {
+        Text(label, style = VType.Label.capFont(1.3f).copy(fontWeight = FontWeight.Bold), maxLines = 1)
     }
+    val iconSlot: @Composable BoxScope.() -> Unit = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
+    val m = Modifier.width(width).defaultMinSize(minHeight = VSize.touch)
+    if (primary) Button(onClick = onClick, modifier = m, icon = iconSlot, label = content)
+    else FilledTonalButton(onClick = onClick, modifier = m, icon = iconSlot, label = content)
 }
