@@ -52,7 +52,8 @@ object SnapshotBuilder {
         }
         val worstWeekly = maxOf(weeklyAmbient, weeklyHeadphone)
         val daysOver = i.days.take(7).count { it.nioshDosePercent >= 100.0 }
-        val completedDays = i.days.drop(1).take(7).map { it.nioshDosePercent < 100.0 }
+        // Only measured days keep a streak: a day the watch was off is not a day "within the limit".
+        val completedDays = i.days.drop(1).take(7).map { keepsStreak(it.measuredMinutes, it.nioshDosePercent) }
 
         val hourly = today?.hourly.orEmpty()
         val levels = hourly.filter { it > 0f }
