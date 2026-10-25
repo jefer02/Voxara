@@ -54,28 +54,38 @@ import kotlin.math.sin
  * the mode comes in, and the quick switch below the fold. The picture itself (arcs, moon) is `NowRing`.
  */
 
-/** What "why" a layer is on or off says, as the chip's second line and the card's value. */
+/**
+ * Where the headphones are, as the chip's second line and the card's value: this watch ("Auto"), the phone
+ * ("Auto · from phone"), or a Bluetooth output that may be a speaker ("Auto · possible speaker").
+ */
 @Composable
-internal fun layerSourceText(layer: ListeningLayerState): String = stringResource(
-    when (layer.source) {
-        LayerSource.MANUAL -> R.string.hp_mode_src_manual
-        LayerSource.PHONE -> R.string.hp_mode_src_auto_phone
+internal fun layerSourceText(layer: ListeningLayerState, possibleSpeaker: Boolean = false): String = stringResource(
+    when {
+        layer.source == LayerSource.PHONE -> R.string.hp_mode_src_auto_phone
+        possibleSpeaker -> R.string.hp_mode_src_auto_speaker
         else -> R.string.hp_mode_src_auto
     }
 )
 
 /**
- * THE CHIP — headphones mode's place in the hero's bottom slot: "Headphones" over "Auto" or "Manual"
- * (and "from phone" when the phone said so), a 48 dp indigo pill. A tap switches the mode off (Manual).
- * On small screens or large text it is a plain label (no 48 dp room); the Now page's headphones card below
- * does the switching then. It pops once as the label settles into it at the end of the transition.
+ * THE CHIP — headphones mode's place in the hero's bottom slot: "Headphones" over "Auto", "From phone" or
+ * "Possible speaker", an indigo pill. It looks like a button because it is one: a tap opens "Not headphones?"
+ * ([onClick]), the way out when the output is not headphones (detection itself stays automatic). On small screens
+ * or large text it is a plain label and the way out is the first row under the hero. It pops once as the label
+ * settles into it at the end of the transition.
  */
 @Composable
-internal fun HeadphonesChip(layer: ListeningLayerState, progress: LayerProgress, interactive: Boolean, onClick: () -> Unit) {
+internal fun HeadphonesChip(
+    layer: ListeningLayerState,
+    possibleSpeaker: Boolean,
+    progress: LayerProgress,
+    interactive: Boolean,
+    onClick: () -> Unit = {},
+) {
     val ambient = LocalAmbient.current
     val title = stringResource(R.string.hp_mode_chip_title)
-    val why = layerSourceText(layer)
-    val label = stringResource(R.string.hp_mode_turn_off)
+    val why = layerSourceText(layer, possibleSpeaker)
+    val exitLabel = stringResource(R.string.hp_not_headphones)
     val shape = RoundedCornerShape(percent = 50)
     val body: @Composable () -> Unit = {
         Icon(
@@ -85,7 +95,7 @@ internal fun HeadphonesChip(layer: ListeningLayerState, progress: LayerProgress,
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, style = VType.Label.heroScaled(), color = if (ambient) VColor.TextSecondary else VColor.Secondary, maxLines = 1)
-            Text(why, style = VType.Caption.heroScaled(), color = VColor.TextSecondary, maxLines = 1)
+            Text(why, style = VType.Caption.heroScaled(), color = VColor.TextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
     val pop = Modifier.graphicsLayer {
@@ -106,8 +116,8 @@ internal fun HeadphonesChip(layer: ListeningLayerState, progress: LayerProgress,
                 .clip(shape)
                 .background(VColor.SecondaryFill.copy(alpha = 0.18f))
                 .border(1.dp, VColor.SecondaryFill.copy(alpha = 0.7f), shape)
-                .pressable(onClick = onClick, onClickLabel = label)
-                .semantics { contentDescription = "$title, $why. $label" }
+                .pressable(onClick = onClick, onClickLabel = exitLabel)
+                .semantics(mergeDescendants = true) { contentDescription = "$title, $why" }
                 .padding(horizontal = 14.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -153,24 +163,19 @@ internal fun HeadphonesLabel(progress: LayerProgress) {
 }
 
 /**
- * HEADPHONES MODE CARD — the quick action on Overview: what the mode is now ("Off", "On · Auto", "On ·
- * Manual", "On · from phone") and one tap to flip it. Going back to what Auto would do puts it back on
- * Auto, so a manual override never lingers longer than needed. The full choice is on the Mode screen.
+ * HEADPHONES STATUS — what headphones mode is doing now, in words: "On · Auto", "On · From phone",
+ * "On · Possible speaker" or "Off". Information only (no card, no press): the mode follows the headphones by
+ * itself; while it is on, the way out is the "Not headphones" button.
  */
 @Composable
-internal fun HeadphonesModeCard(layer: ListeningLayerState, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val why = layerSourceText(layer)
-    val value = when {
-        layer.active -> stringResource(R.string.hp_mode_on_fmt, why)
-        layer.source == LayerSource.MANUAL -> stringResource(R.string.hp_mode_off_fmt, why)
-        else -> stringResource(R.string.hp_mode_off)
-    }
+internal fun HeadphonesStatusCard(layer: ListeningLayerState, possibleSpeaker: Boolean, modifier: Modifier = Modifier) {
+    val why = layerSourceText(layer, possibleSpeaker)
+    val value = if (layer.active) stringResource(R.string.hp_mode_on_fmt, why) else stringResource(R.string.hp_mode_off)
     MetricCard(
         icon = VoxIcons.Headphones,
         label = stringResource(R.string.hp_mode_title),
         value = value,
         accent = VColor.Secondary,
-        onClick = onClick,
         modifier = modifier,
     )
 }
