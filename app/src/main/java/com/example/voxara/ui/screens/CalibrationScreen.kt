@@ -210,9 +210,9 @@ fun CalibrationScreen(
             when (step) {
                 Step.INTRO -> {
                     captureProblem?.let { row { BodyText(stringResource(it), color = VColor.Caution) } }
-                    row { BodyText(stringResource(R.string.cal_step_1), color = VColor.Text, maxLines = 6) }
-                    row { BodyText(stringResource(R.string.cal_step_2), color = VColor.Text, maxLines = 6) }
-                    row { BodyText(stringResource(R.string.cal_step_3), color = VColor.Text, maxLines = 6) }
+                    row { BodyText(stringResource(R.string.cal_step_1), color = VColor.Text) }
+                    row { BodyText(stringResource(R.string.cal_step_2), color = VColor.Text) }
+                    row { BodyText(stringResource(R.string.cal_step_3), color = VColor.Text) }
                     row { SectionLabel(stringResource(R.string.cal_reference_type), color = VColor.TextSecondary) }
                     ReferenceType.entries.forEach { t ->
                         row {
@@ -226,11 +226,14 @@ fun CalibrationScreen(
                             )
                         }
                     }
-                    row {
-                        SectionLabel(
-                            stringResource(R.string.cal_source_line, source.name.lowercase().replace('_', ' ')),
-                            color = VColor.TextSecondary,
-                        )
+                    // The raw microphone path ("voice recognition") is technical, untranslatable detail: debug builds only.
+                    if (com.example.voxara.BuildConfig.DEBUG) {
+                        row {
+                            SectionLabel(
+                                stringResource(R.string.cal_source_line, source.name.lowercase().replace('_', ' ')),
+                                color = VColor.TextSecondary,
+                            )
+                        }
                     }
                     row {
                         Button(
@@ -341,7 +344,7 @@ fun CalibrationScreen(
                             color = VColor.TextSecondary,
                         )
                     }
-                    row { BodyText(stringResource(R.string.cal_second_hint), color = VColor.TextSecondary, maxLines = 5) }
+                    row { BodyText(stringResource(R.string.cal_second_hint), color = VColor.TextSecondary) }
                     row {
                         Button(onClick = { save(m.offsetDb, null) }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.cal_save))
@@ -377,7 +380,7 @@ fun CalibrationScreen(
                             }
                         }
                         is Consistency.Inconsistent -> {
-                            row { BodyText(stringResource(R.string.cal_inconsistent, cmp.differenceDb), color = VColor.Danger, maxLines = 6) }
+                            row { BodyText(stringResource(R.string.cal_inconsistent, cmp.differenceDb), color = VColor.Danger) }
                             row {
                                 FilledTonalButton(onClick = { save(cmp.averageDb, b.offsetDb) }, modifier = Modifier.fillMaxWidth()) {
                                     Text(stringResource(R.string.cal_save_average))
@@ -399,10 +402,9 @@ fun CalibrationScreen(
                         BodyText(
                             stringResource(R.string.cal_saved, formatDate(savedAt)),
                             color = VColor.AccentInk,
-                            maxLines = 4,
                         )
                     }
-                    row { BodyText(stringResource(R.string.cal_saved_note), color = VColor.TextSecondary, maxLines = 6) }
+                    row { BodyText(stringResource(R.string.cal_saved_note), color = VColor.TextSecondary) }
                     row {
                         Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.action_done))
@@ -417,9 +419,9 @@ fun CalibrationScreen(
 @Composable
 private fun ChoiceButton(label: String, selected: Boolean, onClick: () -> Unit) {
     if (selected) {
-        Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(label, maxLines = 2) }
+        Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(label) }
     } else {
-        FilledTonalButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(label, maxLines = 2) }
+        FilledTonalButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(label) }
     }
 }
 

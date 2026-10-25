@@ -39,7 +39,8 @@ import com.example.voxara.ui.theme.LocalReduceMotion
 import com.example.voxara.voice.VoiceTurn
 
 /**
- * ASK — talk to Tono. Speak (on-device recognition), or tap a quick reply. Symptoms get a fixed
+ * TONO — what Tono says about today (its full sentence, never cut), then talk to it: speak (on-device
+ * recognition), or tap a quick reply. The title is Tono's name, because what follows is Tono's statement. Symptoms get a fixed
  * safe answer; cloud AI is used only with consent; otherwise the on-device answers reply.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -57,26 +58,29 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
 
     VoxList {
         row {
-            ScreenTitle(if (tono) stringResource(R.string.home_ask, name) else stringResource(R.string.voice_title))
+            // Named after who speaks: the line under it is Tono's statement, not a question asked of the wearer.
+            ScreenTitle(if (tono) name else stringResource(R.string.voice_title))
         }
         if (turn.heard.isNotBlank()) {
-            row { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary, maxLines = 3) }
+            row { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary) }
         }
         row {
             val text = when {
                 listening -> stringResource(R.string.voice_listening)
                 turn.phase == VoiceTurn.Phase.THINKING || coach.loading -> stringResource(R.string.tono_loading, name)
                 !showCoach && turn.answer.isNotBlank() -> turn.answer
-                showCoach && reply != null -> reply.insight
+                // Tono's short statement leads (one glanceable line); the full insight follows as a sentence.
+                showCoach && reply != null -> reply.status
                 else -> stringResource(R.string.ask_hint, if (tono) name else stringResource(R.string.app_name))
             }
             HeroStatus(
-                text, maxLines = 5,
+                text,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         if (listening) row { ListeningWave(turn.amplitude) }
         if (showCoach && reply != null && !coach.loading && !listening) {
+            row { BodyText(reply.insight, color = VColor.Text) }
             if (reply.why.isNotBlank()) row { BodyText(reply.why, color = VColor.TextSecondary) }
             row { BodyText(reply.suggestion, color = VColor.AccentInk) }
             row {
@@ -92,6 +96,8 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 )
             }
             if (coach.cloudFailed) row { BodyText(stringResource(R.string.tono_cloud_failed), color = VColor.TextSecondary) }
+            // Debug builds say why (a fixed code, no key, no question), so a watch that cannot reach the AI can be diagnosed.
+            coach.failure?.takeIf { coach.cloudFailed && env.debug }?.let { why -> row { BodyText(why, color = VColor.TextSecondary) } }
             if (reply.chips.isNotEmpty()) {
                 row {
                     FlowRow(
