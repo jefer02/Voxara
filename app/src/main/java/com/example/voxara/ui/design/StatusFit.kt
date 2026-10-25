@@ -1,31 +1,24 @@
 package com.example.voxara.ui.design
 
 /**
- * FIT A SENTENCE WITHOUT AN ELLIPSIS. The hero shows Tono's line in at most two lines; when the
- * words do not fit even at the smallest type step, this returns a shorter, complete piece of the same
- * text (whole clauses first, whole words after), never a cut-off one: the full text is on Ask.
+ * FIT TONO'S LINE ON A GLANCE, OR NOT AT ALL. The hero shows one short sentence of Tono's in at most two lines.
+ * This returns the whole text when it fits; otherwise the longest run of WHOLE sentences from its start that fits
+ * ("All good today." out of "All good today. Your week is calm."); otherwise null, and the caller shows nothing
+ * on the hero and the full line as the first row under it. It never returns a piece of a sentence: a clause or a
+ * few words ("A calm day for") read as a different, broken message, and an ellipsis hides what was meant.
  *
- * [fits] answers whether a candidate fits the space (the caller measures it). Pure, so it is
- * unit-tested without a screen.
+ * [fits] answers whether a candidate fits the space (the caller measures it). Pure, so it is unit-tested without
+ * a screen.
  */
-internal fun shortenToFit(text: String, fits: (String) -> Boolean): String {
+internal fun wholeSentencesToFit(text: String, fits: (String) -> Boolean): String? {
     val t = text.trim()
-    if (t.isEmpty() || fits(t)) return t
-    // Clause ends: after . ! ? ; : , (followed by a space) and before a dash that stands for a pause.
-    val clauseEnds = Regex("""[.!?;:,…](?=\s)|(?=\s[—–]\s)""").findAll(t).map { it.range.last + 1 }
-        .filter { it < t.length }.toList()
-    for (end in clauseEnds.sortedDescending()) {
-        val cand = tidy(t.substring(0, end))
+    if (t.isEmpty()) return null
+    if (fits(t)) return t
+    // Sentence ends: . ! ? (or …) followed by a space; the text's own end is handled above.
+    val ends = Regex("""[.!?…](?=\s)""").findAll(t).map { it.range.last + 1 }.toList()
+    for (end in ends.sortedDescending()) {
+        val cand = t.substring(0, end).trim()
         if (cand.isNotEmpty() && fits(cand)) return cand
     }
-    // Whole words, longest first.
-    val wordEnds = Regex("""\s+""").findAll(t).map { it.range.first }.filter { it > 0 }.toList()
-    for (end in wordEnds.sortedDescending()) {
-        val cand = tidy(t.substring(0, end))
-        if (cand.isNotEmpty() && fits(cand)) return cand
-    }
-    return t.split(Regex("""\s+""")).first()
+    return null
 }
-
-/** No trailing comma, semicolon, colon or dash: a clause that ends the line should end like a sentence would. */
-private fun tidy(s: String): String = s.trim().trimEnd(',', ';', ':', '—', '–', ' ')

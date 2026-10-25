@@ -104,6 +104,8 @@ fun OrbitStage(
     listening: Boolean = false,
     stereo: () -> Float = { 0f },
     stereoColor: Color = Color.Unspecified,
+    /** False on a page whose picture is not the live sound (Dose): the breathing rings would read as data there. */
+    waves: Boolean = true,
     picture: @Composable () -> Unit,
     content: @Composable BoxWithConstraintsScope.() -> Unit,
 ) {
@@ -114,7 +116,7 @@ fun OrbitStage(
             LocalFigureScale provides figureScaleFor(d),
             LocalDisplay provides d,
         ) {
-            WaveHalo(wave, waveColor, Modifier.size(d).padding(d * Face.WAVES_PAD), listening, strength = 0.9f, stereo = stereo, stereoColor = stereoColor)
+            if (waves) WaveHalo(wave, waveColor, Modifier.size(d).padding(d * Face.WAVES_PAD), listening, strength = 0.9f, stereo = stereo, stereoColor = stereoColor)
             if (!LocalAmbient.current) {
                 Canvas(Modifier.size(d)) {
                     val scrim = size.minDimension * 0.38f
@@ -203,6 +205,7 @@ fun CircularOverlay(
                 drawCircle(border, style = Stroke((1.5f + 2.5f * p).dp.toPx()))
             }
         }
-        content()
+        // The content scrolls inside the ring, never across its border.
+        Box(Modifier.fillMaxSize().padding(8.dp).clip(androidx.compose.foundation.shape.CircleShape)) { content() }
     }
 }
