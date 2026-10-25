@@ -14,6 +14,21 @@
     <!-- Sync problems and, if the wearer turns it on, mirrored 100% alerts. Asked in context. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+        Headphone listening on this phone (opt-in) keeps a foreground service of type connectedDevice.
+        Android requires FOREGROUND_SERVICE_CONNECTED_DEVICE for that type and, as a prerequisite, that the
+        app declares one of CHANGE_NETWORK_STATE / CHANGE_WIFI_STATE / ... or holds a Bluetooth permission.
+        BLUETOOTH_CONNECT is optional here (it only tells a speaker from headphones), so a normal permission
+        is declared to satisfy the prerequisite whether or not it is granted. Voxara changes no network state.
+    -->
+    <!-- The headphone-volume alert vibrates the phone (the same family of pattern as on the watch). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Start watching for headphones again after a reboot (the foreground service may start from boot). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- "Open the Galaxy Wearable app": the apps that pair a watch with this phone. -->
     <queries>
         <package android:name="com.samsung.android.app.watchmanager" />
@@ -61,6 +76,26 @@
             </intent-filter>
         </receiver>
 
+        <!-- Watches for headphones (events: devices, playback, volume) while the wearer shares listening with the watch. -->
+        <service
+            android:name=".listening.PhoneListeningService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <receiver
+            android:name=".listening.PhoneBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- "Dismiss" / "Lower to safe volume" on the headphone-volume alert. -->
+        <receiver
+            android:name=".listening.PhoneAlertActionReceiver"
+            android:exported="false" />
+
         <!-- The Voxara watch app (same app id + signature only): status, settings, capability. -->
         <service
             android:name=".sync.PhoneListenerService"
@@ -81,6 +116,22 @@
                 <data
                     android:host="*"
                     android:path="/voxara/alert/limit"
+                    android:scheme="wear" />
+            </intent-filter>
+            <!-- The watch asks the phone to lower its music volume. -->
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:path="/voxara/hp/cmd/lower"
+                    android:scheme="wear" />
+            </intent-filter>
+            <!-- The wearer said on the watch that the phone's output is not headphones. -->
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:path="/voxara/hp/cmd/not_headphones"
                     android:scheme="wear" />
             </intent-filter>
             <intent-filter>
