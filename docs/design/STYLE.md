@@ -13,9 +13,9 @@ Where the values live:
 | What | Where |
 |---|---|
 | Raw colours, accent variants, contrast maths (pure, unit-tested) | `shared/…/core/design/Palette.kt` |
-| Fonts, level-accent mapping, wave/capsule drawing shared by both apps | `shared-ui/…/ui/design/` (`SharedDesign.kt`, `Visuals.kt`) |
+| Fonts, level-accent mapping, wave drawing, and the digit cells (`DigitCells.kt`: tabular and rolling figures) shared by both apps | `shared-ui/…/ui/design/` (`SharedDesign.kt`, `Visuals.kt`, `DigitCells.kt`) |
 | Watch tokens and components | `app/…/ui/design/` (`Tokens.kt`, `Components.kt`, `Layout.kt`, `Numerals.kt`, `WatchVisuals.kt`), `app/…/ui/theme/VoxaraTheme.kt`, the glance pages in `app/…/ui/screens/` (`Glance.kt`, `HomeScreen.kt`) |
-| Phone theme and components | `phone/…/ui/theme/PhoneTheme.kt`, `phone/…/ui/components/` (`Components.kt`, `Template.kt`, `Charts.kt`) |
+| Phone theme and components | `phone/…/ui/theme/PhoneTheme.kt`, `phone/…/ui/components/` (`Components.kt`, `Template.kt`, `Orbit.kt`, `Charts.kt`), the figures every screen shares `phone/…/model/Figures.kt` |
 
 ---
 
@@ -60,7 +60,7 @@ switch glow, number glow, halo). Fill and ink differ per theme so every pair pas
 | **Purple (default)** | `#8B5CF6` | `#A78BFA` | `#8B5CF6` | `#6D28D9` | `#05080D` |
 | Turquoise | `#00E5BF` | `#00E5BF` | `#009E87` | `#00695C` | `#05080D` |
 | Blue | `#3B82F6` | `#60A5FA` | `#3B82F6` | `#1D4ED8` | `#05080D` |
-| Emerald | `#10B981` | `#34D399` | `#059669` | `#065F46` | `#05080D` |
+| Emerald | `#34D399` ² | `#34D399` | `#059669` | `#065F46` | `#05080D` |
 | Caution tier | `#FFB800` | `#FFB800` | `#B7791F` | `#92400E` | `#05080D` |
 | Danger tier | `#FF2A6D` | `#FF6B93` | `#FF2A6D` | `#9F1239` | `#05080D` |
 
@@ -69,6 +69,8 @@ Rules, enforced by `shared/src/test/…/core/design/AccentPaletteTest.kt` for **
 - fill ≥ 3:1 on background and card (WCAG 1.4.11, non-text);
 - on-fill ≥ 4.5:1 on fill;
 - watch: Purple ink ≥ 4.5:1 and fill ≥ 3:1 on black and on the dark card.
+
+² Emerald's dark fill was `#10B981`; against the dark crimson it was only 3.9 apart under deuteranopia (below the dataviz floor of 6), so it moved to the lighter `#34D399` (`ChartColorsTest`).
 
 Turquoise and Emerald are too light to be a graphic on white, so their light fills are deeper
 shades of the same hue. Purple text on a white card uses `#6D28D9`, not `#8B5CF6`.
@@ -105,10 +107,10 @@ from the dose/budget each ring shows.
 | Family | Use | Weights |
 |---|---|---|
 | **Plus Jakarta Sans** (variable, OFL 1.1) | All UI text | 400, 500, 600, 700, 800 |
-| **JetBrains Mono** (variable, OFL 1.1) | Phone numerals only (with `tnum`). **Not used on the watch**: its zero carries a dot ("30" reads "30·") that no OpenType setting removes (`zero`, `ss01`, `ss02`, `cv01`, `cv12` were tried) | 500, 600, 700, 800 |
+| **JetBrains Mono** (variable, OFL 1.1) | **No longer used by either app.** It was the phone's numeral face; its zero carries a dot ("30" reads "30·") that no OpenType setting removes (`zero`, `ss01`, `ss02`, `cv01`, `cv12` were tried). The file stays bundled until the licence notice is retired | 500, 600, 700, 800 |
 
-On the watch every figure is Plus Jakarta Sans (plain zero, plain one), drawn one fixed-width cell per digit
-(`TabularNumber` / `RollingNumber`, cell = widest digit of the style), so numbers stay tabular and can
+On the watch **and the phone** every figure is Plus Jakarta Sans (plain zero, plain one), drawn one fixed-width cell per digit
+(`TabularDigits` / `RollingDigits` in `shared-ui`; the watch's `TabularNumber` / `RollingNumber` are thin wrappers that add its motion switches; cell = widest digit of the style). At display sizes the phone tightens the cell to 0.92 of that and sizes it to the digits shown ("11" gets the narrow cell of a one), so "83%" reads as one number, so numbers stay tabular and can
 roll. No watch style asks for the `tnum` feature: Plus Jakarta Sans' tabular alternates give "1" a slab foot
 (it read as a different, serif font on "11" and "13"), and the cells already do the job. The unit is always written `dBA`. Both fonts are bundled in `shared-ui/src/main/res/font/` (`plus_jakarta_sans.ttf`,
 `jetbrains_mono.ttf`, from github.com/google/fonts) with their licences in
@@ -118,20 +120,19 @@ Scale (sp, so the system font size scales it; nothing below 12 sp):
 
 | Style | Watch (`VType`) | Phone (`VoxTypography` / `VoxNum`) | Font / weight / tracking |
 |---|---|---|---|
-| Hero number | `Hero` 52 | `displayLarge` 56, `displayMedium` 44 (Home score) | Watch: Jakarta 800, −0.03 em · Phone: Mono 700, −0.04 / −0.03 em |
-| Display number | `Display` 36 | `displaySmall` 32 (stat cards) | Watch: Jakarta 800, −0.02 em · Phone: Mono 700, −0.03 em |
-| Numeral | `Numeral` 22, `Value` 13 | `VoxNum.large` 24, `.medium` 17, `.small` 12 | Watch: Jakarta 800 / 700 · Phone: Mono 600–700 |
+| Hero number | `Hero` 52 | `figureStyle(92)` Home ring (80 / 68 / 58 / 48 when it must fit), 72–48 Trends hero | Jakarta 800, −0.03 em, digit cells; held at 1.3 × the font scale |
+| Display number | `Display` 36 | `figureStyle(36 / 30 / 26)` (share tiles), 36 (headphone level) | Jakarta 800, −0.03 em, digit cells |
+| Numeral | `Numeral` 22, `Value` 13 | `VoxNum.large` 24, `.medium` 17, `.small` 12 (numbers inside a row) | Jakarta 800 / 700, proportional |
 | Editorial title | `Title` 19 | `headlineMedium` 26, `titleLarge` 21 | Jakarta 800, −0.02 em |
 | Title small | `TitleSmall` 15 | `titleMedium` 17, `titleSmall` 15 | Jakarta 700 |
 | Body | `Body` 14 | `bodyLarge` 16 / `bodyMedium` 15 / `bodySmall` 13 | Jakarta 500 / 400 |
-| Eyebrow (uppercase) | — (removed on the watch) | `EyebrowStyle` 12 | Jakarta 700–800, +0.12 em |
+| Eyebrow (uppercase) | — (removed) | — (removed on the phone too: sentence case everywhere) | — |
 | Caption / label | `Caption` 12, `Label` 13 | `labelSmall` 12, `labelMedium` 13, `labelLarge` 15 | Jakarta 500–700 |
 
 ## 3. Shape, depth, spacing
 
-- Cards: 22 dp radius, 1 dp border (`border` token), soft shadow on the phone (elevation 2 dp,
-  ambient black 8 %). The watch draws no shadows (black background, cost).
-- Hero card: 26 dp radius, a deeper shadow on the phone (6 dp).
+- Cards: 20 dp radius, 1 dp border (`border` token). **No shadows on either device**: depth is colour (a tile on `surface2`, a halo of the zone's colour behind the ring), never a drop shadow.
+- The phone has no hero card any more: the ring is the hero (section 8).
 - Pills, badges, chips, switches, nav indicator: fully rounded.
 - Icon tile: 36 dp rounded square (12 dp radius) in accent-soft with an accent-ink icon (phone; the watch
   uses a plain tinted icon in its rows).
@@ -145,19 +146,22 @@ Scale (sp, so the system font size scales it; nothing below 12 sp):
 
 | Component | Watch (`app/…/ui/design/`) | Phone (`phone/…/ui/components/`) | Notes |
 |---|---|---|---|
-| **Hero metric card** | `PageStage` + `OrbitStage` (`Glance.kt`, `WatchVisuals.kt`) with one picture per page from `Orbit.kt` (`NowRing`, `DoseMorph`) | — | Waves + scrim, the page's picture on the ring, figure, zone tag, foot (told its room) and one control above the dots | `HeroCard` (Template.kt) + Home's `HomeHero` | 26 dp card, uppercase subtitle, big Mono number, status badge pill (`ZoneTag`: tier-soft fill, tier ink, tier border), wave lines behind |
+| **Hero metric card (watch)** | `PageStage` + `OrbitStage` (`Glance.kt`, `WatchVisuals.kt`) with one picture per page from `Orbit.kt` (`NowRing`, `DoseArc`) | — | Waves + scrim, the page's picture on the ring, figure, zone tag, foot (told its room) and one control above the dots | `HeroCard` (Template.kt) + Home's `HomeHero` | 26 dp card, uppercase subtitle, big Mono number, status badge pill (`ZoneTag`: tier-soft fill, tier ink, tier border), wave lines behind |
 | **Wave lines** (horizontal) | — | `WaveLines` (shared-ui Visuals.kt) | 3 sine lines with an edge envelope; amplitude from today's dose; alphas 27 % / 12.5 % |
-| **Segmented capsule meter** | 24 hourly capsules on Dose / Today (`HourBars`) | `CapsuleMeter` (Home hero) | 26 capsules, each in the tier colour of the zone it stands for, last lit one 16 % taller, unlit 14 % shorter, Mono scale marks |
-| **Metric triplet** | — | `MetricTriplet` (Today) | Three small cards: uppercase label, Mono value, caption; stacked at font scale ≥ 1.5 |
+| **Meter** | 24 hourly capsules on Dose / Today (`HourBars`) | `Meter` (share tiles, 8 dp pill) | The track is the whole allowance: the fill reaches the end at 100 % and stays full above it, in the zone's colour; no tick |
+| **Orbit ring** | `BezelArc`, `OrbitStage` | `OrbitRing` (Home, Today) + `FitFigure` | The watch's 250° arc, enlarged: track, glow arc (1.7 × the stroke at 16 %), arc in the zone's colour, a halo of the same colour (13 % light, 20 % dark); the figure is the largest of 92 / 80 / 68 / 58 / 48 sp that fits inside; the caption and the zone word move under the ring when they would touch the arc |
+| **Share tile** | — | `ShareTile` (Home: last 7 days, headphones; Headphones) | `surface2` tile, 20 dp: icon + label, figure, a line of what it is a share of, `Meter`; side by side up to font scale 1.15, stacked above it |
+| **Expandable row** | — | `ExpandableRow` (Watch checklist, troubleshooting) | One row that opens in place (chevron turns, 200 ms); state spoken ("Expanded" / "Collapsed") |
+| **Segmented choice** | `DoseSwitch` | `SegmentedChoice` | Material 3 single-choice segmented buttons (a filter, not navigation); becomes radio rows when a word would not fit a segment |
 | **Switch** | Wear M3 buttons/toggles in accent | `VoxSwitch` | 48×28 track, white thumb off, dark thumb on, accent track with a 3 dp glow ring |
 | **Row with icon tile** | `MetricCard` (tinted icon, no tile) | `GroupRow` / `SwitchRow` + `IconTile` | Tile = rounded square in the tint's soft alpha, icon in the tint |
-| **Screen title / group heading** | `ScreenTitle`, `GroupLabel` | `VoxScreen` (`eyebrow`) + `EditorialLabel` | Watch: one extra-bold title, sentence-case group headings in long lists, both headings; no uppercase label above anything |
-| **Bottom nav / rail** | — | `PhoneApp` item colours | Muted items; selected: accent-soft pill, accent icon |
+| **Screen title / group heading** | `ScreenTitle`, `GroupLabel` | `VoxScreen` (large collapsing title; Home has none) + `GroupHeader` | One extra-bold title, sentence-case group headings in long lists, both headings; no uppercase label above anything on either device |
+| **Bottom nav / rail** | — | `VoxNavigationSuite` (`PhoneApp.kt`) | Four tabs (Home, Trends, Watch, Settings); labels held at 1.3 × the font scale; muted items (text 2); selected: accent-soft pill, accent icon; a screen opened from a tab keeps that tab selected |
 | **Bezel arc** | `BezelArc`, `LevelBezel` (ambient) | — | 250° (110° gap at the bottom), rounded caps, 2.7 % of the display, outer edge 4 % in from the glass on every page (ambient 11 %, clear of the clock), track white 7 %, glow = a 3× wider stroke at 18 % alpha (no blur) |
 | **Headphones ring** | `NowRing` (`Orbit.kt`) | — | The dBA scale opens at the top (where the Moderate zone begins) into two ear-cup arcs (42° gap) that rise with the listening level, indigo (the tier colour when loud); the outside level is `Moon` in the gap |
-| **Tono's tag** | `TonoTag`, `FittedStatus` (`Glance.kt`) | — | Icon (sparkle = cloud AI) + Tono's line in Label size on a black 55 % scrim, hairline border; 2 lines, 1 line or the first detail row by the room left; up to 76 % of the display wide; tap = Ask |
+| **Tono's tag** | `TonoTag`, `rememberFittedStatus` (`Glance.kt`), `wholeSentencesToFit` | — | Icon (sparkle = cloud AI) + Tono's line in Label size on a black 55 % scrim, hairline border; one whole sentence in 2 lines or 1, or the first detail row (wrapping whole) when none fits — never a clause, never an ellipsis; up to 76 % of the display wide; tap = Tono |
 | **Today \| Week switch** | `DoseSwitch` (`DoseScreen.kt`) | — | Two tab segments in one 48 dp pill, the selected one filled with the accent tint and extra-bold; also flipped by the crown |
-| **Headphones chip / card** | `HeadphonesChip`, `HeadphonesModeCard` (`HeadphonesLayer.kt`) | `Settings` → Headphones mode | 48 dp indigo pill "Headphones / Auto or Manual"; card = quick switch in Now's first detail |
+| **Headphones chip / way out** | `HeadphonesChip` (`HeadphonesLayer.kt`), `HeadphonesExitScreen` (`InfoScreens.kt`) | `Settings` → Headphones mode | 48 dp indigo pill "Headphones / Auto · From phone · Possible speaker"; a tap opens **Not headphones?** (ignore until it disconnects, or remember a Bluetooth speaker); the same "Not headphones" button is Now's first detail and sits on the volume alert. Off: a plain line, not a switch |
 | **Harmonic rings + halo** | `WaveHalo` (shared `HarmonicRings`) | — | 3 sine-deformed closed rings (4 finer while listening on headphones) + radial halo |
 | **Level number** | `LevelNumber` + `RollingNumber` / `TabularNumber` | — | Per-digit-cell figure over a translucent radial glow (the template's text-shadow without blur); digits roll |
 | **Glance pager** | `HomeScreen` (`HorizontalPagerScaffold`, `AnimatedPage`) | — | Now, Dose (Today / Week), More (Ask, Mode, Settings); the Wear page indicator hugs the bezel, with a black scrim where its dots sit |
@@ -171,10 +175,9 @@ Scale (sp, so the system font size scales it; nothing below 12 sp):
 
 | Template visual | Voxara data |
 |---|---|
-| Phone hero waves | Amplitude from today's dose (`head.dosePercent`) |
-| Phone 26 capsules (30–110 dB scale) | Today's dose 0–120 % on Home (marks 0 / 50 / 80 / 100 %, Voxara's percent zones) |
-| Phone status badge | Today's dose zone (word + icon) |
-| Watch page pictures | Now: live level on a 30–110 dBA scale of four zones (headphones mode: the estimate on two arcs, or the week's listening share when nothing plays). Dose / Today: the 24 hourly levels (`DaySummary.hourly`). Dose / Week: the seven days' shares of the weekly allowance, each in its own dose zone. Ambient: the live level on a hairline arc |
+| Phone ring | Today's dose (`HearingFigures.todayPercent`) on the 250° arc; the zone as a word + icon |
+| Phone share tiles | `surroundingsWeekPercent`, `headphonesWeekPercent` (shares of the weekly allowance) |
+| Watch page pictures | Now: live level on a 30–110 dBA scale of four zones (headphones mode: the estimate on two arcs, or the week's listening share when nothing plays). Dose: one progress arc from 12 o'clock, today's share of the daily limit (Today) or the worse weekly share (Week); full = 100 %. The 24 hours and the seven days are lists below the fold. Ambient: the live level on a hairline arc |
 | Watch harmonic rings | Amplitude and tier from the live level (Now, Home) |
 | Scene / level band | First detail rows on Now (it has no pill on the hero) |
 | Hourly bars | 24 hourly ledger levels (`DaySummary.hourly`), tier colour per hour |
@@ -197,7 +200,7 @@ static fallback (reduced motion or ambient).
 | Pages slide with the Wear pager animation; list items scale/fade at the screen edges | Place and continuity | Wear specs |
 | Mode chip: label rolls to the new mode with a short pop, fill turns accent in Concert | Auto detection changed the mode | 220 ms |
 | Page picture draws itself in when its page becomes current, retracts when it leaves, and turns up to 40° with the swipe | A page changed: a new picture, not only a new position | 650 ms in / 250 ms out |
-| Today to Week (Dose): the 24 bars retract into the rim in turn while the day segments fill in; the figure rolls; caption cross-fades; the switch fill moves. Reduced motion: the pictures cross-fade | The view changed: the same ring shows the other period | 520 ms (200 ms cross-fade) |
+| Today to Week (Dose): the arc runs from one share to the other; the figure rolls; caption cross-fades; the switch fill moves. Reduced motion: the arc jumps | The view changed: the same ring shows the other period | 520 ms (instant) |
 | Zone tag swaps icon and word with a short pop | The zone changed | 150 ms |
 | Taps shrink to 96 % while held | Feedback | 100 ms |
 | Limit alert: border and icon pulse once per haptic beat (daily: 0/150/300/470 ms; weekly: 0/220/400 ms) | The haptic is firing: see it too | 420 ms (big) / 210 ms (small) per beat |
@@ -237,6 +240,23 @@ static fallback (reduced motion or ambient).
 - **The crown** flips Today and Week while the Dose page rests at its top (`HeroList(onRotary)`); scrolled, or turning on past Week, it scrolls the details as usual.
 - **Bottom scrim.** Black where the page dots sit, so a list's last visible item never shows through them.
 
+## 5e. Phone motion
+
+Same rules as the watch (a reason, a duration, a static fallback); the phone's switch is the system's "remove animations" setting (`LocalReduceMotion`): every item below becomes a still frame or a short fade.
+
+| Motion | Why | Duration |
+|---|---|---|
+| The Home ring grows into Today (shared element, `sharedBounds`) | The ring IS the detail: you opened what you touched | the navigation transition |
+| The ring's arc draws in, then eases to a new value (spring) | A screen just opened: where the value is | spring, very low stiffness |
+| The figure rolls up from 0 on Home, and digit by digit on a change (`RollingDigits`) | The value changed | 220 ms per digit |
+| Charts draw in once: columns grow in turn, lines draw along their path | Where the data is | 650 ms (lines 900 ms), decelerating |
+| Pull to refresh: three sine lines in the accent rise with the pull and keep moving while syncing | The same waves as the watch's rings; a sync is running | follows the finger; 5.5 rad/s |
+| Theme and accent changes crossfade every colour (`animateVox`) | A choice you made, not a flash | 360 ms |
+| Tabs cross-fade with a 4 % scale; detail screens slide in 10 % and fade; with reduced motion, a 120 ms fade | Place and continuity | 220 / 260 ms |
+| A tappable card, tile or row shrinks to 97 % while pressed | Feedback | spring |
+| Expandable rows open in place; the chevron turns | The row grew | 200 ms |
+| The sync button turns while a sync runs | A sync is running | 1.1 s per turn |
+
 ## 6. Accessibility
 
 - Touch targets ≥ 48 dp; text ≥ 12 sp (the "%" beside a figure included); layouts checked at font
@@ -247,7 +267,9 @@ static fallback (reduced motion or ambient).
 - Decimals, dates and times use the language the app shows (the configuration locale), not the JVM default.
 - Headings carry `heading()` semantics (editorial titles, section labels).
 - Zones always as word + icon; charts keep their spoken descriptions.
-- Every accent × theme passes the contrast tests (section 1).
+- Every accent × theme passes the contrast tests (section 1) **and the chart tests** (`ChartColorsTest`): every zone mark ≥ 3:1 against the page and the card, text on a calendar cell or under a column ≥ 4.5:1, and the accent, amber and crimson apart by ≥ 15 (OKLab × 100) in normal vision and ≥ 6 for protanopia, deuteranopia and tritanopia (a second encoding, icon + word + height, is always present).
+- **Large text on the phone** (`FontScaleLayoutTest`): every screen at font scale 1.3 and 2.0 on a 360 dp phone has no word broken across lines, no text cut off and no two texts on top of each other. The ring's figure is held at 1.3 ×; the caption and the zone word leave the ring before they touch the arc; tiles, buttons and the uncalibrated note stack; a segmented choice becomes radio rows when a word would not fit.
+- Every chart has a spoken twin (the seven days are read as a list: "Wed: 3 percent; …") and most have the table next to them.
 
 ## 7. Phone appearance settings
 
@@ -257,3 +279,25 @@ Settings → **Appearance**: accent (Purple · Turquoise · Blue · Emerald, def
 live through `VoxaraPhoneTheme` (CompositionLocals), the system bars, the window background and,
 on Android 12+, `UiModeManager.setApplicationNightMode` so the splash follows; the Glance widget
 reads the same keys.
+
+
+## 8. The phone, after the redesign ("Orbit, enlarged" with the Ledger's charts)
+
+**One question per screen.** Home answers *how is my hearing today?* in its first viewport: the ring (today's share of the allowance, its caption, the zone as its own label), Tono's sentence under it, the uncalibrated note while it applies, then the last 7 days and the headphones as tiles, the day hour by hour and the last alert. The invented "Hearing care score" is no longer a hero: it is a supporting line in Trends.
+
+**Four names for four numbers** (`HearingFigures`, one source for Home, Today and Trends; `FiguresConsistencyTest` renders the three from one state and compares): *today* (share of the daily allowance), *surroundings, last 7 days* and *headphones, last 7 days* (each a share of the weekly allowance), *all sound, last 7 days* (those two added; Trends' hero, compared with the 7 days before, so "N points more" is always the hero minus the number printed beside it). The seven days are always the rolling last seven, never a calendar week.
+
+**Charts** (dataviz on Compose Canvas, `Charts.kt`): thin capped marks rounded only at the data end, solid hairline guides (never dashed) with their label beside the line, direct labels only where they help (every value of the 7 columns, the loudest hour), the future quiet, a short grey stub for a day without data, the zone as colour **and** icon **and** word, a calendar (OK = the accent outlined and softly filled, MODERATE = solid accent, LOUD amber, DANGEROUS crimson, today ringed, the month named on its first day), Today's cumulative line ("where the day went", scaled so it ends exactly on the figure). Text drawn on a canvas is held at 1.3 × the font scale; the same facts are real text beside the chart.
+
+**Navigation.** Four tabs. Everything else is at most two taps from Home: Today (the ring), Tono (Home's sentence, Trends' "Ask Tono" chip), Alerts (the last-alert row), Headphones (its tile); Settings → About → How it works. Wide windows use a rail; Home becomes two panes from 840 dp.
+
+**Widget.** The watch's ring and Plus Jakarta Sans digits, drawn as masks (`WidgetArt`) and tinted by Glance in either theme; the zone as a word; "As of" the time it was true; an empty ring and "No data today" otherwise.
+
+
+## 9. The UX and copy pass (Oct 2026)
+
+- **Information looks like information.** `MetricCard` without an action is a plain row (icon, muted label, value; no card, no chevron); with one it is a card with a chevron. Panels of plain text are gone from lists.
+- **No ellipsis anywhere on the watch.** `BodyText`, `HeroStatus`, `ScreenTitle`, `GroupLabel`, `PillButton`, `MetricCard`, the foot lines and captions wrap whole; lists scroll. Glance text that cannot fit moves below the fold instead of being cut.
+- **Dose is one progress ring** (`DoseArc`): 12 o'clock, clockwise, a faint full track (`VColor.Track`), full = 100 %; no waves on that page. The caption ("of today's limit" / "of this week's limit") carries an info icon and opens a two-sentence explanation.
+- **More** is a one-screen glance page of three pills (Tono, Mode, Settings) sized to the circle; the clock steps aside on all three glance pages.
+- **Words.** One word per idea: Spanish says *audífonos* (Latin American audience), *parlante*, *teléfono*, *límite* (never *lo permitido* / *presupuesto*), *en vivo*, *alertas*; English says *limit* (never *allowance* / *budget*) and *Around you*. The full old → new table is in PROGRESS.md.

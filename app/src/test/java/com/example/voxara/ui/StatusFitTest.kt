@@ -1,55 +1,47 @@
 package com.example.voxara.ui
 
-import com.example.voxara.ui.design.shortenToFit
+import com.example.voxara.ui.design.wholeSentencesToFit
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Tono's line on the hero never ends in an ellipsis: it is kept whole, or cut at a clause or a word, never mid-word. */
+/**
+ * Tono's line on a glance is a whole sentence or nothing: never an ellipsis, never a piece of a sentence ("Un día
+ * tranquilo para" was seen on the real watch and read as a broken message). What does not fit goes under the hero.
+ */
 class StatusFitTest {
 
     /** A pretend space: at most [n] characters. */
     private fun fitsIn(n: Int): (String) -> Boolean = { it.length <= n }
 
     @Test fun aSentenceThatFitsIsKeptAsItIs() {
-        assertEquals("Looking after your ears", shortenToFit("Looking after your ears", fitsIn(40)))
+        assertEquals("Calm day for your ears", wholeSentencesToFit("Calm day for your ears", fitsIn(40)))
     }
 
-    @Test fun whenItDoesNotFitItKeepsWholeClauses() {
-        val t = "Moderate right now, take a break soon, keep the volume low."
-        assertEquals("Moderate right now", shortenToFit(t, fitsIn(30)))
-        assertEquals("Moderate right now, take a break soon", shortenToFit(t, fitsIn(40)))
+    @Test fun whenItDoesNotFitItKeepsWholeSentencesFromTheStart() {
+        val t = "All good today. Your week is calm. Keep the volume where it is."
+        assertEquals("All good today. Your week is calm.", wholeSentencesToFit(t, fitsIn(40)))
+        assertEquals("All good today.", wholeSentencesToFit(t, fitsIn(20)))
     }
 
-    @Test fun aSentenceEndKeepsItsPunctuation() {
-        val t = "All good today. You are well inside your allowance and the week looks calm."
-        assertEquals("All good today.", shortenToFit(t, fitsIn(30)))
+    @Test fun aSentenceThatDoesNotFitIsNotCutIntoClausesOrWords() {
+        // The real watch showed "Un día tranquilo para": a clause or word cut is never offered.
+        assertNull(wholeSentencesToFit("Un día tranquilo para tus oídos", fitsIn(22)))
+        assertNull(wholeSentencesToFit("Moderate right now, take a break soon.", fitsIn(30)))
     }
 
-    @Test fun withNoClauseThatFitsItCutsAtAWholeWord() {
-        val t = "Surroundings are moderate at the moment"
-        val out = shortenToFit(t, fitsIn(22))
-        assertEquals("Surroundings are", out)
-        assertTrue(t.startsWith(out))
-    }
-
-    @Test fun neverEndsInACutWordOrADanglingMark() {
-        val t = "Fuerte ahora, baja el volumen — descansa un rato; tus oídos lo agradecerán."
-        for (n in 8..t.length) {
-            val out = shortenToFit(t, fitsIn(n))
-            assertFalse("'$out' ends in a mark", out.last() in ",;:—– ")
-            assertFalse("'$out' has an ellipsis", out.contains("…") || out.endsWith("..."))
-            // A prefix of the text that stops at a word boundary.
-            assertTrue("'$out' is not a whole-word prefix", t.startsWith(out) && (out.length == t.length || !t[out.length].isLetterOrDigit()))
+    @Test fun whateverItReturnsIsAPrefixEndingASentence() {
+        val t = "Fuerte ahora. Baja el volumen. Descansa un rato; tus oídos lo agradecerán."
+        for (n in 1..t.length) {
+            val out = wholeSentencesToFit(t, fitsIn(n)) ?: continue
+            assertTrue("'$out' is not a prefix", t.startsWith(out))
+            assertTrue("'$out' does not end a sentence", out == t || out.last() in ".!?…")
+            assertTrue("'$out' has an ellipsis", !out.endsWith("...") && (out == t || !out.endsWith("…")))
         }
     }
 
-    @Test fun aSingleLongWordIsReturnedWhole() {
-        assertEquals("Supercalifragilistic", shortenToFit("Supercalifragilistic and more", fitsIn(5)))
-    }
-
-    @Test fun emptyStaysEmpty() {
-        assertEquals("", shortenToFit("   ", fitsIn(5)))
+    @Test fun emptyIsNothing() {
+        assertNull(wholeSentencesToFit("   ", fitsIn(5)))
     }
 }
