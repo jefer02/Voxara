@@ -17,7 +17,9 @@ import com.google.android.gms.wearable.Wearable
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import java.io.IOException
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -82,7 +84,12 @@ class DataLayerGateway(context: Context) : WatchGateway {
     }
 
     override suspend fun request(nodeId: String, path: String, body: ByteArray): ByteArray = wear {
-        withTimeout(REQUEST_TIMEOUT_MS) { Wearable.getMessageClient(app).sendRequest(nodeId, path, body).await() }
+        try {
+            withTimeout(REQUEST_TIMEOUT_MS) { Wearable.getMessageClient(app).sendRequest(nodeId, path, body).await() }
+        } catch (e: TimeoutCancellationException) {
+            // Not a cancellation of the caller: the watch did not answer (asleep, out of range, app killed).
+            throw IOException("the watch did not answer within ${REQUEST_TIMEOUT_MS / 1000} s", e)
+        }
     }
 
     override suspend fun publishSettings(json: String) {
