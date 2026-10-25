@@ -16,6 +16,7 @@ import com.example.voxara.core.ai.SymptomGuard
 import com.example.voxara.core.ai.Validation
 import com.example.voxara.core.ai.cacheKey
 import com.example.voxara.core.ai.daysToWeeklyLimit
+import com.example.voxara.core.ai.keepsStreak
 import com.example.voxara.core.ai.streakDays
 import com.example.voxara.core.headphones.HeadphoneCategory
 import com.example.voxara.core.ledger.DaySummary
@@ -93,11 +94,27 @@ class CoachTest {
     }
 
     @Test
-    fun `streaks are gentle`() {
+    fun `a streak is strictly days in a row, so saying it is always true`() {
         assertEquals(3, streakDays(listOf(true, true, true, false, false, true)))
-        assertEquals("one slip forgiven", 5, streakDays(listOf(true, true, false, true, true, true)))
-        assertEquals("two slips in a week are not", 2, streakDays(listOf(true, true, false, false, true)))
+        assertEquals("a slip ends it: 'N days in a row' must be literal", 2, streakDays(listOf(true, true, false, true, true, true)))
         assertEquals(0, streakDays(listOf(false, true, true)))
+    }
+
+    @Test
+    fun `a day without enough measurement does not keep a streak`() {
+        // The real watch said "6 días seguidos" while it had measured nothing: an unmeasured day is not a day "within the limit".
+        assertFalse(keepsStreak(measuredMinutes = 0.0, nioshDosePercent = 0.0))
+        assertFalse(keepsStreak(measuredMinutes = 59.0, nioshDosePercent = 10.0))
+        assertTrue(keepsStreak(measuredMinutes = 60.0, nioshDosePercent = 99.0))
+        assertFalse(keepsStreak(measuredMinutes = 300.0, nioshDosePercent = 100.0))
+    }
+
+    @Test
+    fun `a status longer than a glance is rejected`() {
+        val long = """{"status":"Llevas seis días seguidos cuidando tus oídos y hoy vas muy bien con todo","insight":"x","why":"","suggestion":"y","chips":[]}"""
+        assertTrue(ReplyValidator.validate(long, snapshot) is Validation.Invalid)
+        val ok = """{"status":"Oídos tranquilos hoy","insight":"x","why":"","suggestion":"y","chips":[]}"""
+        assertTrue(ReplyValidator.validate(ok, snapshot) is Validation.Valid)
     }
 
     // ------------------------------------------------------------------ guardrails
