@@ -1,9 +1,9 @@
 package com.example.voxara.phone.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,43 +18,47 @@ import com.example.voxara.phone.model.averageDba
 import com.example.voxara.phone.ui.PhoneActions
 import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.components.Banner
-import com.example.voxara.phone.ui.components.ChoiceRow
 import com.example.voxara.phone.ui.components.FreshnessLine
 import com.example.voxara.phone.ui.components.Group
-import com.example.voxara.phone.ui.components.GroupDivider
-import com.example.voxara.phone.ui.components.GroupHeader
 import com.example.voxara.phone.ui.components.GroupNote
+import com.example.voxara.phone.ui.components.GroupRow
+import com.example.voxara.phone.ui.components.ShareTile
 import com.example.voxara.phone.ui.components.SkeletonCard
-import com.example.voxara.phone.ui.components.StatCard
-import com.example.voxara.phone.ui.components.SwitchRow
 import com.example.voxara.phone.ui.components.VoxCard
 import com.example.voxara.phone.ui.components.VoxScreen
-import com.example.voxara.phone.ui.components.ZoneBadge
+import com.example.voxara.phone.ui.components.ZoneWord
 import com.example.voxara.phone.ui.components.contentWidth
 import com.example.voxara.phone.ui.dateTimeText
 import com.example.voxara.phone.ui.theme.Vox
-import com.example.voxara.settings.HeadphoneType
-import com.example.voxara.settings.SettingField
+import com.example.voxara.phone.ui.theme.figureStyle
+import com.example.voxara.ui.design.RollingDigits
 import com.example.voxara.ui.design.VoxIcons
+import com.example.voxara.ui.design.wordRes
 import kotlin.math.roundToInt
 
+/**
+ * HEADPHONES — what the phone's headphones are doing now, today's estimate and the week's share. Sharing the listening
+ * with the watch and the headphone type are settings: they live in Settings, one row away (the first row here).
+ * How the sharing works is explained in How it works.
+ */
 @Composable
-fun HeadphonesScreen(s: PhoneUiState, actions: PhoneActions, onBack: () -> Unit) {
+fun HeadphonesScreen(s: PhoneUiState, actions: PhoneActions, onBack: () -> Unit, onOpenSettings: () -> Unit = {}) {
     VoxScreen(stringResource(R.string.hp_title), onBack = onBack, refreshing = s.syncing, onRefresh = actions.onRefresh) {
         item {
             Group(Modifier.contentWidth()) {
-                SwitchRow(
+                GroupRow(
                     title = stringResource(R.string.hp_sampling),
                     subtitle = if (!s.phoneSampling) stringResource(R.string.phone_status_off)
                     else if (s.lastListeningSentMs <= 0L) stringResource(R.string.phone_status_waiting)
                     else stringResource(R.string.phone_status_synced, dateTimeText(s.lastListeningSentMs, s.nowMs)),
-                    checked = s.phoneSampling,
-                    onChange = actions.onPhoneSampling,
                     icon = VoxIcons.Phone,
+                    onClick = onOpenSettings,
                 )
             }
         }
-        item { GroupNote(stringResource(R.string.phone_what) + "\n\n" + stringResource(R.string.phone_sends) + "\n\n" + stringResource(R.string.phone_never), Modifier.contentWidth()) }
+        // What is happening now comes first.
+        headphoneLiveItems(s, actions)
+        item { BatteryGuide(s, actions, Modifier.contentWidth()) }
         if (s.phoneSampling && !s.bluetoothGranted) {
             item {
                 Banner(
@@ -76,11 +80,10 @@ fun HeadphonesScreen(s: PhoneUiState, actions: PhoneActions, onBack: () -> Unit)
                     if (level == null) {
                         Text(stringResource(R.string.hp_estimate_none), style = MaterialTheme.typography.bodyMedium, color = Vox.colors.text2)
                     } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(R.string.value_dba, level.roundToInt()), style = MaterialTheme.typography.displaySmall, color = Vox.colors.text)
-                            Spacer(Modifier.width(12.dp))
-                            ZoneBadge(RiskZone.of(level))
+                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            RollingDigits(level.roundToInt(), figureStyle(36), Vox.colors.text, prefix = "≈", suffix = "dBA", still = true, cellScale = 0.94f)
                         }
+                        ZoneWord(RiskZone.of(level), sizeSp = 15)
                         Text(stringResource(R.string.hp_estimate_label), style = MaterialTheme.typography.labelMedium, color = Vox.colors.text2)
                         Text(
                             stringResource(R.string.hp_today) + " · " + formatClock(today.measuredMinutes),
@@ -91,31 +94,15 @@ fun HeadphonesScreen(s: PhoneUiState, actions: PhoneActions, onBack: () -> Unit)
                 }
             }
             item {
-                StatCard(
-                    VoxIcons.Headphones, stringResource(R.string.hp_weekly), s.head.headphoneWeeklyPercent.roundToInt(),
-                    stringResource(R.string.stat_headphones_sub), s.head.asOfMs, s.nowMs, Modifier.contentWidth(),
+                val week = s.figures.headphonesWeekPercent
+                ShareTile(
+                    stringResource(R.string.hp_weekly), stringResource(R.string.tile_headphones_caption), week,
+                    VoxIcons.Headphones, Vox.colors.secondary,
+                    stringResource(R.string.tile_headphones_cd, week.roundToInt(), stringResource(RiskZone.ofPercent(week).wordRes())),
+                    Modifier.contentWidth(),
                 )
             }
         }
-
-        item { GroupHeader(stringResource(R.string.hp_type), Modifier.contentWidth()) }
-        item {
-            Group(Modifier.contentWidth()) {
-                ChoiceRow(
-                    title = stringResource(R.string.hp_type),
-                    options = listOf(
-                        HeadphoneType.EARBUDS to stringResource(R.string.hp_type_earbuds),
-                        HeadphoneType.OVER_EAR to stringResource(R.string.hp_type_over),
-                        HeadphoneType.NONE to stringResource(R.string.hp_type_none),
-                    ),
-                    selected = s.settings.headphoneType,
-                    onSelect = { actions.onSetting(SettingField.HEADPHONE_TYPE, it.name) },
-                    pending = SettingField.HEADPHONE_TYPE in s.pending,
-                )
-                GroupDivider()
-                GroupNote(stringResource(R.string.hp_type_note), Modifier.padding(vertical = 12.dp))
-            }
-        }
-        item { GroupNote(stringResource(R.string.phone_limits), Modifier.contentWidth()) }
+        item { GroupNote(stringResource(R.string.phone_limits), Modifier.contentWidth().padding(top = 4.dp)) }
     }
 }
