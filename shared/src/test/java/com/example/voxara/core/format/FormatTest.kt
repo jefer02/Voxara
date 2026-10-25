@@ -27,4 +27,26 @@ class FormatTest {
         assertEquals("1h 30m", formatClock(90.0))
         assertEquals("28s", formatClock(28.0 / 60))
     }
+
+    @Test
+    fun `levels and long estimates claim no more precision than they have`() {
+        assertEquals("82 dBA", formatLevel(81.6))
+        assertEquals("54 dBA", formatLevel(54.0))
+        assertEquals("100h", formatApproxDuration(100 * 60 + 29.0))
+        assertEquals("3h 20m", formatApproxDuration(3 * 60 + 17.0))
+        assertEquals("35m", formatApproxDuration(33.0))
+        assertEquals("5m", formatApproxDuration(1.0))
+    }
+
+    @Test
+    fun `quiet hours follow the clock format and the language`() {
+        // The JDK's CLDR data puts a narrow no-break space before the day period; compare with plain spaces.
+        fun plain(t: String) = t.replace(' ', ' ').replace(' ', ' ')
+        val es = Locale.forLanguageTag("es")
+        assertEquals("22:00", formatTimeOfDay(22 * 60, is24Hour = true, locale = es))
+        assertEquals("07:30", formatTimeOfDay(7 * 60 + 30, is24Hour = true, locale = Locale.ENGLISH))
+        assertEquals("10:00 PM", plain(formatTimeOfDay(22 * 60, is24Hour = false, locale = Locale.ENGLISH)))
+        assertEquals("10:00 p. m.", plain(formatTimeOfDay(22 * 60, is24Hour = false, locale = es)))
+        assertEquals("12:00 AM", plain(formatTimeOfDay(1440, is24Hour = false, locale = Locale.ENGLISH)))
+    }
 }
