@@ -60,7 +60,7 @@ object Palette {
         Accent.PURPLE -> if (dark) Tone(0xFF8B5CF6, 0xFFA78BFA) else Tone(0xFF8B5CF6, 0xFF6D28D9)
         Accent.TURQUOISE -> if (dark) Tone(0xFF00E5BF, 0xFF00E5BF) else Tone(0xFF009E87, 0xFF00695C)
         Accent.BLUE -> if (dark) Tone(0xFF3B82F6, 0xFF60A5FA) else Tone(0xFF3B82F6, 0xFF1D4ED8)
-        Accent.EMERALD -> if (dark) Tone(0xFF10B981, 0xFF34D399) else Tone(0xFF059669, 0xFF065F46)
+        Accent.EMERALD -> if (dark) Tone(0xFF34D399, 0xFF34D399) else Tone(0xFF059669, 0xFF065F46)
     }
 
     /** Caution tier (zone LOUD). */
