@@ -21,6 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.graphics.drawable.toDrawable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.voxara.core.design.Palette
 import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.phone.data.ThemeMode
@@ -61,6 +66,7 @@ class MainActivity : ComponentActivity() {
                         is PhoneEvent.Message -> snackbar.showSnackbar(getString(e.text))
                         PhoneEvent.Export -> export()
                         PhoneEvent.OpenWearableApp -> openWearableApp()
+                        PhoneEvent.OpenBatterySettings -> openBatterySettings()
                         PhoneEvent.RequestNotifications ->
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         PhoneEvent.RequestBluetooth ->
@@ -90,6 +96,26 @@ class MainActivity : ComponentActivity() {
         vm.onResume()
     }
 
+    override fun onPause() {
+        vm.onPause()
+        super.onPause()
+    }
+
+    /**
+     * Where the wearer sets Voxara to "Unrestricted" so the system does not stop it in the background (on Samsung:
+     * Settings → Apps → Voxara → Battery → Unrestricted). The app's own page first (it has that row on every
+     * phone), the system's battery-optimisation list as the fallback. Voxara never changes it for them.
+     */
+    private fun openBatterySettings() {
+        val intents = listOf(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", packageName, null)),
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+        )
+        for (i in intents) {
+            try { startActivity(i); return } catch (_: ActivityNotFoundException) { }
+        }
+    }
+
     /**
      * System bars, the window background behind Compose, and (Android 12+) the app's night mode so
      * the splash screen of the next launch matches. [mode] null = the store is not read yet.
@@ -114,9 +140,17 @@ class MainActivity : ComponentActivity() {
         Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }.getOrDefault(false)
 
+    /** Builds the files off the main thread (a year of minutes is hundreds of thousands of rows), then opens the share sheet. */
     private fun export() {
-        runCatching { startActivity(vm.exportIntent()) }
-            .onFailure { android.widget.Toast.makeText(this, R.string.export_failed, android.widget.Toast.LENGTH_SHORT).show() }
+        lifecycleScope.launch {
+            runCatching {
+                val intent = withContext(Dispatchers.IO) { vm.exportIntent() }
+                startActivity(intent)
+            }.onFailure {
+                if (it is CancellationException) throw it
+                android.widget.Toast.makeText(this@MainActivity, R.string.export_failed, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     /** The app that pairs the watch: Galaxy Wearable, else the Wear OS app, else Bluetooth settings. */

@@ -12,58 +12,67 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.google.android.gms.tasks.Tasks
-import com.google.android.gms.wearable.PutDataMapRequest
-import com.google.android.gms.wearable.Wearable
+import com.example.voxara.audio.HeadphoneWatcher
+import com.example.voxara.core.headphones.PhoneListeningSample
+import com.example.voxara.phone.listening.PhoneListeningService
+import com.example.voxara.phone.listening.WatchBridge
+import com.example.voxara.sync.PhoneListeningState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * Samples phone listening every 15 minutes (WorkManager's minimum) and at Bluetooth connect /
- * disconnect edges. When media is playing to headphones it sends ONE span to the watch:
- * end time, seconds, volume (dB and index) and the output TYPE. Nothing else.
+ * THE FALLBACK. The detector is [PhoneListeningService] (events: devices, playback, volume). This worker is
+ * only the safety net for when Android does not let that service run (it was started from the background and
+ * refused, or the system stopped it): every 15 minutes (WorkManager's minimum) and at Bluetooth edges it takes
+ * ONE sample. While the service is running it does nothing at all, so a minute is never reported twice.
  *
- * Honest limits: a 15-minute sample cannot see pauses or volume changes in between, so the watch
- * files these minutes as very-low-confidence estimates.
+ * When media is playing to headphones it sends ONE span to the watch (end time, seconds, volume and the
+ * output TYPE; nothing else) and tells the watch the live state.
+ *
+ * Honest limits: one sample cannot see pauses or volume changes in between, so this path is coarser. The
+ * span can only be as long as the time since the previous sample (at most 15 minutes).
  */
 class ListeningSampler(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         val ctx = applicationContext
         if (!PhonePrefs.enabled(ctx)) return Result.success()
-        val am = ctx.getSystemService(AudioManager::class.java) ?: return Result.success()
+        // The service is the detector: while it runs, this stays out of the way.
+        if (PhoneListeningService.running) return Result.success()
+        // From the background this is usually refused on Android 12+; when it is allowed the service takes over.
+        if (PhoneListeningService.tryStart(ctx)) return Result.success()
         val now = System.currentTimeMillis()
         val last = PhonePrefs.lastSampleMs(ctx)
         PhonePrefs.setLastSampleMs(ctx, now)
 
-        val headphones = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull { outputKind(it.type) != null }
-        val kind = headphones?.let { outputKind(it.type) }
-        val playing = kind != null && am.isMusicActive
-        val seconds = spanSeconds(last, now)
-        if (!playing || headphones == null || kind == null || seconds <= 0.0) return Result.success()
-
-        val index = am.getStreamVolume(AudioManager.STREAM_MUSIC)
-        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val volumeDb = runCatching {
-            am.getStreamVolumeDb(AudioManager.STREAM_MUSIC, index, outputDeviceType(headphones.type)).toDouble()
-        }.getOrDefault(Double.NaN)
-
-        val request = PutDataMapRequest.create("$PATH_PREFIX/$now").apply {
-            dataMap.putLong(KEY_END_MS, now)
-            dataMap.putDouble(KEY_SECONDS, seconds)
-            dataMap.putDouble(KEY_VOLUME_DB, volumeDb)
-            dataMap.putInt(KEY_INDEX, index)
-            dataMap.putInt(KEY_MAX, max)
-            dataMap.putString(KEY_OUTPUT, kind)
-        }.asPutDataRequest().setUrgent()
-
-        return runCatching {
-            Tasks.await(Wearable.getDataClient(ctx).putDataItem(request), 30, TimeUnit.SECONDS)
-            PhonePrefs.setLastSyncMs(ctx, now)
-            Result.success()
-        }.getOrElse {
-            Log.w(TAG, "sync failed; will retry", it)
-            Result.retry()
+        // One look at the outputs, through the same classifier the service uses.
+        val snap = withContext(Dispatchers.Main) { HeadphoneWatcher(ctx).refresh() }
+        val route = snap.route
+        // The watch always hears the state, so its "headphones on the phone" is right at the edges too.
+        runCatching {
+            WatchBridge.sendState(
+                ctx,
+                if (route == null) PhoneListeningState.none(now, PhonePrefs.nextSequence(ctx, now))
+                else PhoneListeningState(
+                    now, PhonePrefs.nextSequence(ctx, now), true, snap.playing, route.kind, route.possibleSpeaker,
+                    snap.volumeDb, snap.volumeIndex, snap.volumeMax, snap.fixedVolume, now,
+                ),
+            )
         }
+        val seconds = spanSeconds(last, now)
+        if (route == null || !snap.playing || seconds <= 0.0) return Result.success()
+
+        WatchBridge.enqueueSpan(
+            ctx,
+            PhoneListeningSample(
+                endMs = now, seconds = seconds, volumeDb = snap.volumeDb,
+                index = snap.volumeIndex, max = snap.volumeMax, output = route.kind,
+            ),
+        )
+        // What the Data Layer does not take stays in the outbox; the next flush (a reconnect, the next sample) sends it once.
+        WatchBridge.flushSpans(ctx, now)
+        return Result.success()
     }
 
     companion object {
