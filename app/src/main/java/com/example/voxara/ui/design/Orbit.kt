@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -32,7 +35,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -335,48 +337,52 @@ private fun Moon(layer: LayerProgress, dba: Int?, tone: VoxTone) {
     if (LocalAmbient.current || dba == null) return
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val d = minOf(maxWidth, maxHeight)
-        val moonSize = d * 0.155f
+        val pillHeight = d * 0.10f
         val density = LocalDensity.current
-        // The moon's figure keeps to the design size at large fonts (13 sp): the number is also in the
-        // foot line and in the spoken description, and it must stay inside its disc.
+        // The pill keeps to the design size at large fonts: the level is also in the first detail row and in the
+        // spoken description, and the pill must stay in the gap between the two arcs, above the figure.
         val fixed = Density(density.density, fontScale = minOf(density.fontScale, 1f))
         val centerPx = with(density) { (d / 2).toPx() }
-        // Where it settles: wholly inside the ring, in the gap between the two arcs.
-        val restPx = with(density) { (d * 0.352f).toPx() }
-        val sizePx = with(density) { moonSize.toPx() }
-        Box(
+        // Where it settles: inside the ring, in the top gap between the two arcs, above the figure.
+        val restPx = with(density) { (d * 0.385f).toPx() }
+        val heightPx = with(density) { pillHeight.toPx() }
+        Row(
             Modifier
-                .align(Alignment.TopStart)
-                .size(moonSize)
+                .align(Alignment.TopCenter)
+                .height(pillHeight)
                 .offset {
                     val m = layer.moon.value
                     // It starts where the outside figure was (just above the centre) and flies up to the top gap
                     // on a curve that swings out to the right: an orbit, not a straight line.
                     val startY = centerPx - centerPx * 0.06f
-                    val y = startY + ((centerPx - restPx) - startY) * m - sizePx / 2
-                    val x = centerPx + sin(PI * m).toFloat() * centerPx * 0.30f - sizePx / 2
+                    val y = startY + ((centerPx - restPx) - startY) * m - heightPx / 2
+                    val x = sin(PI * m).toFloat() * centerPx * 0.30f
                     IntOffset(x.roundToInt(), y.roundToInt())
                 }
                 .graphicsLayer {
                     val m = layer.moon.value.coerceAtLeast(0f)
-                    // The outside level starts as large as the figure it was, and shrinks into the moon.
+                    // The outside level starts as large as the figure it was, and shrinks into the pill.
                     val s = 1f + 0.7f * (1f - m.coerceIn(0f, 1f))
                     scaleX = s; scaleY = s
                     // There from the first moment it leaves (it stands in for the outside figure); gone once it is home again.
                     alpha = (layer.moon.value * 40f).coerceIn(0f, 1f)
                 }
-                .clip(androidx.compose.foundation.shape.CircleShape)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(percent = 50))
                 .drawBehind {
-                    drawCircle(Color.Black)
-                    drawCircle(tone.fill.copy(alpha = 0.22f))
-                    drawCircle(tone.fill, radius = size.minDimension / 2 - 1.dp.toPx(), style = Stroke(2.dp.toPx()))
-                },
-            contentAlignment = Alignment.Center,
+                    drawRect(Color.Black)
+                    drawRect(tone.fill.copy(alpha = 0.22f))
+                }
+                .border(1.5.dp, tone.fill, androidx.compose.foundation.shape.RoundedCornerShape(percent = 50))
+                .padding(horizontal = d * 0.03f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
+            // The waves icon is "the sound around you" everywhere in the app; with the unit, "58" is no longer a riddle.
+            Icon(VoxIcons.Waves, contentDescription = null, tint = tone.ink, modifier = Modifier.size(pillHeight * 0.5f))
             CompositionLocalProvider(LocalDensity provides fixed) {
                 Text(
-                    dba.toString(),
-                    style = VType.Label.scaled(figureScaleFor(d)),
+                    "$dba dBA",
+                    style = VType.Caption.scaled(figureScaleFor(d)),
                     color = VColor.Text, maxLines = 1, softWrap = false,
                     modifier = Modifier.clearAndSetSemantics { },
                 )
@@ -388,107 +394,40 @@ private fun Moon(layer: LayerProgress, dba: Int?, tone: VoxTone) {
 // ------------------------------------------------------------------------------------ Dose
 
 /**
- * DOSE — one ring, two pictures that morph into each other as [week] goes from 0 (Today) to 1 (Week).
+ * DOSE — one progress ring: the share of the limit used, read in one glance. It starts at 12 o'clock and fills
+ * clockwise; a faint track is the part not used yet; a full ring is 100 % of the limit (it stays full above it).
+ * Nothing else is drawn on it: no hour marks, no markers, no day segments (the hours and the days are lists
+ * below the fold), so every mark on the ring is the one number in the middle.
  *
- * Today: 24 hourly bars around the ring, from the minute ledger: midnight bottom-left, noon at the top,
- * 24:00 bottom-right. The bars hang inward from the shared rim; a bar's length and colour follow that
- * hour's level (40 to 110 dBA); an hour with no measurement is a dot; this hour gets a marker.
- *
- * Week: one segment per day, oldest first and today last (bottom-right). A segment fills in proportion to
- * that day's share of the weekly allowance ([values], 0..1) in the colour of that day's own dose zone
- * ([tones]); a day with measurements always shows at least a stub, so it is never mistaken for a day with
- * none ([measured] false: a thin dotted segment). Today is the one widened and underlined in white.
- *
- * Morphing: the bars retract into the rim one after another round the ring while the day segments fill in
- * behind them, one after another. With reduced motion ([LocalReduceMotion]) nothing moves: the two
- * pictures cross-fade. [week] is read while drawing, so a frame of the morph recomposes nothing.
+ * [today] and [week] are the two shares as fractions of the limit (1 = 100 %), each with its zone [todayTone] /
+ * [weekTone]. [week] goes from 0 (Today) to 1 (Week) while the view changes: the arc runs from one share to the
+ * other and its colour follows. It is read while drawing, so a frame of the change recomposes nothing. With
+ * reduced motion the caller snaps it; the page's draw-in ([rememberReveal]) is 1 then, and in ambient.
  */
 @Composable
-fun DoseMorph(
-    hourly: List<Float>,
-    nowHour: Int,
-    values: List<Float>,
-    tones: List<VoxTone>,
-    measured: List<Boolean>,
-    week: () -> Float,
+fun DoseArc(
+    today: Float,
+    week: Float,
+    todayTone: VoxTone,
+    weekTone: VoxTone,
+    mix: () -> Float,
     modifier: Modifier = Modifier,
 ) {
     val reveal = rememberReveal()
-    val still = LocalReduceMotion.current
     val c = remember { StrokeCache() }
-    val colors = remember(hourly) {
-        Array(24) { h ->
-            val v = hourly.getOrElse(h) { 0f }
-            if (v <= 0f) VColor.Track else VColor.zone(RiskZone.of(v.toDouble()))
-        }
-    }
+    val track = VColor.Track
     Canvas(modifier.fillMaxSize().turnWithPager()) {
-        val m = week().coerceIn(0f, 1f)
-        if (m < 0.999f) dayBars(c, colors, hourly, nowHour, reveal.value, m, still)
-        if (m > 0.001f) weekSegments(c, values, tones, measured, reveal.value, m, still)
-    }
-}
-
-/** Today's 24 bars. [m] is how far the morph to the week has gone: the bars retract into the rim in turn (or fade, [still]). */
-private fun DrawScope.dayBars(c: StrokeCache, colors: Array<Color>, hourly: List<Float>, nowHour: Int, reveal: Float, m: Float, still: Boolean) {
-    val d = size.minDimension
-    val bar = d * 0.021f
-    val r = ringRadius(bar)
-    val longest = d * 0.075f
-    // A faint full ring on the rim keeps the shape readable where the day has no data.
-    ringArc(c, r, 0f, 1f, Color.White.copy(alpha = 0.06f * (1f - m)), bar * 0.35f)
-    for (h in 0 until 24) {
-        val f = (h + 0.5f) / 24f
-        val v = hourly.getOrElse(h) { 0f }
-        val grow = (reveal * 1.7f - f * 0.7f).coerceIn(0f, 1f)
-        // The bars go in order round the ring: 0 = standing, 1 = gone into the rim. Cross-fading: all together.
-        val gone = if (still) m else (m * 1.5f - f * 0.5f).coerceIn(0f, 1f)
-        val keep = 1f - gone
-        if (keep <= 0.003f) continue
-        val len = if (v <= 0f) 0f else (d * 0.014f + (longest - d * 0.014f) * ((v - 40f) / 70f).coerceIn(0.1f, 1f)) * grow * (if (still) 1f else keep)
-        drawLine(colors[h].copy(alpha = colors[h].alpha * keep), ringPoint(r, f), ringPoint(r - len, f), strokeWidth = bar, cap = StrokeCap.Round)
-    }
-    if (nowHour in 0..23) drawCircle(Color.White.copy(alpha = reveal * (1f - m)), bar * 0.6f, ringPoint(r - longest - bar * 1.1f, (nowHour + 0.5f) / 24f))
-}
-
-/** The week's seven segments. [m] is how far the morph has gone: they fill in turn as it rises (or fade in, [still]). */
-private fun DrawScope.weekSegments(
-    c: StrokeCache, values: List<Float>, tones: List<VoxTone>, measured: List<Boolean>, reveal: Float, m: Float, still: Boolean,
-) {
-    val w = bezelW() * 1.6f
-    val r = ringRadius(w * 1.25f)
-    val n = values.size.coerceAtLeast(1)
-    val gap = 0.034f
-    val seg = (1f - gap * (n - 1)) / n
-    // How far the segments have been drawn in: the page's draw-in and the morph, one after another. Cross-fading: all at once.
-    val drawn = if (still) reveal else reveal * m
-    val alpha = if (still) m else 1f
-    for (i in 0 until n) {
-        val a = i * (seg + gap)
-        val today = i == n - 1
-        val has = measured.getOrElse(i) { true }
-        val sw = if (today) w * 1.25f else w
-        if (has) {
-            ringArc(c, r, a, a + seg, Color.White.copy(alpha = 0.2f * alpha), sw)
-            val p = (drawn * (n + 1.5f) - i).coerceIn(0f, 1f)
-            val v = values.getOrElse(i) { 0f }.coerceIn(0f, 1f)
-            // At least a stub: the day was measured, however quiet.
-            val fill = (maxOf(v, 0.10f) * p).coerceAtMost(1f)
-            val tone = tones.getOrElse(i) { VColor.accent }.fill
-            ringArc(c, r, a, a + seg * fill, tone.copy(alpha = tone.alpha * alpha), sw)
-        } else {
-            // No measurement that day: a thin dotted line, clearly not a bar at zero.
-            val dots = 4
-            for (k in 0 until dots) {
-                val f = a + seg * (k + 0.5f) / dots
-                drawCircle(Color.White.copy(alpha = 0.30f * drawn * alpha), w * 0.11f, ringPoint(r, f))
-            }
-        }
-    }
-    if (values.isNotEmpty()) {
-        // Today, marked: a bright underline just inside its segment, so the last one is never mistaken for an empty day.
-        val a = (n - 1) * (seg + gap)
-        ringArc(c, r - w * 0.62f - bezelW() * 0.9f, a, a + seg, Color.White.copy(alpha = 0.9f * drawn * alpha), bezelW() * 0.32f)
+        val m = mix().coerceIn(0f, 1f)
+        val w = bezelW(1.3f)
+        val r = ringRadius(w)
+        // The empty part: a faint full circle, so the ring's whole length (100 %) is always visible.
+        drawCircle(track, r, center, style = c.get(w, round = false))
+        val value = (today + (week - today) * m).coerceIn(0f, 1f) * reveal.value
+        if (value <= 0f) return@Canvas
+        val tone = androidx.compose.ui.graphics.lerp(todayTone.fill, weekTone.fill, m)
+        // A soft glow under the arc (a wider translucent stroke, no blur), then the arc from 12 o'clock.
+        arcDeg(c, r, -90f, 360f * value, tone.copy(alpha = 0.18f), w * 2.4f)
+        arcDeg(c, r, -90f, 360f * value, tone, w)
     }
 }
 
@@ -511,8 +450,7 @@ fun PageName(name: String, icon: ImageVector, accent: Color, modifier: Modifier 
     ) {
         Icon(icon, contentDescription = null, tint = if (ambient) VColor.TextSecondary else accent, modifier = Modifier.size(14.dp * LocalTextScale.current))
         Text(
-            name, style = style, color = if (ambient) VColor.TextSecondary else accent,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            name, style = style, color = if (ambient) VColor.TextSecondary else accent, maxLines = 1,
         )
     }
 }
