@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.example.voxara.R
 import com.example.voxara.core.alerts.Alert
+import com.example.voxara.core.alerts.AlertHistoryWriter
 import com.example.voxara.core.alerts.AlertKind
 import com.example.voxara.core.alerts.AlertPolicy
 import com.example.voxara.core.alerts.HapticPrefs
@@ -37,10 +38,23 @@ import kotlin.math.roundToInt
 class AlertNotifier(private val context: Context, private val haptics: HapticConductor) {
 
     companion object {
+        /**
+         * The one way the app writes and resolves alert history rows: off the calling thread, in order, and fenced
+         * against "delete all" ([AlertHistoryWriter]). The notifier records with it; the notification actions resolve with it.
+         */
+        fun historyWriter(context: Context) = AlertHistoryWriter(
+            log = { ExposureDb.get(context).alerts },
+            wipedAtMs = { ExposureRepository.wipedAtMs },
+            onFailure = { Log.w("VoxaraAlerts", "alert history write failed", it) },
+        )
+
         const val CHANNEL_ID = "voxara_alerts"
         const val ACTION_ACK = "com.example.voxara.ALERT_ACK"
         const val ACTION_SNOOZE = "com.example.voxara.ALERT_SNOOZE"
+        const val ACTION_LOWER = "com.example.voxara.ALERT_LOWER"
         const val EXTRA_KIND = "kind"
+        /** Whose headphones the alert is about (LayerSource name), so "Lower" goes to the right device. */
+        const val EXTRA_SOURCE = "source"
 
         fun notificationId(kind: AlertKind) = 5_000 + kind.ordinal
 
@@ -64,11 +78,13 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
 
     init { ensureChannel(context) }
 
+    private val history = historyWriter(context)
+
     /**
      * Delivers [alerts] (most severe first). Only the most severe one that may vibrate does:
      * advisories honour the wearer's haptic preference, warnings and limits always vibrate
-     * (AlertPolicy). Every delivered alert is written to the alert history; a failed write
-     * never blocks the haptic or the notification.
+     * (AlertPolicy). Every delivered alert is written to the alert history, after the haptic
+     * and on a background thread ([AlertHistoryWriter]); a failed write never blocks the haptic or the notification.
      */
     fun deliver(alerts: List<Alert>, prefs: HapticPrefs = ExposureRepository.state.value.hapticPrefs) {
         if (alerts.isEmpty()) return
@@ -78,10 +94,8 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
         val now = System.currentTimeMillis()
         // The screen sees it too: a headphones-mode transition is skipped for an alert.
         ExposureRepository.update { it.copy(lastAlertAtMs = now) }
-        alerts.forEach { a ->
-            runCatching { ExposureDb.get(context).alerts.add(a.kind, a.value, a.level, now) }
-                .onFailure { Log.w("VoxaraAlerts", "alert history write failed", it) }
-        }
+        // After the haptic, and off this thread: SQLite must not hold the notification back.
+        history.record(alerts, now)
         alerts.forEach { post(it) }
         // Last, and asynchronous: the optional copy on the phone for 100% alerts.
         alerts.filter { it.kind.tier == Tier.LIMIT }.forEach {
@@ -104,7 +118,8 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
         )
         fun action(action: String) = PendingIntent.getBroadcast(
             context, id * 10 + action.length,
-            Intent(context, AlertActionReceiver::class.java).setAction(action).putExtra(EXTRA_KIND, kind.name),
+            Intent(context, AlertActionReceiver::class.java).setAction(action).putExtra(EXTRA_KIND, kind.name)
+                .putExtra(EXTRA_SOURCE, ExposureRepository.state.value.headphoneSource.name),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
@@ -120,7 +135,14 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
             )
             .setContentIntent(open)
             .setAutoCancel(true)
-            .addAction(0, res.getString(R.string.alert_action_ack), action(ACTION_ACK))
+        if (kind == AlertKind.HEADPHONE_OVER_SAFE) {
+            // The two actions of the headphone-volume alert (the same two as in its in-view panel).
+            builder.addAction(0, res.getString(R.string.hp_lower_action), action(ACTION_LOWER))
+            builder.addAction(0, res.getString(R.string.hp_dismiss_action), action(ACTION_ACK))
+            context.getSystemService(NotificationManager::class.java).notify(id, builder.build())
+            return
+        }
+        builder.addAction(0, res.getString(R.string.alert_action_ack), action(ACTION_ACK))
         if (kind.snoozable) {
             val minutes = ExposureRepository.state.value.snoozeMinutes
             val label = if (minutes == 60) res.getString(R.string.alert_action_snooze)
@@ -143,6 +165,7 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
         AlertKind.HEADPHONE_WEEK_80 -> R.string.alert_hp_week_80_title
         AlertKind.HEADPHONE_WEEK_100 -> R.string.alert_hp_week_100_title
         AlertKind.HEADPHONE_LOUD_NOW -> R.string.alert_hp_loud_title
+        AlertKind.HEADPHONE_OVER_SAFE -> R.string.alert_hp_safe_title
     }
 
     @StringRes
@@ -156,5 +179,6 @@ class AlertNotifier(private val context: Context, private val haptics: HapticCon
         AlertKind.HEADPHONE_WEEK_80 -> R.string.alert_hp_week_80_body
         AlertKind.HEADPHONE_WEEK_100 -> R.string.alert_hp_week_100_body
         AlertKind.HEADPHONE_LOUD_NOW -> R.string.alert_hp_loud_body
+        AlertKind.HEADPHONE_OVER_SAFE -> R.string.alert_hp_safe_body
     }
 }
