@@ -9,5 +9,6 @@ fun AlertKind.pattern(): Pattern = when (this) {
     AlertKind.DAILY_80, AlertKind.WEEK_80, AlertKind.HEADPHONE_WEEK_80 -> Pattern.TWO_FIRM
     AlertKind.DAILY_100 -> Pattern.DOSE_FULL
     AlertKind.WEEK_100, AlertKind.HEADPHONE_WEEK_100 -> Pattern.LONG_SHORT_LONG
-    AlertKind.HEADPHONE_LOUD_NOW -> Pattern.QUICK_TRIPLE
+    // The headphone-volume family: the quick triple (above the recommended level, and very loud listening).
+    AlertKind.HEADPHONE_LOUD_NOW, AlertKind.HEADPHONE_OVER_SAFE -> Pattern.QUICK_TRIPLE
 }

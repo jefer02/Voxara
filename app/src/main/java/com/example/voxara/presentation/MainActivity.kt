@@ -17,6 +17,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import com.example.voxara.sync.PhoneLink
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import androidx.wear.ambient.AmbientLifecycleObserver
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.TimeText
@@ -37,7 +40,10 @@ import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.LedgerBook
 import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.monitoring.monitoringStatus
-import com.example.voxara.core.headphones.HeadphoneModeChoice
+import com.example.voxara.audio.HeadphoneControl
+import com.example.voxara.audio.HeadphoneWatcher
+import com.example.voxara.audio.SpeakerMemory
+import com.example.voxara.core.alerts.AlertKind
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.data.AppLanguage
@@ -46,6 +52,7 @@ import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
 import com.example.voxara.haptics.HapticConductor
 import com.example.voxara.haptics.Pattern
+import com.example.voxara.service.AlertNotifier
 import com.example.voxara.service.DosimeterService
 import com.example.voxara.service.MidnightRollupWorker
 import com.example.voxara.service.MonitoringWatchdogWorker
@@ -143,6 +150,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         ExposureRepository.init(this)
+        // "Not headphones" memory, so the Mode screen can say how many speakers are remembered.
+        lifecycleScope.launch { SpeakerMemory.ensureLoaded() }
         language = LocaleStore.read(this)
         lifecycle.addObserver(AmbientLifecycleObserver(this, ambientCallback))
         MidnightRollupWorker.schedule(this)
@@ -199,6 +208,22 @@ class MainActivity : ComponentActivity() {
         refreshHealth()
         // Changed from the settings panel - or, in principle, from another surface.
         if (LocaleStore.read(this) != language) recreate()
+        // The app is back: look at the phone link now, and keep looking while it is in front, so "reconnecting"
+        // turns into "connected" (and the catch-up runs) with no action from the wearer.
+        linkJob?.cancel()
+        linkJob = lifecycleScope.launch {
+            while (true) {
+                PhoneLink.refresh(this@MainActivity)
+                delay(LINK_LOOK_MS)
+            }
+        }
+    }
+
+    private var linkJob: Job? = null
+
+    override fun onPause() {
+        linkJob?.cancel()
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -309,14 +334,30 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * The wearer picked a headphones-mode choice: the layer follows at once (the transition plays from
-     * the new state), a minimal confirmation tap under their finger, the choice stored and stamped so
-     * it syncs to the phone. The dosimeter, if running, keeps tracking the detection underneath.
+     * "Dismiss" on the headphone-volume panel: it closes for this tier and nothing else. No setting is written
+     * and nothing is muted, so a higher tier or the engine's cooldown alerts again. The alert history records
+     * that it was acknowledged.
      */
-    private fun selectHeadphoneMode(choice: HeadphoneModeChoice) {
+    private fun dismissHeadphoneAlert() {
         confirmHaptics.fire(Pattern.CONFIRM)
-        ExposureRepository.setHeadphoneMode(choice)
-        lifecycleScope.launch { ExposureRepository.store.setHeadphoneMode(choice) }
+        ExposureRepository.dismissHeadphoneAlert()
+        // Queued behind the alert's own history row (a tap right after the alert is not lost).
+        AlertNotifier.historyWriter(applicationContext).resolve(AlertKind.HEADPHONE_OVER_SAFE, acknowledged = true, snoozed = false)
+    }
+
+    /** "Lower to safe volume": on the watch's own headphones, or asked of the phone (it must answer). */
+    private fun lowerHeadphones() {
+        confirmHaptics.fire(Pattern.CONFIRM)
+        val source = ExposureRepository.state.value.headphoneAlert?.source
+            ?: ExposureRepository.state.value.headphoneSource
+        lifecycleScope.launch { HeadphoneControl.lowerToSafe(this@MainActivity, source) }
+    }
+
+    /** "Not headphones": headphones mode leaves now and ignores this output until it disconnects (or remembers a speaker). */
+    private fun notHeadphones(rememberSpeaker: Boolean) {
+        confirmHaptics.fire(Pattern.CONFIRM)
+        val source = ExposureRepository.state.value.headphoneSource
+        lifecycleScope.launch { HeadphoneControl.notHeadphones(this@MainActivity, source, rememberSpeaker) }
     }
 
     private fun actions() = VoxaraActions(
@@ -330,7 +371,16 @@ class MainActivity : ComponentActivity() {
             else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         },
         onSituationChoice = { choice -> selectSituation(choice, confirm = true) },
-        onHeadphoneMode = ::selectHeadphoneMode,
+        onDismissHeadphoneAlert = ::dismissHeadphoneAlert,
+        onLowerHeadphones = ::lowerHeadphones,
+        onNotHeadphones = ::notHeadphones,
+        onForgetSpeakers = {
+            confirmHaptics.fire(Pattern.CONFIRM)
+            lifecycleScope.launch {
+                SpeakerMemory.ensureLoaded()
+                HeadphoneWatcher.forgetSpeakers()
+            }
+        },
         onCalibrationTrim = { offset ->
             val clamped = offset.coerceIn(TRIM_RANGE.start, TRIM_RANGE.endInclusive)
             ExposureRepository.update { it.copy(calibrationOffsetDb = clamped) }
@@ -444,3 +494,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+/** While the app is in front, the phone link is looked at this often (a cheap local Data Layer query). */
+private const val LINK_LOOK_MS = 15_000L
