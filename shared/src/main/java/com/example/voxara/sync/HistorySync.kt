@@ -71,10 +71,13 @@ internal object SyncJson {
     }.getOrNull()
 }
 
-/** The UTC days the sync compares, oldest first, ending with today's. */
-fun syncWindow(nowMs: Long): LongRange {
+/**
+ * The UTC days the sync compares, oldest first, ending with today's. [days] is the window length: the phone
+ * asks for no more than it keeps (a 30-day retention must not fetch day 31 only to prune it again).
+ */
+fun syncWindow(nowMs: Long, days: Int = WearContract.SYNC_WINDOW_DAYS): LongRange {
     val today = LedgerCodec.utcDay(Math.floorDiv(nowMs, 60_000L))
-    return (today - WearContract.SYNC_WINDOW_DAYS + 1)..today
+    return (today - days.coerceIn(1, WearContract.SYNC_WINDOW_DAYS) + 1)..today
 }
 
 /**
@@ -156,10 +159,12 @@ data class SyncReport(val daysChecked: Int, val daysUpdated: Int, val alerts: In
 class HistorySyncEngine(
     private val rpc: WatchRpc,
     private val store: PhoneHistoryStore,
+    /** Days the phone keeps (at most [WearContract.SYNC_WINDOW_DAYS] are ever compared). */
+    private val windowDays: () -> Int = { WearContract.SYNC_WINDOW_DAYS },
     private val nowMs: () -> Long,
 ) {
     suspend fun run(): SyncReport {
-        val window = syncWindow(nowMs())
+        val window = syncWindow(nowMs(), windowDays())
         val mine = store.digests(window.first, window.last)
         val digestReq = linkedMapOf(
             "v" to WearContract.PROTOCOL,
@@ -173,6 +178,8 @@ class HistorySyncEngine(
         for (entry in stale) {
             val m = entry as? Map<*, *> ?: continue
             val day = (m["day"] as Number).toLong()
+            // The watch compares its whole window; a day the phone did not ask about is not the phone's to keep.
+            if (day !in window) continue
             val kind = ExposureKind.of((m["kind"] as Number).toInt())
             var parts = (m["parts"] as Number).toInt().coerceAtLeast(1)
             val records = ArrayList<MinuteRecord>()
