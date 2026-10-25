@@ -246,27 +246,24 @@ fun LevelBezel(dba: Float?, modifier: Modifier = Modifier) {
 
 // ------------------------------------------------------------------------------------ text
 
-/** The plain-language sentence that owns the screen: extra-bold, tight. */
+/** The plain-language sentence that owns the screen: extra-bold, tight. Always whole (lists scroll; no ellipsis). */
 @Composable
-fun HeroStatus(text: String, modifier: Modifier = Modifier, maxLines: Int = 3) {
-    Text(
-        text = text, style = VType.Title, color = VColor.Text, textAlign = TextAlign.Center,
-        maxLines = maxLines, overflow = TextOverflow.Ellipsis, modifier = modifier,
-    )
+fun HeroStatus(text: String, modifier: Modifier = Modifier) {
+    Text(text = text, style = VType.Title, color = VColor.Text, textAlign = TextAlign.Center, modifier = modifier)
 }
 
 /** A short caption-sized line (notes, sources, coverage). */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier, color: Color = VColor.TextSecondary) {
-    Text(text, style = VType.Caption, color = color, textAlign = TextAlign.Center, modifier = modifier, maxLines = 2)
+    Text(text, style = VType.Caption, color = color, textAlign = TextAlign.Center, modifier = modifier)
 }
 
 /** A group heading inside a long list (Settings): sentence case, quiet, a heading for TalkBack. */
 @Composable
 fun GroupLabel(text: String, modifier: Modifier = Modifier, color: Color = VColor.TextSecondary) {
     Text(
-        text, style = VType.Label, color = color, textAlign = TextAlign.Center, maxLines = 2,
-        overflow = TextOverflow.Ellipsis, modifier = modifier.padding(top = VSpace.s).semantics { heading() },
+        text, style = VType.Label, color = color, textAlign = TextAlign.Center,
+        modifier = modifier.padding(top = VSpace.s).semantics { heading() },
     )
 }
 
@@ -274,17 +271,15 @@ fun GroupLabel(text: String, modifier: Modifier = Modifier, color: Color = VColo
 @Composable
 fun ScreenTitle(text: String, modifier: Modifier = Modifier, color: Color = VColor.Text) {
     Text(
-        text, style = VType.Title, color = color, textAlign = TextAlign.Center, maxLines = 3,
-        overflow = TextOverflow.Ellipsis, modifier = modifier.semantics { heading() },
+        text, style = VType.Title, color = color, textAlign = TextAlign.Center,
+        modifier = modifier.semantics { heading() },
     )
 }
 
+/** A sentence in a list: always whole (the list scrolls), never cut with an ellipsis. */
 @Composable
-fun BodyText(text: String, modifier: Modifier = Modifier, color: Color = VColor.TextSecondary, maxLines: Int = 6) {
-    Text(
-        text, style = VType.Body, color = color, textAlign = TextAlign.Center, maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis, modifier = modifier,
-    )
+fun BodyText(text: String, modifier: Modifier = Modifier, color: Color = VColor.TextSecondary) {
+    Text(text, style = VType.Body, color = color, textAlign = TextAlign.Center, modifier = modifier)
 }
 
 // ------------------------------------------------------------------------------------ actions
@@ -300,19 +295,45 @@ fun PillButton(
     icon: ImageVector? = null,
     style: PillStyle = PillStyle.PRIMARY,
     enabled: Boolean = true,
+    /** A longer label: the Label size and room for three lines, so it is never cut with an ellipsis. */
+    wide: Boolean = false,
+    /** The largest the wearer's font size makes the label (1.5 times by default). */
+    maxFontScale: Float = 1.5f,
 ) {
     val m = modifier.fillMaxWidth().defaultMinSize(minHeight = VSize.touch)
-    val iconSlot: (@Composable BoxScope.() -> Unit)? = icon?.let {
+    // On a small face or at large text the icon gives its width to the words, so no word breaks mid-way
+    // ("Allow microphon/e" was seen at 192 dp).
+    val roomy = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 200 &&
+        androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.15f
+    val iconSlot: (@Composable BoxScope.() -> Unit)? = icon?.takeIf { roomy }?.let {
         { Icon(it, contentDescription = null, modifier = Modifier.size(20.dp)) }
     }
     val labelSlot: @Composable RowScope.() -> Unit = {
-        Text(label, style = VType.TitleSmall.capFont(1.5f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // Whole, on as many lines as it needs: a button never hides part of what it does.
+        // (The Wear button's label slot would otherwise cap it at three lines with an ellipsis.)
+        Text(label, style = (if (wide) VType.Label else VType.TitleSmall).capFont(maxFontScale), maxLines = Int.MAX_VALUE)
     }
     when (style) {
         PillStyle.PRIMARY -> Button(onClick = onClick, modifier = m, enabled = enabled, icon = iconSlot, label = labelSlot)
         PillStyle.TONAL -> FilledTonalButton(onClick = onClick, modifier = m, enabled = enabled, icon = iconSlot, label = labelSlot)
         PillStyle.OUTLINED -> OutlinedButton(onClick = onClick, modifier = m, enabled = enabled, icon = iconSlot, label = labelSlot)
     }
+}
+
+/**
+ * SWITCH ROW — a setting that is on or off: Wear Material 3 `SwitchButton`, the label (what it is) and a real switch
+ * (its state), plus an optional [secondary] line (the hours of quiet time). Spoken as a switch with its state, so
+ * the state is never only a word inside the label ("Tono: Sí").
+ */
+@Composable
+fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier, secondary: String? = null) {
+    androidx.wear.compose.material3.SwitchButton(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier.fillMaxWidth().defaultMinSize(minHeight = VSize.touch),
+        secondaryLabel = secondary?.let { { Text(it, maxLines = Int.MAX_VALUE) } },
+        label = { Text(label, style = VType.TitleSmall.capFont(1.5f), maxLines = Int.MAX_VALUE) },
+    )
 }
 
 /** A quick-reply chip for Ask (still a 48 dp target). */
@@ -352,8 +373,11 @@ private fun Modifier.card(): Modifier = this
     .border(VSize.border, VColor.Border, RoundedCornerShape(VRadius.card))
 
 /**
- * METRIC CARD — a list row: tinted icon, muted label, value, optional detail, fully rounded like the
- * Wear buttons it sits among. The whole row is the touch target.
+ * METRIC ROW — tinted icon, muted label, value, optional detail.
+ *
+ * WHAT LOOKS TAPPABLE IS TAPPABLE. With [onClick] it is an action: a card, fully rounded like the Wear buttons it
+ * sits among, a chevron at the end, press feedback, the whole row the 48 dp target. Without it, it is information
+ * and looks like it: no card, no fill, no chevron, nothing that invites a tap that would do nothing.
  */
 @Composable
 fun MetricCard(
@@ -367,26 +391,34 @@ fun MetricCard(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(VRadius.card)
+    val action = onClick != null
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = VSize.touch)
-            .clip(shape)
-            .background(VColor.Card)
-            .let { if (onClick != null) it.pressable(onClick = onClick) else it }
-            .padding(horizontal = VSpace.l, vertical = VSpace.s + 2.dp),
+            .let {
+                if (action) it.defaultMinSize(minHeight = VSize.touch).clip(shape).background(VColor.Card).pressable(onClick = onClick!!)
+                else it.semantics(mergeDescendants = true) { }
+            }
+            .padding(horizontal = if (action) VSpace.l else VSpace.s, vertical = if (action) VSpace.s + 2.dp else VSpace.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(VSpace.s + 2.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+        // On a small face or at large text the icon gives its width to the words, so no word breaks mid-way.
+        val roomy = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 200 &&
+            androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.15f
+        if (roomy) Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
         Column(Modifier.weight(1f)) {
-            Text(label, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextSecondary, maxLines = 2)
-            Text(value, style = VType.TitleSmall.copy(textAlign = TextAlign.Start), color = VColor.Text, maxLines = 2)
-            detail?.let {
-                Text(it, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextSecondary, maxLines = 2)
-            }
+            Text(label, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextSecondary)
+            Text(
+                value, style = (if (action) VType.TitleSmall else VType.Label).copy(textAlign = TextAlign.Start),
+                color = VColor.Text,
+            )
+            detail?.let { Text(it, style = VType.Caption.copy(textAlign = TextAlign.Start), color = VColor.TextSecondary) }
         }
-        trailing?.invoke()
+        when {
+            trailing != null -> trailing()
+            action -> Icon(VoxIcons.Forward, contentDescription = null, tint = VColor.TextSecondary, modifier = Modifier.size(18.dp))
+        }
     }
 }
 

@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.rotary.onPreRotaryScrollEvent
 import androidx.wear.compose.material3.lazy.TransformationSpec
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
-import androidx.wear.compose.material3.lazy.transformedHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,12 +26,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.FilledTonalIconButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 
@@ -45,8 +48,8 @@ val LocalRowInset = androidx.compose.runtime.staticCompositionLocalOf { 0.dp }
 /** Room at the bottom of a pager page that the page indicator may cover (0 outside the pager). */
 val LocalPageInset = androidx.compose.runtime.staticCompositionLocalOf { 0.dp }
 
-/** Height of the black fade that hides content scrolling under the time text. */
-private val TopScrim = 34.dp
+/** Height of the black fade that hides content scrolling under the time text (solid where the clock's digits are). */
+private val TopScrim = 44.dp
 
 /**
  * EDGE SCRIMS — black fades over the top and bottom edge of a scrolling page, under the time text and
@@ -62,7 +65,11 @@ private fun BoxScope.EdgeScrims(state: TransformingLazyColumnState, bottomHeight
     Box(
         Modifier.align(Alignment.TopCenter).fillMaxWidth().height(TopScrim)
             .graphicsLayer { alpha = topAlpha }
-            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(VColor.Black, androidx.compose.ui.graphics.Color.Transparent)))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    0f to VColor.Black, 0.6f to VColor.Black, 1f to androidx.compose.ui.graphics.Color.Transparent,
+                )
+            )
     )
     if (bottomHeight > 0.dp) {
         // Black right where the page dots sit (the lowest half), fading in above them: content never shows through the dots.
@@ -90,8 +97,10 @@ fun TransformingLazyColumnScope.row(key: Any? = null, content: @Composable () ->
     item(key = key) {
         val scope = this
         val spec = LocalTransformSpec.current
+        // Items keep their own height (no transformedHeight): with it, a tall paragraph near the edge was laid out
+        // shorter than it draws and the next item landed on its last lines (text over text in the review renders).
+        // The edge effect stays: content scales and fades as it leaves the screen.
         val modifier = if (spec == null) Modifier else Modifier
-            .transformedHeight(scope, spec)
             .graphicsLayer {
                 with(scope) {
                     val progress = scrollProgress
@@ -190,36 +199,72 @@ fun ValueStepper(
     increaseDescription: String,
     modifier: Modifier = Modifier,
 ) {
+    // The value on its own line, the two 48 dp buttons under it: on a 192 dp face there is no room for all three
+    // in a row (the value broke across lines and "+" was pushed off the screen).
     Panel(modifier) {
         SectionLabel(label)
+        Text(
+            value, style = VType.Numeral.capFont(1.3f), color = VColor.Text, textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "$label $value" },
+        )
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(VSpace.l, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilledTonalButton(
+            FilledTonalIconButton(
                 onClick = onDecrease,
                 modifier = Modifier.size(VSize.touch).semantics { contentDescription = decreaseDescription },
-            ) { Text("−", style = VType.Title, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
-            Text(value, style = VType.Numeral, color = VColor.Text, modifier = Modifier.semantics { contentDescription = "$label $value" })
-            FilledTonalButton(
+            ) { androidx.wear.compose.material3.Icon(VoxIcons.Minus, contentDescription = null, modifier = Modifier.size(22.dp)) }
+            FilledTonalIconButton(
                 onClick = onIncrease,
                 modifier = Modifier.size(VSize.touch).semantics { contentDescription = increaseDescription },
-            ) { Text("+", style = VType.Title, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
+            ) { androidx.wear.compose.material3.Icon(VoxIcons.Plus, contentDescription = null, modifier = Modifier.size(22.dp)) }
         }
     }
 }
 
-/** A single-choice list of full-width pills; the selected one is primary, with a check. */
+/**
+ * A single choice as ONE LIST ROW PER OPTION ([choiceRows]): a whole choice list in a single row is a tall item, and
+ * the list's edge transformation squeezes a tall item as soon as its top leaves the screen, which drew the next
+ * paragraph over its last options. One pill per row scales and fades like any other row. [label] words each option.
+ */
+fun <T> TransformingLazyColumnScope.choiceRows(
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    label: @Composable (T) -> String,
+) {
+    for (value in options) {
+        row {
+            val on = value == selected
+            PillButton(
+                label = label(value),
+                onClick = { onSelect(value) },
+                modifier = Modifier.semantics { role = androidx.compose.ui.semantics.Role.RadioButton; this.selected = on },
+                style = if (on) PillStyle.TONAL else PillStyle.OUTLINED,
+                icon = if (on) VoxIcons.Check else null,
+            )
+        }
+    }
+}
+
+/**
+ * A single-choice list of full-width pills. The selected one is marked as a choice (a check, the tonal fill) and
+ * the others are outlined, so a selection never looks like the screen's primary action (that purple fill is kept
+ * for buttons that do something). Each is a radio button for TalkBack.
+ */
 @Composable
 fun <T> ChoiceList(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(VSpace.xs)) {
+    Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(VSpace.xs)) {
         options.forEach { (value, label) ->
+            val on = value == selected
             PillButton(
                 label = label,
                 onClick = { onSelect(value) },
-                style = if (value == selected) PillStyle.PRIMARY else PillStyle.TONAL,
-                icon = if (value == selected) VoxIcons.Check else null,
+                modifier = Modifier.semantics { role = androidx.compose.ui.semantics.Role.RadioButton; this.selected = on },
+                style = if (on) PillStyle.TONAL else PillStyle.OUTLINED,
+                icon = if (on) VoxIcons.Check else null,
             )
         }
     }
