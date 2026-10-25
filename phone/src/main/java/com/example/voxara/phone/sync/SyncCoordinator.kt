@@ -1,6 +1,8 @@
 package com.example.voxara.phone.sync
 
 import android.util.Log
+import com.example.voxara.link.LinkHealth
+import com.example.voxara.link.LinkMonitor
 import com.example.voxara.link.LinkResolver
 import com.example.voxara.link.LinkState
 import com.example.voxara.link.SyncProblem
@@ -16,6 +18,7 @@ import com.example.voxara.sync.HistorySyncEngine
 import com.example.voxara.sync.WatchStatus
 import com.example.voxara.sync.WearContract
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +45,40 @@ class SyncCoordinator(
 
     private val mutex = Mutex()
 
+    // The honest state of the link, for the screens: connected, reconnecting, or disconnected since...
+    private val monitor = LinkMonitor()
+    private val _health = MutableStateFlow<LinkHealth>(LinkHealth.Unknown)
+    val health: StateFlow<LinkHealth> = _health.asStateFlow()
+
+    /** The watch answered (or did not): an observation of the link, from a sync, a message or a callback. */
+    fun observeReachable(reachable: Boolean) {
+        _health.value = monitor.observe(nowMs(), reachable)
+    }
+
+    /** Lets "reconnecting" turn into "disconnected" with time, with no new observation. */
+    fun tickHealth() {
+        _health.value = monitor.health(nowMs())
+    }
+
+    /**
+     * Something changed about the watch (its capability appeared or went): look, and when it has just come
+     * back run what it missed: a sync (settings and history both ways) and [afterReconnect] (queued listening,
+     * the current headphone state). No user action. Never throws.
+     */
+    suspend fun onWatchEvent(afterReconnect: suspend () -> Unit = {}) {
+        val reachable = linkedWatch(refreshLink()) != null
+        if (!reachable) return
+        // Not "was the link shown as connected": a message that got through (live headphone state, a lowered volume)
+        // marks the link connected before this event is handled, and the catch-up would be skipped for good.
+        if (caughtUp) return
+        caughtUp = true
+        if (!sync()) caughtUp = false         // the watch went again mid-sync: the next event tries again
+        runCatching { afterReconnect() }.onFailure { if (it is CancellationException) throw it }
+    }
+
+    /** The watch has been caught up since it was last seen to go (settings, history and queued listening re-sent). */
+    @Volatile private var caughtUp = false
+
     /** Re-reads which watches are connected and which have the app. Never throws. */
     suspend fun refreshLink(): LinkState {
         val state = try {
@@ -56,6 +93,9 @@ class SyncCoordinator(
             LinkState.NoWatch
         }
         _link.value = state
+        val reachable = linkedWatch(state) != null
+        if (!reachable) caughtUp = false
+        observeReachable(reachable)
         return state
     }
 
@@ -83,15 +123,24 @@ class SyncCoordinator(
                 // Settings: take the watch's document, then send ours if it still has changes.
                 gateway.latestPayload(watch.id, WearContract.PATH_SETTINGS_WATCH)?.let { onWatchSettings(it) }
                 if (pendingSettings().isNotEmpty()) pushSettings()
-                // History.
+                // History: no further back than the phone keeps (a 30-day retention must not fetch day 31 to prune it).
+                val retention = store.read().retentionDays
                 HistorySyncEngine(
                     rpc = { path, body -> gateway.request(watch.id, path, body) },
                     store = db,
                     nowMs = nowMs,
+                    windowDays = { retention },
                 ).run()
-                db.prune(store.read().retentionDays, nowMs())
+                db.prune(retention, nowMs())
                 store.syncSucceeded(nowMs())
                 true
+            } catch (e: TimeoutCancellationException) {
+                // A watch that did not answer in time is a sync problem to show, not a cancelled coroutine to rethrow
+                // (a timeout IS a CancellationException: rethrown, nothing would be recorded and the screen would
+                // keep saying "linked" while every sync failed).
+                Log.w(TAG, "sync failed: watch did not answer in time", e)
+                store.syncFailed(attemptAt, SyncProblem.UNREACHABLE)
+                false
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
