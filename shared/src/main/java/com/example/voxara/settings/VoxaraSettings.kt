@@ -191,9 +191,13 @@ data class VoxaraSettings(
 /**
  * THE CONFLICT RULE — per field, the newest change wins; ties go to the watch.
  *
- * Two clocks are involved, so changes less than [SKEW_MS] apart count as a tie, and on the watch
- * a phone timestamp more than [SKEW_MS] in the watch's future is refused outright (it would
- * otherwise win every later comparison).
+ * Two clocks are involved, so changes less than [SKEW_MS] apart count as a tie. A phone timestamp more
+ * than [SKEW_MS] in the watch's future is NOT refused (refusing it lost the wearer's change for good: the
+ * Data Layer delivers an unchanged item only once): it is accepted with the watch's own "now" as its time,
+ * so a phone whose clock runs ahead (or is simply wrong) can neither lose a change nor win every later
+ * comparison. The same future-dated phone value is accepted ONCE: the watch remembers the phone's own stamp
+ * ([Result.futureSeen]) and a redelivery of it (the pull on every reconnect) is not a new change, so it cannot
+ * undo something the wearer set on the watch since.
  */
 object SettingsMerge {
     const val SKEW_MS = 5_000L
@@ -202,30 +206,42 @@ object SettingsMerge {
         val merged: SettingsDoc,
         /** Fields whose value came from the other device. */
         val accepted: Set<SettingField>,
-        /** Fields refused because their timestamp was in the receiver's future. */
-        val refusedFuture: Set<SettingField>,
+        /** Fields accepted with their timestamp pulled back to the receiver's now (it was in the receiver's future). */
+        val clampedFuture: Set<SettingField>,
+        /** The phone's own (future) stamp of each field accepted that way; the caller keeps it and passes it back next time. */
+        val futureSeen: Map<SettingField, Long> = emptyMap(),
     )
 
     /**
      * The watch applying the phone's settings: the phone must be newer by more than [SKEW_MS],
-     * future timestamps are refused, every value is normalized (clamped) first.
+     * future timestamps are pulled back to the watch's now, every value is normalized (clamped) first.
      */
-    fun watchReceives(watch: SettingsDoc, phone: SettingsDoc, watchNowMs: Long): Result =
-        merge(own = watch, incoming = phone, incomingIsWatch = false, receiverNowMs = watchNowMs)
+    fun watchReceives(
+        watch: SettingsDoc, phone: SettingsDoc, watchNowMs: Long,
+        /** Future-dated phone stamps already accepted once ([Result.futureSeen] of the earlier calls). */
+        futureSeen: Map<SettingField, Long> = emptyMap(),
+    ): Result = merge(own = watch, incoming = phone, incomingIsWatch = false, receiverNowMs = watchNowMs, seen = futureSeen)
 
     /** The phone taking the watch's settings: the watch wins ties. */
     fun phoneReceives(phone: SettingsDoc, watch: SettingsDoc, phoneNowMs: Long): Result =
         merge(own = phone, incoming = watch, incomingIsWatch = true, receiverNowMs = phoneNowMs)
 
-    private fun merge(own: SettingsDoc, incoming: SettingsDoc, incomingIsWatch: Boolean, receiverNowMs: Long): Result {
+    private fun merge(
+        own: SettingsDoc, incoming: SettingsDoc, incomingIsWatch: Boolean, receiverNowMs: Long,
+        seen: Map<SettingField, Long> = emptyMap(),
+    ): Result {
         val out = LinkedHashMap(own.fields)
         val accepted = LinkedHashSet<SettingField>()
-        val refused = LinkedHashSet<SettingField>()
-        for ((field, theirs) in incoming.fields) {
-            val value = normalize(field, theirs.value) ?: continue
+        val clamped = LinkedHashSet<SettingField>()
+        val clampedStamps = LinkedHashMap<SettingField, Long>()
+        for ((field, stamped) in incoming.fields) {
+            val value = normalize(field, stamped.value) ?: continue
+            var theirs = stamped
             if (!incomingIsWatch && theirs.atMs > receiverNowMs + SKEW_MS) {
-                refused += field
-                continue
+                if (seen[field] == stamped.atMs) continue      // this very change was accepted before: a redelivery
+                clamped += field
+                clampedStamps[field] = stamped.atMs
+                theirs = theirs.copy(atMs = receiverNowMs)
             }
             val mine = own[field]
             val wins = when {
@@ -238,13 +254,17 @@ object SettingsMerge {
                 if (mine?.value != value) accepted += field
             }
         }
-        return Result(SettingsDoc(out), accepted, refused)
+        return Result(SettingsDoc(out), accepted, clamped, clampedStamps)
     }
 
-    /** Phone changes the watch has not applied yet (shown as "Pending sync"). */
+    /**
+     * Phone changes the watch has not applied yet (shown as "Pending sync"): newer on the phone AND a
+     * different value. A watch that already holds the same value has nothing to apply, whatever the clocks say
+     * (it stamps an accepted value with its own time when the phone's was ahead).
+     */
     fun pending(phone: SettingsDoc, watch: SettingsDoc?): Set<SettingField> =
         phone.fields.filter { (field, mine) ->
             val theirs = watch?.get(field)
-            theirs == null || mine.atMs > theirs.atMs + SKEW_MS
+            theirs == null || (mine.atMs > theirs.atMs + SKEW_MS && mine.value != theirs.value)
         }.keys
 }
