@@ -194,7 +194,7 @@ What was done:
 
 Files created:
 - `…/voxara/core/headphones/Headphones.kt`
-- `…/voxara/audio/HeadphoneMonitor.kt`
+- `…/voxara/audio/HeadphoneMonitor.kt` (deleted later: replaced by `shared/…/audio/HeadphoneWatcher.kt`, see "Headphones automatic" and the note under "Current watch detection" below)
 - `…/voxara/ui/screens/HeadphonesScreen.kt`
 - `…/voxara/tile/ListeningTileService.kt`
 - `…/voxara/complication/ListeningComplicationService.kt`
@@ -1734,7 +1734,7 @@ source = WATCH | PHONE | MANUAL | NONE, detected, detectedBy)`; code in `shared/
 **Setting.** `SettingField.HEADPHONE_MODE` (`headphone_mode`: AUTO default / ON / OFF), `normalize()`, merge rule (newest
 wins, ties to the watch, future phone stamps refused: unchanged machinery), DataStore key + stamp in `VoxaraStore`, phone
 Settings → "Headphones mode" (3 rows), EN + ES strings on both apps.
-**Detection.** `HeadphoneMonitor.rawConnected()` (the watch's outputs: wired / USB / Bluetooth A2DP / BLE, speakers and car
+**Detection.** `HeadphoneMonitor.rawConnected()` [historical: now `HeadphoneWatcher.current().connected`, see "Current watch detection"] (the watch's outputs: wired / USB / Bluetooth A2DP / BLE, speakers and car
 kits excluded when `BLUETOOTH_CONNECT` is granted) and the phone's opt-in listening sync (`ListeningSyncService` records the end
 of the latest span in `ExposureRepository.phoneHeadphonesAtMs`; a report counts for 16 min, labelled "Auto · from phone").
 Hysteresis in `ListeningLayer`: ~3 s to enter, ~10 s to leave (a flapping link never replays the transition), manual choices
@@ -1873,3 +1873,278 @@ Removed code: `HomePage`, `TodayScreen`, `WeekScreen`, `HeadphonesScreen`, `Over
   scrolled to its end, font 1.3 and 2.0, the morph driven by a real rotary event (`compare/watch_morph_strip.png`). XL emulator: the same pages and the crown.
   A real crown or touch bezel, real headphones and the tile and complication taps were **not** exercised: see the checklist in `pass4/README.md`.
 - One bug found by the test, not the watch: the crown handler's "quiet after a flip" timer started at 0, so a rotation in the first 380 ms of a process's uptime was ignored; it now starts unset.
+
+
+---
+
+## Automatic headphones, live listening, volume alerts, faster Auto, stable link ✅ (no watch or phone connected: JVM only)
+No git command that modifies the tree was used. The API key was read from `local.properties` by scripts and never printed.
+**No device was reachable over adb**, so nothing below was measured on hardware; every claim that needs a watch or a phone is in
+"Not verified" at the end.
+
+### Diagnosis (what was wrong, with the evidence)
+1. **Headphones mode on, but no data.** The mode and the recording used two different detectors. The mode came from `layerLoop`
+   (raw, 3 s); recording came from `HeadphoneMonitor.snapshot()` [historical: removed, see "Current watch detection"] read once per burst (up to 60 s apart when quiet) through a second
+   debouncer, so it could be on for 1–2 minutes with nothing recorded. A phone report or a manual On never recorded on the watch (its
+   own category was null). The phone sampler (15 min, opt-in) credited the whole interval if playback happened to be active at that
+   instant and nothing otherwise, and reset its span at Bluetooth edges. The watch UI read headphone figures only from the dosimeter
+   service, so phone minutes written to SQLite never reached the screen while monitoring was off. Also by design (pinned by
+   `ListeningLayerSafetyTest`): a loud room owns a span, so the headphone ledger gets none of it.
+2. **Latency.** The estimate was published once per burst (60 s idle) and there was no volume or playback listener anywhere; the phone
+   sent one span per 15 min. The 30 s heartbeat is only proof of life and was not the cause.
+3. **Tono.** Cloud side is fine: key present (35 chars) and in the debug `BuildConfig`; `GET /models` = HTTP 200 with `deepseek-flash`
+   and `deepseek-v4-pro`; four real requests (EN and ES) answered in ~1.3 s and all passed a port of `ReplyValidator`. The causes on the
+   watch are the consent default (OFF), the Now page asking only once (`LaunchedEffect(tono)`, not on consent), the Bluetooth-proxied
+   network with 8 s / 12 s timeouts, and failures logged only as an opaque code. Release has no key and no INTERNET on purpose.
+4. **Disconnections.** The watch was passive (status only when the phone pulled), had no reachability tracking and no UI for it; the
+   phone refreshed the link only on capability events, app open and an hourly worker that never retried sooner; a mirrored limit alert
+   was fire-and-forget; battery optimisation was only displayed. Manifest filters were correct.
+5. **Auto detection.** Before: cold start / Street→Transport = 180 / 240 s (IDLE), 90 / 210 s (AMBIENT), 30 / 160 s (ACCRUING). Votes
+   were weighted equally over a 5 min window (old votes dragged the average), 3 votes + 2 evaluations + a 4 min dwell.
+
+### Phase 1 — automatic detection (watch and phone)
+- Manual headphones mode removed from both UIs. Compat: the `headphone_mode` field stays in the settings document; the watch ignores any
+  stored or received On/Off, answers Auto with a newer time so an older phone settles on Auto, and an older watch's value is carried and
+  ignored on the phone (`AutoHeadphonesCompatTest`).
+- `HeadphoneWatcher` (:shared, used by both): `AudioDeviceCallback`, `AudioPlaybackCallback` (a trigger; the answer is the documented
+  `isMusicActive`), the music-volume broadcast and the settings provider (best effort, undocumented, never trusted), and a 2 s guard that
+  runs **only while headphones play**. `chooseRoute` (pure): wired/USB → BLE headset → A2DP; speaker/car kit never; with
+  BLUETOOTH_CONNECT denied A2DP counts as headphones and is flagged **possible speaker** ("Posible altavoz" on the chip, Mode screen,
+  details, phone card).
+- Phone background (official docs checked): the four Bluetooth connection broadcasts are manifest-exempt; `ACTION_HEADSET_PLUG` is not;
+  a Bluetooth broadcast is **not** an exemption for starting a foreground service on Android 12+. So: `PhoneListeningService`
+  (`connectedDevice`, needs `FOREGROUND_SERVICE_CONNECTED_DEVICE` and a declared prerequisite permission, `CHANGE_NETWORK_STATE`) is started
+  from the visible app, at boot and after an update; from a Bluetooth broadcast as best effort; if refused, one sample is taken
+  (`ListeningSampler` is now only the fallback and stands down while the service runs). Battery optimisation off lifts the restriction.
+- BLUETOOTH_CONNECT is asked in context the first time something connects over Bluetooth while the phone app is in front.
+- The phone's sharing switch (opt-in, OFF by default) was **kept**: it is the consent for sending listening to the watch, not the mode.
+
+### Phase 2 — headphones record data
+- `ListeningTracker` cuts a span at every event (connect, play, pause, volume) at the level then in force; seconds follow the ears, not the
+  sampling period. Spans go to the headphone ledger with their origin (watch = 0, phone = 1) and count toward the weekly dose; a minute
+  reported by two devices counts once (the louder). No playback → nothing, even with headphones connected. Constants unchanged
+  (`HeadphoneProfile`: 100 dBA at full volume, ±10 dB); the estimate is labelled an estimate everywhere.
+- Today's **listening seconds** are counted separately (any ledger), so "Listening today: 40 min" is honest even when the room owned the
+  dose; a note says so. Phone spans carry a `coarse` flag: exact spans keep the estimate's confidence, the fallback sampler and older
+  phones stay VERY LOW.
+- Not changed, deliberately: the double-count rule between the room and the headphones (one ledger per span) and the daily dose
+  (ambient engine). See "Decisions".
+
+### Phase 3 — latency
+- Watch: events + guard tick (≤ 2 s) → UI in ≤ 3 s **by construction**; `HeadphoneWatcherLatencyTest` proves the guard fires within 2 s
+  of an unannounced volume change and that nothing ticks when nothing plays.
+- Phone → watch: `PhoneListeningState` sent on every change as a **message** (real time) and as **one overwritten data item** (durable,
+  a watch that was off reads it back), ≥ 0.4 s apart, repeated every 60 s while connected so "fresh" (3 min) stays true. Finished spans go
+  to the ledger as idempotent data items through a persisted outbox. Bound by design: ≤ 2 s guard + 0.4 s + Data Layer delivery ≈ the 10 s
+  target; the Data Layer's own delay was not measured.
+
+### Phase 4 — volume alerts
+- New `AlertKind.HEADPHONE_OVER_SAFE` (WARNING) in the existing `AlertEngine`: above 80 dBA after 8 s over; tiers 1 (>80), 2 (≥90),
+  3 (≥100); a higher tier always alerts, the same tier again after the engine's 30 min cooldown; ≤ 75 re-arms; held in quiet hours and
+  snoozable like any warning; always vibrates (QUICK_TRIPLE through `HapticConductor`). `ModesNeverWeakenAlertsTest` and
+  `AlertFloorsTest` untouched and passing.
+- In-view panel on Now (`HeadphoneAlertPanel`, round overlay like the limit alert): **Lower to safe volume** (≥ 48 dp, says what
+  happened, including fixed volume / nothing playing / phone unreachable; announced to TalkBack) and **Dismiss** (below the first screen;
+  closes the tier, writes nothing, mutes nothing). The same two actions on the notification (`AlertActionReceiver`). Phone headphones:
+  the watch sends `/voxara/hp/cmd/lower` with an id; the phone lowers, reads the volume back and answers with the same id; no answer in
+  6 s = "could not reach your phone" (never queued: a volume that drops minutes later would be a surprise). Headphones on the phone also
+  alert **on the phone** (same engine, its own notification and vibration; `VIBRATE` declared: lint caught that it was missing).
+- Lower target: the highest step whose estimate is ≤ 80 dBA (`safeVolumeIndex`), never raises, verified by reading the volume back.
+
+### Phase 5 — faster Auto (licence gate and weights untouched)
+Recency-weighted by the **time** each vote covers (half-life 60 s), `minVotes` 3→2, dwell 4 min→90 s, plus a small budget of fast
+votes (every 15 s, 8 tokens, one earned per 90 s) while unsure or while a different scene knocks. Measured on the real detector
+(`AutoModeLatencyTest`, a clear 0.8 lean), seconds, ladder alone → with fast votes:
+
+| step | cold start before | cold start now | Street→Transport before | now (ladder) | now (fast votes) |
+|---|---|---|---|---|---|
+| IDLE (60 s) | 180 | 120 → **30** | 240 | 120 | **75** |
+| AMBIENT (30 s) | 90 | 60 → **30** | 210 | 90 | **75** |
+| ACCRUING (10 s) | 30 | 20 | 160 | 60 | 60 |
+
+No more flicker: a 45 s blip and alternating evidence change nothing at any cadence, with or without fast votes. Two older tests that
+pinned the slow timings were updated on purpose (`AutoModeDetectorTest`: first detection at the 3rd vote; dwell measured from the real
+detection). Real scenes are less clear than 0.8, so real times will be longer: not measured on a watch.
+
+### Phase 6 — stable link
+- `LinkMonitor` (connected / reconnecting for 60 s / disconnected since X) on both devices; shown on the watch's More page and on the
+  phone's Home chip, Watch screen and Headphones screen. Watch: `PhoneLink` (capability lookup every 30 s while monitoring and every
+  15 s while the app is open, plus `HeadphoneSyncService` for capability changes with the app closed). Phone: `PhoneListenerService`
+  reacts to capability changes; when the watch is back it syncs and flushes by itself (`onWatchEvent`).
+- Idempotent pending queue (`Outbox`, keyed, persisted): phone listening spans and the watch's mirrored limit alert (dropped after 10 min).
+  Settings, status and the live headphone state are single overwritten data items, so a resend is never a duplicate.
+- `WearableListenerService` filters: new `HeadphoneSyncService` on the watch (`/voxara/hp` messages, `/voxara/hp/state` item, capability);
+  `/voxara/hp/cmd/lower` on the phone. Both started by Play services with the app closed.
+- Phone battery guidance (EN/ES): a card on Home, Watch and Headphones that opens the app's settings (Samsung: Battery → Unrestricted),
+  hidden for a week when dismissed. It guides; it never changes the setting. (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` was not added: it needs
+  a Play policy justification.)
+
+### Tono
+The Now status refreshes when cloud consent changes; timeouts 15 s connect / 25 s read; failure reasons carry the exception class and the
+time (never the key or the text); the Ask screen shows the reason in **debug builds only**.
+
+### Decisions made on your behalf (please review)
+1. Kept the phone's opt-in switch (consent), default OFF.
+2. Kept the room-vs-headphones ownership of a span (pinned by `ListeningLayerSafetyTest`); the listening minutes are shown separately.
+3. The daily dose is still the ambient engine's; the headphone ledger counts toward the weekly dose and its alerts. Adding headphone
+   NIOSH dose to today's figure would touch every surface, tile and alert input: not done.
+4. The "recommended level" is 80 dBA = the WHO 1.6 Pa²h/week reference at 40 h/week (a test checks the arithmetic).
+5. When the watch's dosimeter is not running, headphones on the **phone** still alert on the watch from the last saved figures
+   (`PhoneListeningAlerts`); the watch's own headphones are only tracked while monitoring runs (the mic service needs a visible start).
+
+### Results
+- Unit tests: `:shared` **180**, `:app` **216**, `:phone` **48**, all passing. New: `HeadphoneAutoDetectionTest`, `ListeningTrackerTest`,
+  `EffectiveListeningTest`, `HeadphoneOverSafeAlertTest`, `HeadphoneWireTest`, `LinkHealthAndOutboxTest`, `AutoModeLatencyTest`,
+  `HeadphoneWatcherLatencyTest`, `AutoHeadphonesCompatTest`, `WatchBridgeOutboxTest`, 3 reconnect tests in `SyncCoordinatorTest`,
+  2 in `PhoneListeningTest`.
+- `:app:assembleDebug`, `:app:assembleRelease`, `:phone:assembleDebug`, `:phone:assembleRelease` build; `lintDebug` and `lintRelease`
+  of both apps: **0 errors**. Release APKs: no API key, no scene-weights class, no INTERNET (checked on the built APKs).
+- Roborazzi captures (192, 203, 216, 240 dp; font 1.0 and 1.3, the alert panel also 2.0; EN and ES): `app/build/screenshots/hp_*`,
+  `es_hp_*`, `link_*` (watch) and `phone/build/screenshots/hp_live*`, `link_*`, `battery_guide_*` (phone, also ES). Reviewing them found
+  and fixed: a cut level line, a button label ending in an ellipsis at 1.3×, a clipped chip line, a link value cut off, stale 15-minute
+  wording in the phone's consent text. Debug-only: `--es hpalert 2:93.0[:phone]` and `--es hplower <OUTCOME>` show the panel on a device.
+
+### Not verified (needs hardware) — what to test yourself
+See the final message of this session; it is repeated here so it survives: Bluetooth and wired headphones on the watch and on the phone
+(connect, play, pause, volume up: how fast the watch follows; remove them); a Bluetooth speaker and a car kit (with and without "Allow
+Bluetooth details"); the alert's haptic, notification and both actions on the watch and on the phone, including "Lower" on a phone whose
+volume is fixed and with the phone out of range; turning the watch off and on, leaving the app, killing the phone app on Samsung with and
+without "Unrestricted"; the foreground service starting from a Bluetooth connect with the phone app closed (expected to be refused on
+Android 12+ unless excluded from battery optimisation); the `VOLUME_CHANGED_ACTION` event (undocumented) versus the 2 s guard; Tono on
+the real watch (consent on, Wi-Fi off, then the Ask screen's debug reason); Auto detection times in real places.
+
+## Reliability audit (watch ↔ phone) ✅ (JVM only: no watch or phone was connected)
+No git command that changes the tree was used. Documents: `docs/reliability/FEATURE_MAP.md` (every feature and every piece of
+cross-device data: owner, direction, transport, path, version, retry), `docs/reliability/AUDIT.md` (13 fixed problems with cause,
+fix, test and file:line; 8 left open with reasons), `docs/reliability/TEST_PLAN.md` (31 manual checks for the Galaxy Watch 7 + phone).
+
+### Fixed (details and tests in AUDIT.md)
+- **Data loss:** phone listening spans in the same minute erased each other on the watch (now added, once each: `mergePhoneMinute`,
+  `PhoneSpanReceiver`, `SeenKeys`); "Delete all data" left queued listening that came back (`WatchBridge.discardPending`); NaN / future-dated
+  spans (`sanitizePhoneSample`); a limit alert queued during an outbox flush was dropped.
+- **Disconnection:** a 20 s request timeout was swallowed as a cancellation and never shown as a sync problem; phone → watch settings were
+  lost when the phone clock was > 5 s ahead or the watch app was not running when they were sent (clamp instead of refuse, "pending" by value,
+  the watch now reads the phone's settings item when the phone becomes reachable); the reconnect catch-up was skipped when another message
+  had already marked the link connected (both devices); clock tolerance for mirrored alerts and the phone's live state raised to 5 min.
+- **Other:** CSV export off the main thread; sync window follows the phone's retention; `LinkMonitor` thread-safe; `mergeByMinute` deterministic.
+
+### Tests
+New: `FakeDataLayer` + `InMemoryMinuteStore` (shared test fixtures), `PhoneSpanSyncTest` (11), `SyncCompatibilityTest` (13: old ↔ new
+payloads, worst-case window, retention window, minute landing mid-fetch, threads), additions to `SettingsMergeTest`, `MirroredAlertTest`,
+`HeadphoneWireTest`, `SyncCoordinatorTest` (+5), `WatchBridgeOutboxTest` (+1). One existing test was changed on purpose: the one that
+pinned "a future phone timestamp is refused" now pins "accepted at the watch's now" (the old behaviour was bug F5). `ListeningLayerTest`
+only renamed `refusedFuture` → `clampedFuture`. `ListeningLayerSafetyTest`, `ModesNeverWeakenAlertsTest`, `AlertFloorsTest` untouched.
+
+### Not fixed / needs hardware
+See AUDIT.md "Not fixed" (release signing S1 first) and TEST_PLAN.md.
+
+### Results (checkpoint A)
+`:shared` 207, `:app` 216, `:phone` 54 unit tests, 0 failing. `:app`/`:phone` `assembleDebug` and `assembleRelease`, `lintDebug` (0 errors; 201 / 97
+warnings, none new by hand), `verifyReleaseHasNoSceneWeights` (both): build successful. Phone redesign (Part B) not started: waiting for checkpoint A.
+
+
+---
+
+## Reliability audit: follow-ups after checkpoint A ✅ (JVM only)
+Asked after checkpoint A: two items from the "not fixed" list, then `/code-review` on the Part A diff.
+
+**1. Delete all while the dosimeter runs (was S7).** The running dosimeter held the minute in progress, the open listening span and its
+alert windows in memory and would have written them back. Now: `LedgerBook.wipe(nowMs)` (synchronized) drops the in-progress minute,
+clears every stored minute of its kind and fences the ledger, so a span that began before the delete keeps only its part after it
+(`secondsAfter`); `CompanionLink.deleteAll` wipes the live ledgers (`ExposureRepository.liveLedgers`), clears the database, zeroes the
+engine (dose, weekly, peak) and bumps `wipeGeneration`; the service then forgets its alert windows, the open tracker span, today's listening
+seconds and the alert memory (`syncWipes`). The phone does the same for its side: `WatchBridge.discardPending` records the delete time
+(`PhonePrefs.wipedAtMs`), `enqueueSpan` and `flushSpans` clip every span to it (`clipToFloor`), and a flush that was running while the queue was
+emptied can no longer put the old items back. Tests: `DeleteAllPrivacyTest` (7), `WatchBridgeOutboxTest` (+1). Residual: a listening item already
+handed to the watch's listener at the very instant of the delete (the phone deletes its own unconsumed items).
+
+**2. Alert history off the main thread (was S3).** `AlertHistoryWriter` (`:shared`): one daemon thread, in order, after the haptic and the
+notification; a row for an alert delivered before the last delete is dropped; failures are reported, never thrown. `AlertFloorsTest` untouched.
+Tests: `AlertHistoryWriterTest` (5). Residual: "Got it" tapped within milliseconds of the alert could run before its row exists.
+
+**Code review (Part A diff, high).** 10 findings.
+- Fixed: (1) a future-dated phone setting is accepted once and its redelivery can no longer undo a later watch edit (`SettingsMerge.futureSeen`, kept
+  in `voxara_phone_future_stamps`); (2) `PhoneOutbox.flush` serialised with a mutex and saves the queue as it is NOW minus what it sent; (4) the watch's
+  catch-up runs again after a cancelled catch-up or a failed send (`wasReachable`); (5) an alert evaluation in flight during a delete delivers and
+  remembers nothing; (7) the history write and the delete are one step (`AlertHistoryWriter.wipe`); (9) the phone's live state is fresh by the watch's own
+  arrival time when known (`receivedAtMs`), so a phone clock that is ahead cannot stretch "live"; (10) the pending count ignores spans about to be dropped for age.
+- Fixed in part: (6) one failing span write no longer aborts the batch; the "key recorded before applying" trade (lose one span rather than count it twice) stays on purpose.
+- Dismissed: (3) the long sync in `onCapabilityChanged` is S2, left as is on request; (8) two spans with one end time cannot come from one tracker (its spans end at
+  strictly increasing instants) and the key is part of the wire format.
+- Tests added: `SettingsMergeTest` (+1), `HeadphoneWireTest` (+1), `SyncCompatibilityTest` (+1), `AlertHistoryWriterTest`.
+
+---
+
+## Phone redesign: Part B, checkpoint B (superseded by the section below)
+impeccable `context`/`init` (surface brief, mode Operate), dataviz for the charts. Everything is in `docs/design/phone-redesign/`:
+`SURFACE_BRIEF.md`, `before/` (280 renders: 3 widths × font 1.0/1.3/2.0 × light/dark, plus full length, states and every accent), `baseline-critique.md`
+(26/40) and `baseline-audit.md` (13/20), `concepts/` (two concepts for Home and Trends, README with the comparison, the information map and the
+decisions needed). Waiting for the choice of concept before B3.
+Tooling added: `PhoneFixtures` (shared fake data), `PhoneRenderMatrixTest` (the same matrix for before and after; opt-in with `VOXARA_SHOTS_DIR`),
+`PhoneConceptsRenderTest`, and `shared-ui/.../DigitCells.kt` (digit-cell numerals without Material, to be used by the phone and the watch).
+Material 3 in this build: `material3` 1.4.0 and `material3-adaptive-navigation-suite` 1.4.0 (BOM 2025.12.00), `adaptive` 1.2.0.
+
+## Phone redesign ✅ (JVM only: no phone or watch was connected)
+Chosen at checkpoint B: concept A (the ring) for Home, the Ledger's charts for Trends, four tabs, the care score as a line in Trends. Evidence, the
+information map, the animation list and the before/after scores are in `docs/design/phone-redesign/` (`README.md`); style in `docs/design/STYLE.md`
+(§2, §3, §4, §5e, §6, §8) and `DESIGN.md` (Voxara Phone). Critique 26/40 → 35/40, audit 13/20 → 18/20.
+
+### What was built
+- **Home**: status line, the 250° ring (figure that always fits, caption and zone word as its own label, both leave the ring at large text), Tono's sentence (opens Tono), the uncalibrated note while it applies, two tiles (last 7 days, headphones), the day hour by hour, the last alert; the phone's live headphone card appears while its headphones play. Two panes from 840 dp.
+- **Today** (the ring grows into it): where the day went (cumulative, ends exactly on the figure), hours, minutes, numbers, alerts. **Trends**: Material 3 segmented Day / Week / Month, one hero and one chart per range (hours; seven capped columns; a heat calendar with today ringed and the month named), the rolling weekly allowance, the headphones' share, the care score as a line, "Ask Tono"; two panes from 840 dp.
+- **Watch** (calibration and battery open in their rows, troubleshooting is one row), **Settings** (ten groups → six, headphone type moved in), **Headphones** (sharing moved to Settings), **How it works** (gained the sharing explanation), Setup, Tono, the Glance widget (the watch's ring and digits).
+- `HearingFigures` (one source of every number), `DigitCells.kt` in `:shared-ui` (the watch's `Numerals.kt` is now a wrapper), M3 `Switch`, wave pull-to-refresh, theme and accent crossfade, press feedback, shared-element transition, chart draw-in, number roll; all honour "remove animations".
+- Idempotent "Got it": `AlertHistoryWriter.resolve` is queued behind the alert's own row (notification actions and the headphone dismiss use it).
+
+### Fixed after the concept renders (fixture vs real logic)
+Numbers that disagreed (83 vs 89 %, 64 vs 90 %, "49 points more"): fixture (status typed by hand, not derived from the ledger) **and** label (surroundings only vs surroundings plus headphones, both called "this week"); plus a real-logic risk (Home read the watch's status, Trends the ledger). Calm state with an 80 % alert: fixture; the real engine cannot raise it (`FiguresConsistencyTest`; only "clear today" on the watch can leave an alert above the day's dose). Dates (header Tuesday, week and calendar disagreeing): fixture. Tono "afternoon": fixture (the real snapshot derives day parts from the hourly data). The month hero, the "OK of today's allowance" phrase, the struck-through "100%", "85" without unit, the tile tick, the tall cumulative chart, the alert row, the dark calendar, the loose digit cells: labels and drawing, fixed.
+
+### Tests
+Added `FiguresConsistencyTest` (8), `FontScaleLayoutTest` (2: 16 screens at 1.3 and 2.0), `ChartColorsTest` (3: every accent × theme, plus colour-blind distance), `WidgetArtRenderTest` (2), `AlertHistoryWriterTest` (+3). One colour changed to pass (Emerald dark fill `#10B981` → `#34D399`); no threshold was touched. Removed: the concept code (`phone/src/test/.../ui/concepts/`); `docs/design/phone-redesign/before/` is in `.gitignore`.
+
+### Not verified (needs hardware)
+Everything on a real phone: the ring and charts at real density, the shared-element and pull-to-refresh feel, the widget on a launcher (Glance tint and the 2×2 size), TalkBack reading order, font 2.0 on a real device, the Samsung Galaxy Watch 7 side of the link.
+
+## Current watch detection (what replaced `HeadphoneMonitor`, which is deleted on purpose)
+`app/…/audio/HeadphoneMonitor.kt` was removed when headphones became automatic and event-driven (the diagnosis it was removed for is under "Diagnosis" above: two detectors, one per minute). Nothing it did is missing:
+
+| It did | Now |
+|---|---|
+| Read the watch's own outputs: wired / USB / Bluetooth A2DP / BLE; speakers, car kits and hearing aids excluded by output type and Bluetooth class (`BLUETOOTH_CONNECT`) | `HeadphoneWatcher` (`shared/…/audio/HeadphoneWatcher.kt`): `kindOf` L258, `hintOf` L268, `btHint` L203, `read()` L174 calling `chooseRoute` (`shared/…/core/headphones/Headphones.kt` L126) and `categoryOf` (L46); without `BLUETOOTH_CONNECT` A2DP counts as headphones with `possibleSpeaker` (L117). Started in `DosimeterService.kt` L254 and L359, `usualCategory` set at L279 |
+| `rawConnected()` (raw input to headphones mode) | `headphones.current().connected` (`DosimeterService.kt` L605 in `layerLoop`), kept fresh by `AudioDeviceCallback` and playback/volume events and a 2 s guard tick only while playing (`HeadphoneWatcher.kt` L99, L104, L116, L251) |
+| The 3 s in / 10 s out hysteresis | `ListeningLayer.update` (`shared/…/core/headphones/ListeningLayer.kt` L85-L102; `ENTER_MS` 3 s L115, `LEAVE_MS` 10 s L117), pinned by `ListeningLayerTest` and `ListeningLayerSafetyTest` |
+| `snapshot()` once per burst, debounced, used for recording | `HeadphoneWatcher.refresh()` per event (`DosimeterService.onListening`, L880) → `ListeningTracker` spans (`watchTracker.update`/`drain`, L894-L899) → `foldListeningSpan` (L932) into the headphone ledger under the double-count rule. The recording no longer waits for a burst, and no longer has its own debouncer |
+
+One behaviour difference, on purpose: the recording is event-exact (a span closes at the event) instead of debounced, so a Bluetooth link that flaps now produces short spans rather than being held for 3 s; the mode (what is shown) still has the 3 s / 10 s hysteresis. `Debouncer` (`Headphones.kt` L212) is no longer used in production, only by `app/src/test/…/HeadphonesTest.kt`.
+
+## UX/UI and copy pass (watch, and the phone where the same text appears) ✅ (JVM renders only: no watch was connected over adb)
+The brief: a smartwatch UX pass on every watch screen (1–2 s glances, users in motion), the six problems seen on the real watch, and a text budget. Evidence lives in `build/audit/` (not committed): `before/` and `after/` renders (EN/ES × 192/216/240 dp × font 1.0/1.3, long lists at several scroll positions; `CopyAuditCaptureTest`, opt-in with `VOXARA_AUDIT_DIR`), contact sheets, Agent A's audit (`AUDIT_A.md`), Agent B's review, the string table (`STRING_TABLE.md`) and the string diff.
+
+### The six problems from the real watch
+1. **Tono.** "Llevas 6 días seguidos cuidando tu sonido": the streak counted past days *without any measurement* as "within the limit", and forgave one slip, so "6 days in a row" was not true. Now a day keeps the streak only when it was measured for at least an hour and stayed under the limit (`keepsStreak`), the streak is strictly consecutive, and Tono (built-in and cloud prompt) and the Week page mention it only from 3 days. "Cuidando tu sonido" came from the cloud model: the prompt now says the ears are what is cared for, calls the limit a limit, asks for Latin American Spanish (audífonos, oídos, teléfono) and a status of at most 12 words; the validator rejects longer statuses. On the hero Tono's line is a whole sentence or nothing (`wholeSentencesToFit`; the clause/word cutter `shortenToFit` is gone); the Ask screen is titled "Tono" (its content is Tono's statement), leads with the short status and shows the full insight under it, never cut.
+2. **Headphones mode way out.** Detection stays automatic. The chip on Now (it looked like a button: now it is one), a "Not headphones" row under the hero and a button on the volume alert open **Not headphones?**: "Ignore for now" leaves the output out until it disconnects (the next connection is detected again); "It's a speaker" (a Bluetooth device with a full address) also remembers it for later connections, stored as a salted SHA-256 digest only (`OutputIgnoreList`, `speakerKeyOf`, `HeadphoneWatcher.notHeadphones`; watch: `SpeakerMemory` + `VoxaraStore`, phone: `PhonePrefs`). Mode shows how many speakers are remembered and forgets them. For the phone's output the watch ignores the phone's reports until it says the headphones are gone and sends `/voxara/hp/cmd/not_headphones` to the phone. The layer leaves at once (no 10 s exit hold). Room alerts are never touched; headphone alerts stop only for that output. When the mode is off, Now shows it as a plain line, not a switch.
+3. **Information looked like a button.** `MetricCard` without an action is now a plain row (no card, no fill); with an action it is a card with a chevron. Settings' text panels are plain text.
+4. **"Modo: Auto · Tranquilo" cut at the bottom.** More is now a one-screen glance page: three pills (Tono, Mode, Settings) sized to the circle (70 / 84 / 70 % of the display), labels held at 1.3×; the phone link and the disclaimer are below the fold as plain lines. The clock steps aside on all three glance pages. List rows keep their own height (no `transformedHeight`: near the edge a tall paragraph was laid out shorter than it draws and the next row landed on it; rows still scale and fade), a single choice is one row per option (`choiceRows`), and the top scrim is solid under the clock.
+5. **The Dose ring.** One progress arc (`DoseArc`): 12 o'clock, clockwise, faint full track, full = 100 %; no hour marks, no "now" dot, no day segments, no waves on that page. Caption "of today's limit" / "of this week's limit" (shown at every size) with an info icon; the number opens **What the ring shows** (two sentences). Reduced motion: the arc jumps; ambient unchanged.
+6. **Terminology.** Spanish: *audífonos* everywhere (watch and phone), *teléfono* (never *móvil*), *límite* (never *lo permitido* / *presupuesto*), *en vivo*, *alertas*, one on/off pair (Sí/No for settings, Activo/Inactivo for a state). English: *limit* (never *allowance* / *budget*), *Around you* (never *Outside* / *Surroundings*), one zone vocabulary (the old Safe/Elevated/High/Critical words now match OK/Moderate/Loud/Dangerous).
+
+### From Agent A's audit (beyond the six)
+No ellipsis anywhere on the watch (lists wrap whole); the uncalibrated notice and "estimated" stay on the hero at every size and in ambient (which also gained its unit); the stepper's value wraps so "+" never leaves the screen; the Moderate zone icon is a small wave (the "i" read as "tap for info"); a selected choice is tonal with a check, not the primary purple; whole decibels for the day's level and rounded headphone time ("100h", not "100h 29m"); Dose/Today says "nothing measured" once, not three times; the limit alert's protective sentence is on its first screen; 104 unused strings removed (EN and ES).
+
+### From Agent B's independent review (after)
+Fixed after the review: buttons and rows drop their icon on small faces and at large text, so no word breaks mid-way ("Allow microphon/e"); both alerts keep their content inside the ring (inset by fractions of the display, the volume alert's rows too); "parlante" replaces Spain's "altavoz" everywhere in Spanish (watch and phone); the uncalibrated notice's icon is inline with its text; the raw mic path ("voice recognition") is debug-only; "low confidence" became "Could be 66–86 dBA"; Tono says "Moderate sound around you" at 70–84 dBA instead of "calm"; "Dismiss" became "Got it" like the limit alert; "Playing on this watch/your phone"; the Dose help reads "Full means the limit is reached" (no orphaned "%"); "No AI used" / "Sin IA" as the built-in source; "Not now" / "Ahora no"; "measuring" for the microphone, "listening" only for headphones.
+Left open on purpose (design decisions for the owner, listed in the final report): the Now ring's marker knob and its fill colour, the headphones hero's unlabelled outside-level moon and twin knobs, text-only toggles in Settings (a Wear `SwitchButton` refactor), the Hearing Care Score on the watch, the NIOSH/TWA explanations, the length of Settings and of the consent/why texts, the Today|Week name at 192 dp, the onboarding step counter.
+
+### Tests
+Added `OutputIgnoreTest` (5), formatter tests, streak and status-length tests in `CoachTest`; rewrote `StatusFitTest` for the whole-sentence rule. Updated to the new wording only: `FiguresConsistencyTest` ("limit"), `AutoHeadphonesCompatTest` ("teléfono"), render fixtures. `ModesNeverWeakenAlertsTest`, `AlertFloorsTest` and the contrast tests were not touched.
+
+### Not verified (needs the watch)
+Everything on the Galaxy Watch 7: the pills and ring at 203 dp, the chip tap target, "Not headphones" with a real speaker and with the phone's output (the phone must have the new build), whether the platform gives a full Bluetooth address without the Bluetooth permission (otherwise only "Ignore for now" is offered), TalkBack order on More and Dose.
+
+### Follow-up (Oct 24)
+- Streak checked in code: unmeasured days never count (`keepsStreak`, `Coach.kt:129`) and no slip is forgiven (`streakDays`, `Coach.kt:138`); `SnapshotStreakTest` (3) pins it through `SnapshotBuilder`.
+- Headphones mode on Now: the outside level is a pill with the "around you" waves icon and its unit ("58 dBA"), not a bare number.
+- Settings: quiet hours, sensitive ears, Tono and cloud AI are Wear M3 `SwitchButton` rows (`SwitchRow`); the "X: Sí/No" strings are gone.
+- Limit alert: on small faces or large text, title, "Protege tus oídos." and "Entendido" keep the base size and fit one screen; the full sentence is the first row below.
+- Hearing Care Score removed from the watch's Week page (domain code, tests and the phone's line kept).
+- ES: "Descansa entre canciones"; "Bus, tren o metro".

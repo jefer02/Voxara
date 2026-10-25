@@ -1,6 +1,6 @@
 ---
 name: Voxara Watch
-description: A round, glanceable dosimeter. Three pages on pure black: the live level as a big rolling number on its dBA scale with Tono's one line and today's dose (Now), the dose of today or of the week on one ring that morphs (Dose), and the tools (More), over breathing wave rings.
+description: A round, glanceable dosimeter. Three pages on pure black: the live level as a big rolling number on its dBA scale with Tono's one line and today's dose (Now), the share of today's or this week's limit on one progress ring (Dose), and three actions (More).
 colors:
   amoled-black: "#000000"
   card: "#131722"
@@ -71,7 +71,7 @@ components:
 
 **Creative North Star: "The Orbit"**
 
-The watch is a round instrument, not a list of rectangles. Every glance page is one picture drawn on the same 250 degree ring (a 110 degree gap at the bottom), its outer edge 4 % of the display in from the glass: the same rim on every page, like a Wear system progress indicator. Every proportion on a page (ring radius and stroke, wave rings, centre column, foot, figure and word sizes) is a fraction of the display, so the same layout fills a 192 dp case and a 240 dp one. Inside it sit a big figure and a zone tag, and in the gap just above the page dots the one thing the page lets you do or read next. There are three pages, each answering one question. **Now**: how loud is it, and is today fine (the live level on a dBA scale whose four zones light up, Tono's one line as a tag, today's dose). **Dose**: how much of my allowance is used, today or this week (24 hourly bars, or seven day segments, on one ring that morphs between them). **More**: Ask, Mode, Settings. Swiping is a change of picture, not only of position: the new page's picture draws itself in while the old one retracts, and both turn a little with the finger.
+The watch is a round instrument, not a list of rectangles. Every glance page is one picture drawn on the same 250 degree ring (a 110 degree gap at the bottom), its outer edge 4 % of the display in from the glass: the same rim on every page, like a Wear system progress indicator. Every proportion on a page (ring radius and stroke, wave rings, centre column, foot, figure and word sizes) is a fraction of the display, so the same layout fills a 192 dp case and a 240 dp one. Inside it sit a big figure and a zone tag, and in the gap just above the page dots the one thing the page lets you do or read next. There are three pages, each answering one question. **Now**: how loud is it, and is today fine (the live level on a dBA scale whose four zones light up, Tono's one line as a tag, today's dose). **Dose**: how much of my limit is used, today or this week (one progress ring that starts at 12 o'clock and fills clockwise; a faint track is what is left; full = 100 %). **More**: Tono, Mode, Settings. Swiping is a change of picture, not only of position: the new page's picture draws itself in while the old one retracts, and both turn a little with the finger.
 
 Behind the picture, wave rings and a halo fill the ring's inside and breathe with the live level; a dark scrim under the figure keeps text legible, and the rings drift slowly when it is quiet.
 
@@ -81,12 +81,14 @@ The world stays black (AMOLED, one accent) and calm. Colour is information: viol
 
 **Key Characteristics:**
 - One picture per page on one ring; the ring is concentric with the display and its outer edge is the same on every page.
-- The system clock steps aside on the glance pages (the ring owns the top edge) and stays on More, lists and ambient.
-- Pager of three pages (Now, Dose, More); the system page indicator hugs the bezel. Pages are not captioned with their name: the figure and its unit, the Today | Week switch and the More title say what each is; TalkBack hears "Page n of 3, name".
+- The system clock steps aside on the three glance pages (the ring owns the top edge on Now and Dose; More's three pills fill the face) and stays on every list screen and in ambient.
+- Pager of three pages (Now, Dose, More); the system page indicator hugs the bezel. Pages are not captioned with their name: the figure and its unit, the caption under it and the Today | Week switch say what each is; TalkBack hears "Page n of 3, name".
+- **What looks tappable is tappable.** A card, a pill or a chevron always does something useful; information is plain text with an icon (no card, no fill, no chevron). `MetricCard` enforces it: with an action it is a card with a chevron, without one it is a plain row.
+- **Text budget.** A glance page: one big number or word plus about six words. A list row: label and value up to three words each. An alert: a title up to four words, one short sentence, actions up to three words. Required notices (estimate, not medical) in their shortest honest form; long explanations behind a tap. Nothing is ever cut with an ellipsis: list text wraps whole.
 - No uppercase labels above things.
 - Numbers are drawn one fixed-width cell per digit, in Plus Jakarta Sans (plain zero, plain one: no `tnum`, whose tabular alternates give "1" a slab foot); they roll, they never jitter. Decimals follow the language the app shows.
 - Nothing is clipped at 192, 216, 227 or 240 dp, at font scale 1.3 or 2.0, in English or Spanish: at large sizes the page drops its caption and foot (shown as the first detail), caps the figure and Tono's line at 1.3 times and the other hero words at 1.5 times.
-- Tono's line on the hero is a small tag that never ends in an ellipsis: two lines when the gap has room, one when it is tight (a step or two smaller if needed, then a shorter whole piece of the sentence), and the first detail row when there is no room at all; the full text is on Ask.
+- Tono's line on the hero is a small tag holding one whole sentence or nothing: two lines when the gap has room, one when it is tight (a step or two smaller if needed, then fewer whole sentences), and the first detail row (wrapping whole) when not even one sentence fits. Never a clause or a few words ("A calm day for"), never an ellipsis; the full text is on the Tono screen.
 
 ## Colors
 
@@ -146,13 +148,16 @@ A circle and its arc. Rows and chips are 22 dp rounded (the card) or fully round
 Waves + scrim, the page's picture, a centre column and a foot group (`foot`, told the `room` the centre leaves, plus one `nameSlot` control). Spoken as one description prefixed with "Page n of 3, name"; the name is spoken, not drawn.
 
 ### Pictures (`Orbit.kt`)
-`NowRing` (the dBA scale, and its split into two arcs in headphones mode) and `DoseMorph` (24 hourly bars and seven day segments on one ring, `week` 0..1 read in the draw phase): drawn on the shared ring, draw-in driven by the pager's reveal, cached strokes and colour arrays (no per-frame allocation).
+`NowRing` (the dBA scale, and its split into two arcs in headphones mode) and `DoseArc` (one progress arc on the shared rim: it starts at 12 o'clock and fills clockwise over a faint full track, full = 100 % of the limit and full above it; between Today and Week it runs from one share to the other, `mix` 0..1 read in the draw phase). Nothing else is drawn on the Dose ring (no hour marks, markers or day segments; the hours and the days are lists below), and the Dose page leaves out the breathing waves, which follow the live sound. Draw-in driven by the pager's reveal, cached strokes (no per-frame allocation).
 
 ### Headphones layer (`LayerTransition.kt`, `HomeScreen.kt`, `Orbit.kt`)
-`NowRing` (the scale opens at the top into two arcs), `Moon` (the outside level), `HeadphonesLabel` (curved "Headphones mode"), `HeadphonesChip` (48 dp indigo pill: "Headphones" over "Auto" or "Manual"; a plain label on small screens or large text) and `HeadphonesModeCard` (the quick action in Now's first detail). One `LayerProgress` holds the stages (ring, waves, figure, moon, label) so each part reads only its own value in the draw phase.
+`NowRing` (the scale opens at the top into two arcs), `Moon` (the outside level), `HeadphonesLabel` (curved "Headphones mode"), `HeadphonesChip` (48 dp indigo pill: "Headphones" over "Auto", "From phone" or "Possible speaker"; a tap opens **Not headphones?**; a plain label on small screens or large text) and the "Not headphones" button, Now's first detail while the mode is on. Detection stays automatic: **Not headphones?** ignores the output in use until it disconnects, or remembers a Bluetooth device as a speaker (only a salted digest is stored; Mode lists them and forgets them). The room's alerts are never affected; headphone alerts stop only for that output. When the mode is off, Now shows it as one line of information, not a switch. One `LayerProgress` holds the stages (ring, waves, figure, moon, label) so each part reads only its own value in the draw phase.
 
 ### Tono's tag (`TonoTag`, `FittedStatus`)
 A small tag under the zone: an icon (a sparkle when the wording came from the cloud AI) and Tono's sentence in the Label size, on a black 55 % scrim with a hairline border. One tap opens Ask. `FittedStatus` fits it (never an ellipsis); it may take 76 % of the display's width, because it sits higher in the gap than the last line. Below the fold it is a full-width 48 dp row.
+
+### Dose caption and its explanation
+Under the figure, what it is a share of, with an info icon: "of today's limit" / "of this week's limit". The figure and caption are one tap target that opens **What the ring shows** (two sentences: it fills from the top as the limit is used; full is 100 %). The caption stays at every size.
 
 ### Today | Week switch (`DoseSwitch`)
 Two segments in one 48 dp pill in the gap: the selected one is filled (accent tint) and extra-bold, the other plain and secondary; each is a tab for TalkBack ("Today, tab, selected"). The selected segment is the view's name, so label and state are one thing. On small displays and at large fonts the gap carries only the view's name and the switch is the first detail row. The crown does the same thing (see Motion).
@@ -161,7 +166,10 @@ Two segments in one 48 dp pill in the gap: the selected one is filled (accent ti
 Icon and word in the tier colour on a tier tint over a dark scrim: a status tag, not a button (no outline, 8 dp corners). Colour crossfades and icon/word pop when the zone changes.
 
 ### Rows and buttons
-`MetricCard` (tinted icon, muted label, value), `PillButton` (Wear Material 3 filled / tonal / outlined), `ModeChip` (morphs its label when Auto concludes), `ResumePill`. Every tap target is at least 48 dp and gives press feedback (`pressable`: 96 % for 100 ms).
+`MetricCard` (tinted icon, muted label, value: a card with a chevron when it has an action, a plain row when it is information), `PillButton` (Wear Material 3 filled / tonal / outlined), `ModeChip` (morphs its label when Auto concludes), `ResumePill`. Every tap target is at least 48 dp and gives press feedback (`pressable`: 96 % for 100 ms).
+
+### More (`MenuPage`)
+One screen that fits at every size and font scale: three 48 dp pills stacked in the middle of the face (Tono, Mode, Settings), the top and bottom ones 70 % of the display wide and the middle one 84 %, labels held at 1.3 times the font size. Below the fold, the phone link as a plain line and the one-line disclaimer.
 
 ### Limit alert (`LimitAlertScreen`)
 A round dark panel with a crimson border; icon, title and the acknowledge button fit the first screen; the border pulses once per haptic beat.
@@ -170,7 +178,7 @@ A round dark panel with a crimson border; icon, title and the acknowledge button
 Name and zone tag: Label (13 sp, 600; larger displays scale it up to 1.12 times, large fonts hold it at 1.5 times). Caption and foot lines: Caption (12 sp, 500). Companions to a figure ("dBA", "%", "≈"): 0.42 times the figure, never below 12 sp. Tono's line: Title small (15 sp, 800).
 
 ### Motion (see `VMotion`; headphones mode in `LayerProgress`)
-Picture draw-in 650 ms decelerating (retract 250 ms); the picture turns up to 40 degrees with the swipe; zone crossfade 400 ms; zone tag swap 150 ms; digit roll 220 ms; mode chip morph 220 ms; press 100 ms; limit pulse 420 ms per beat; wave rings follow the level with a spring. **Today to Week** (Dose), 520 ms: the 24 bars retract into the rim one after another round the ring while the seven day segments fill in behind them, the figure rolls from the day's share to the week's, the caption cross-fades, the switch's fill moves and the zone tag swaps if the zone differs. Reduced motion: nothing moves, the two pictures and the captions cross-fade (200 ms). The crown flips the view while the page rests at its top (clockwise to Week, back to Today), with a tick; once the page has scrolled, or when it is on Week and the crown keeps turning clockwise, it scrolls the details as on any list, so it never fights the pager (a swipe) or the scrolling. **Headphones mode in**, about 900 ms staged: the scale opens at the top into two arcs with a spring, slims and fades (0 to 400 ms; the arcs are indigo) · waves morph to stereo (120 to 600) · the centre swaps and the digits roll from the outside level to the listening one (240 to 540) · the outside level flies out as the moon in a half orbit (300 to 750) · the curved label appears, holds and fades (280 to 740) and the chip appears. **Out**, about 700 ms: the moon returns, the figure becomes the outside level again, the arcs rejoin. Reduced motion: a cross-fade of the centre only; ambient or screen not resumed: none; an alert delivered during (or within a minute before) it: the alert wins and the picture jumps to its end. All gated by `LocalAnimate` / `LocalReduceMotion`; none in ambient; no per-frame allocation; no blur.
+Picture draw-in 650 ms decelerating (retract 250 ms); the picture turns up to 40 degrees with the swipe; zone crossfade 400 ms; zone tag swap 150 ms; digit roll 220 ms; mode chip morph 220 ms; press 100 ms; limit pulse 420 ms per beat; wave rings follow the level with a spring. **Today to Week** (Dose), 520 ms: the arc runs from the day's share to the week's (its colour follows the zone), the figure rolls, the caption cross-fades, the switch's fill moves and the zone tag swaps if the zone differs. Reduced motion: the arc jumps to the other share and the captions swap. The crown flips the view while the page rests at its top (clockwise to Week, back to Today), with a tick; once the page has scrolled, or when it is on Week and the crown keeps turning clockwise, it scrolls the details as on any list, so it never fights the pager (a swipe) or the scrolling. **Headphones mode in**, about 900 ms staged: the scale opens at the top into two arcs with a spring, slims and fades (0 to 400 ms; the arcs are indigo) · waves morph to stereo (120 to 600) · the centre swaps and the digits roll from the outside level to the listening one (240 to 540) · the outside level flies out as the moon in a half orbit (300 to 750) · the curved label appears, holds and fades (280 to 740) and the chip appears. **Out**, about 700 ms: the moon returns, the figure becomes the outside level again, the arcs rejoin. Reduced motion: a cross-fade of the centre only; ambient or screen not resumed: none; an alert delivered during (or within a minute before) it: the alert wins and the picture jumps to its end. All gated by `LocalAnimate` / `LocalReduceMotion`; none in ambient; no per-frame allocation; no blur.
 
 ## Do's and Don'ts
 
@@ -192,3 +200,28 @@ Picture draw-in 650 ms decelerating (retract 250 ms); the picture turns up to 40
 - **Don't** animate in ambient, or without `LocalAnimate`, or allocate per frame.
 - **Don't** use `tnum` or any font feature on numerals (the digit cells make them tabular).
 - **Don't** put the system clock under the ring: it steps aside on the glance pages.
+
+---
+
+# Voxara Phone (the other half of the watch)
+
+The phone is the watch's picture made phone-sized and given somewhere to put the days. Same black-and-violet world (light by default, dark and follow-system available), same Orbit ring, same Plus Jakarta Sans digits in fixed-width cells, same zone words and icons. One question per screen; the first viewport of Home answers *how is my hearing today?* with a figure, a word and a sentence.
+
+**Surface and mode.** Operate (a companion app people open for a few seconds to check, then for a few minutes to understand). Brief: `docs/design/phone-redesign/SURFACE_BRIEF.md`. Direction chosen at checkpoint B: concept A (Orbit, enlarged) for Home, concept B's charts (the Ledger) for Trends, in Orbit's language (zone colours, rounded caps, the watch's stroke weights and motion). Evidence: `docs/design/phone-redesign/` (before, concepts, after, critiques).
+
+**Structure.** Four tabs (Home, Trends, Watch, Settings). Home: header (the watch and when it last reported, the sync button, the watch's situation with its headphones layer), the ring, Tono's sentence (opens Tono), the uncalibrated note, two tiles (the last 7 days, headphones), the day hour by hour, the last alert. The ring opens Today (a shared element): the cumulative "where the day went", the hours, the minutes, the numbers and today's alerts. Trends: a Day / Week / Month segmented filter, one hero and one chart per range, the rolling weekly allowance, the headphones' share, the Hearing Care Score as a supporting line, "Ask Tono". Watch: the device, the checklist (calibration and battery open in place), troubleshooting as one row. Settings: Watch and alerts, Headphones, Tono and privacy, Appearance, Data, About.
+
+**Numbers.** Four names, one source (`HearingFigures`): today, surroundings last 7 days, headphones last 7 days, all sound last 7 days (compared with the 7 days before). Never a calendar week; never two different numbers for the same name.
+
+### Do:
+- **Do** answer the screen's one question first and put the rest below.
+- **Do** write a zone as an icon and a word beside any tier colour, in charts too (a legend of icon + word).
+- **Do** draw charts with thin capped marks, solid hairline guides labelled beside the line, direct labels only on the extremes (or on all seven columns), and a spoken twin.
+- **Do** hold the figure at 1.3 times the font scale and let the words grow; move the caption and the zone word out of the ring before they touch the arc; stack tiles and buttons rather than break a word.
+- **Do** keep the "uncalibrated estimate" and "not a medical device" messages visible wherever they apply.
+
+### Don't:
+- **Don't** draw shadows, dashed guides, uppercase labels, Mono numerals or a dotted zero.
+- **Don't** invent a number: a figure is the watch's, the ledger's or derived from them (the cumulative line ends exactly on the headline).
+- **Don't** show the same share three times on one screen.
+- **Don't** let the accent carry a zone alone (OK and Moderate are the accent: the word and the icon say which).
