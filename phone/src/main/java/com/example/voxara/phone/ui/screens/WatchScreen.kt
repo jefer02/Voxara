@@ -25,6 +25,7 @@ import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.components.Banner
 import com.example.voxara.phone.ui.components.Group
 import com.example.voxara.phone.ui.components.GroupDivider
+import com.example.voxara.phone.ui.components.ExpandableRow
 import com.example.voxara.phone.ui.components.GroupHeader
 import com.example.voxara.phone.ui.components.GroupNote
 import com.example.voxara.phone.ui.components.GroupRow
@@ -46,24 +47,24 @@ import com.example.voxara.ui.design.VoxIcons
 fun WatchScreen(s: PhoneUiState, actions: PhoneActions) {
     VoxScreen(stringResource(R.string.watch_title), refreshing = s.syncing, onRefresh = actions.onRefresh) {
         item { DeviceCard(s, actions, Modifier.contentWidth()) }
+        item {
+            val text = linkHealthText(s.linkHealth, s.nowMs)
+            if (text != null) {
+                Banner(
+                    VoxIcons.Refresh, text, stringResource(R.string.link_health_body),
+                    tint = Vox.colors.caution, modifier = Modifier.contentWidth(),
+                    action = stringResource(R.string.action_sync_now), onAction = actions.onRefresh,
+                )
+            }
+        }
+        if (s.pendingSpans > 0) item { GroupNote(stringResource(R.string.link_pending_listening, s.pendingSpans), Modifier.contentWidth()) }
+        item { BatteryGuide(s, actions, Modifier.contentWidth()) }
         item { GroupNote(stringResource(R.string.link_explain), Modifier.contentWidth()) }
 
         val watch = s.watch
         if (watch != null) {
             item { GroupHeader(stringResource(R.string.watch_checklist), Modifier.contentWidth()) }
             item { Checklist(s, actions, Modifier.contentWidth()) }
-            item {
-                Group(Modifier.contentWidth()) {
-                    GroupRow(stringResource(R.string.battery_tips_title), icon = VoxIcons.Battery)
-                    GroupNote("• " + stringResource(R.string.battery_tip_1) + "\n• " + stringResource(R.string.battery_tip_2) + "\n• " + stringResource(R.string.battery_tip_3), Modifier.padding(bottom = 14.dp))
-                }
-            }
-            item {
-                Group(Modifier.contentWidth()) {
-                    GroupRow(stringResource(R.string.cal_how_title), icon = VoxIcons.Tune)
-                    GroupNote(stringResource(R.string.cal_how_body), Modifier.padding(bottom = 14.dp))
-                }
-            }
             val others = when (val l = s.link) {
                 is LinkState.Linked -> l.others
                 is LinkState.Problem -> l.others
@@ -82,12 +83,12 @@ fun WatchScreen(s: PhoneUiState, actions: PhoneActions) {
             }
         }
 
-        item { GroupHeader(stringResource(R.string.troubleshoot_title), Modifier.contentWidth()) }
         item {
             Group(Modifier.contentWidth()) {
-                listOf(R.string.ts_1, R.string.ts_2, R.string.ts_3, R.string.ts_4, R.string.ts_5).forEachIndexed { i, res ->
-                    if (i > 0) GroupDivider()
-                    GroupRow(stringResource(res))
+                ExpandableRow(stringResource(R.string.troubleshoot_title), icon = VoxIcons.Info) {
+                    listOf(R.string.ts_1, R.string.ts_2, R.string.ts_3, R.string.ts_4, R.string.ts_5).forEach {
+                        Text("• " + stringResource(it), style = MaterialTheme.typography.bodyMedium, color = Vox.colors.text2)
+                    }
                 }
             }
         }
@@ -210,13 +211,19 @@ private fun Checklist(s: PhoneUiState, actions: PhoneActions, modifier: Modifier
             if (st == null) unknown else stringResource(if (st.micGranted) R.string.check_mic_ok else R.string.check_mic_missing),
             if (st?.micGranted == false) actions.onOpenOnWatch else null)
         GroupDivider()
-        row(stringResource(R.string.check_cal), st?.calibrated,
-            when {
+        ExpandableRow(
+            stringResource(R.string.check_cal),
+            subtitle = when {
                 st == null -> unknown
                 st.calibrated -> stringResource(R.string.check_cal_ok, st.calibratedAtMs?.let { dateText(it) } ?: "")
                 else -> stringResource(R.string.check_cal_missing)
             },
-            actions.onOpenCalibration)
+            icon = if (st?.calibrated == null) VoxIcons.Info else VoxIcons.zone(if (st.calibrated) RiskZone.OK else RiskZone.LOUD),
+            iconTint = when (st?.calibrated) { null -> c.text3; true -> c.zoneInk(RiskZone.OK); false -> c.zoneInk(RiskZone.LOUD) },
+        ) {
+            Text(stringResource(R.string.cal_how_body), style = MaterialTheme.typography.bodyMedium, color = c.text2)
+            LinkButton(stringResource(R.string.action_open_calibration), actions.onOpenCalibration)
+        }
         GroupDivider()
         row(stringResource(R.string.check_monitoring), st?.let { it.monitoring == MonitoringStatus.RUNNING },
             when (st?.monitoring) {
@@ -230,16 +237,25 @@ private fun Checklist(s: PhoneUiState, actions: PhoneActions, modifier: Modifier
         row(stringResource(R.string.check_notifications), st?.notificationsGranted,
             if (st == null) unknown else stringResource(if (st.notificationsGranted) R.string.check_mic_ok else R.string.check_notifications_off))
         GroupDivider()
-        row(stringResource(R.string.check_battery), st?.let { !it.powerSaveMode },
-            when {
+        ExpandableRow(
+            stringResource(R.string.check_battery),
+            subtitle = when {
                 st == null -> unknown
                 st.powerSaveMode -> stringResource(R.string.battery_power_save)
                 !st.ignoringBatteryOptimizations -> stringResource(R.string.battery_optimized)
                 else -> stringResource(R.string.battery_ok)
-            })
+            },
+            icon = if (st == null) VoxIcons.Info else VoxIcons.zone(if (!st.powerSaveMode) RiskZone.OK else RiskZone.LOUD),
+            iconTint = if (st == null) c.text3 else c.zoneInk(if (!st.powerSaveMode) RiskZone.OK else RiskZone.LOUD),
+        ) {
+            Text(stringResource(R.string.battery_tips_title), style = MaterialTheme.typography.titleSmall, color = c.text)
+            listOf(R.string.battery_tip_1, R.string.battery_tip_2, R.string.battery_tip_3).forEach {
+                Text("• " + stringResource(it), style = MaterialTheme.typography.bodyMedium, color = c.text2)
+            }
+        }
         if (st != null) {
             GroupDivider()
-            GroupNote(stringResource(R.string.check_as_of, freshnessText(st.atMs, s.nowMs)), Modifier.padding(vertical = 12.dp))
+            GroupNote(freshnessText(st.atMs, s.nowMs), Modifier.padding(vertical = 12.dp))
         }
     }
 }
