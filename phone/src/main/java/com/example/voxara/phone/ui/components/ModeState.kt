@@ -1,25 +1,20 @@
 package com.example.voxara.phone.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.example.voxara.core.design.Palette
 import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.phone.R
@@ -52,8 +47,8 @@ fun headphonesSourceText(source: LayerSource): String? = when (source) {
 }
 
 /**
- * The watch's mode as a pill: indigo with a headphones icon while headphones mode is on (the colour
- * and the icon both say it), neutral otherwise. Nothing before the watch has reported a mode.
+ * The watch's mode as one quiet line: a headphones icon and the indigo ink while headphones mode is on (the icon and the
+ * colour both say it), a watch icon and neutral ink otherwise. Nothing before the watch has reported a mode.
  */
 @Composable
 fun WatchModePill(s: PhoneUiState, modifier: Modifier = Modifier) {
@@ -65,14 +60,11 @@ fun WatchModePill(s: PhoneUiState, modifier: Modifier = Modifier) {
     Row(
         modifier
             .semantics(mergeDescendants = true) { contentDescription = cd }
-            .clip(CircleShape)
-            .background(if (on) ink.copy(alpha = Palette.SOFT_ALPHA) else c.surface2)
-            .border(1.dp, if (on) ink.copy(alpha = 0.7f) else c.outline, CircleShape)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Icon(if (on) VoxIcons.Headphones else VoxIcons.Watch, contentDescription = null, tint = ink, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(name, style = MaterialTheme.typography.labelMedium, color = if (on) ink else c.text, maxLines = 2)
+        Icon(if (on) VoxIcons.Headphones else VoxIcons.Watch, contentDescription = null, tint = ink, modifier = Modifier.padding(top = 2.dp).size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(name, style = MaterialTheme.typography.labelMedium, color = ink)
     }
 }
