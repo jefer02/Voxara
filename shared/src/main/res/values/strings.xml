@@ -4,14 +4,14 @@
     <string name="tono_chip_tips">Tips</string>
     <string name="tono_chip_week">My week?</string>
     <string name="tono_chip_why_estimated">Why estimated?</string>
-    <string name="tono_insight_today">You are at %1$d%% of today’s sound allowance and %2$d%% of this week’s.</string>
-    <string name="tono_insight_week">This week you are at %1$d%% of your allowance. Days within your limit in a row: %2$d.</string>
-    <string name="tono_status_busy">A busy day for your ears</string>
-    <string name="tono_status_calm">A calm day for your ears</string>
-    <string name="tono_status_limit">Today’s sound allowance is used up</string>
-    <string name="tono_status_listening">Listening today, all on track</string>
-    <string name="tono_status_loud">Loud around you right now</string>
-    <string name="tono_status_week">Your week is getting full</string>
+    <string name="tono_insight_today">You\'ve used %1$d%% of today\'s limit and %2$d%% of this week\'s.</string>
+    <string name="tono_insight_week">This week: %1$d%% of your limit. %2$d days in a row within your daily limit.</string>
+    <string name="tono_status_busy">Busy day for your ears</string>
+    <string name="tono_status_calm">Calm day for your ears</string>
+    <string name="tono_status_limit">Today\'s limit reached</string>
+    <string name="tono_status_listening">Headphones on, all on track</string>
+    <string name="tono_status_loud">Loud around you now</string>
+    <string name="tono_status_week">Week near its limit</string>
     <string name="tono_suggest_keep">Keep doing what you are doing.</string>
     <string name="tono_suggest_quieter">A quieter spot or ear protection helps right away.</string>
     <string name="tono_suggest_rest">Some quiet time today lets your ears recover.</string>
@@ -19,6 +19,9 @@
     <string name="tono_symptom_insight">Ringing, muffled hearing or ear pain are worth checking with a hearing professional, such as an audiologist or doctor.</string>
     <string name="tono_symptom_status">I can’t assess symptoms</string>
     <string name="tono_symptom_suggestion">Please see a hearing professional, especially if it lasts.</string>
-    <string name="tono_why_alert">Sound adds up over time: the louder it is, the faster the allowance goes.</string>
+    <string name="tono_why_alert">Sound adds up over time: the louder it is, the sooner you reach the limit.</string>
     <string name="tono_why_projection">At this pace you would reach the weekly limit in about %1$d days.</string>
+    <!-- UX/copy pass: the Dose ring explained, "Not headphones" -->
+    <string name="tono_insight_week_plain">This week you\'re at %1$d%% of your limit.</string>
+    <string name="tono_status_moderate">Moderate sound around you</string>
 </resources>
