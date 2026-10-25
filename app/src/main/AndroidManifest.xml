@@ -46,6 +46,37 @@
         </service>
 
         <!--
+            The phone's headphones, live (messages and one state item) and the answer to "lower the volume",
+            plus the phone app's capability appearing or going (the link state). Started by Google Play
+            services when something arrives, so it works with the watch app closed.
+        -->
+        <service
+            android:name=".sync.HeadphoneSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/voxara/hp"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:path="/voxara/hp/state"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data
+                    android:host="*"
+                    android:path="/voxara_phone_app"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+
+        <!--
             The Voxara phone app (same app id + signature only): history requests, status,
             delete-all, and the phone's settings document.
         -->
