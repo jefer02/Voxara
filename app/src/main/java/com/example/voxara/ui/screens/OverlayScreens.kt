@@ -29,6 +29,8 @@ import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.BodyText
+import com.example.voxara.ui.design.capFont
+import com.example.voxara.ui.design.HideClock
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
 import com.example.voxara.ui.design.VColor
@@ -96,24 +98,50 @@ fun LimitAlertScreen(env: UiEnv, kind: LimitKind, actions: VoxaraActions, onDism
         }
     }
 
+    // The panel owns the whole face: the clock steps aside so the title never sits under it at large text.
+    HideClock(true)
     // A dark round panel with a border in the danger tier.
     CircularOverlay(border = VColor.tone(RiskZone.DANGEROUS).fill, pulse = { pulse.value }) {
         val compact = isCompactFont()
+        val compactBody = compact || androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 200
         HeroList(
             hero = { m ->
                 // What must be seen without scrolling: that it happened, and the one way to acknowledge it.
                 Column(
-                    m.padding(start = VSpace.roundInset + 4.dp, end = VSpace.roundInset + 4.dp, top = 28.dp, bottom = 12.dp),
+                    // Inside the ring: the round edge narrows fast near the top and bottom, so the content keeps to the
+                    // circle's middle and the button rests well above the bottom of the ring.
+                    m.padding(start = alertInset(0.14f), end = alertInset(0.14f), top = alertInset(0.09f), bottom = alertInset(0.12f)),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(VSpace.xs, Alignment.CenterVertically),
                 ) {
-                    if (!compact) ZoneIconCircle(RiskZone.DANGEROUS, Modifier.graphicsLayer { scaleX = 1f + 0.14f * pulse.value; scaleY = scaleX })
-                    HeroStatus(stringResource(title, percent), maxLines = 4)
-                    PillButton(stringResource(R.string.alert_action_ack), onClick = onDismiss)
+                    // The icon only where the face has room for it as well as the title, the sentence and the button.
+                    val roomy = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 230
+                    if (!compact && roomy) ZoneIconCircle(RiskZone.DANGEROUS, Modifier.graphicsLayer { scaleX = 1f + 0.14f * pulse.value; scaleY = scaleX })
+                    // Title and sentence held at 1.15 times the font size, so the alert (title, what to do, the button)
+                    // always fits one round face, as the hero figures are held at 1.3.
+                    // On a small face or at large text everything here keeps the base size, so the button is on the first screen.
+                    val cap = if (compactBody) 1.0f else 1.15f
+                    Text(
+                        stringResource(title, percent), style = VType.Title.capFont(cap), color = VColor.Text,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                    // What to do is part of the alert, so it is on the first screen: one short sentence, and on a small
+                    // face or at large text its shortest form (the full sentence is the first row below), so the
+                    // button is always on the first screen too.
+                    Text(
+                        if (compactBody) stringResource(R.string.alert_limit_short) else stringResource(body, percent),
+                        style = VType.Caption.capFont(cap), color = VColor.Text,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                    // Narrower than the column: it sits low on the face, where the circle is narrow.
+                    PillButton(
+                        stringResource(R.string.alert_action_ack), onClick = onDismiss,
+                        modifier = Modifier.padding(horizontal = alertInset(0.04f)), wide = true, maxFontScale = cap,
+                    )
                 }
             },
             details = {
-                row { BodyText(stringResource(body, percent)) }
+                if (compactBody) row { BodyText(stringResource(body, percent), color = VColor.Text) }
                 if (env.state.tonoEnabled) {
                     row {
                         PillButton(
@@ -128,6 +156,11 @@ fun LimitAlertScreen(env: UiEnv, kind: LimitKind, actions: VoxaraActions, onDism
         )
     }
 }
+
+/** A fraction of the display, for content that must stay inside an alert's round border. */
+@Composable
+internal fun alertInset(fraction: Float): androidx.compose.ui.unit.Dp =
+    androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp * fraction
 
 /**
  * AMBIENT — the always-on view, whatever screen was open: level, zone word and a hairline bezel.
@@ -154,9 +187,16 @@ fun AmbientScreen(env: UiEnv) {
             if (layerOn) Icon(VoxIcons.Headphones, contentDescription = null, tint = VColor.TextSecondary, modifier = Modifier.size(18.dp))
             LevelNumber(
                 (est?.dba ?: s.dba).takeIf { it > 0.0 }?.roundToInt(), glow = VColor.TextTertiary, style = VType.Hero,
-                prefix = if (est != null) "≈" else "",
+                prefix = if (est != null) "≈" else "", suffix = stringResource(R.string.unit_dba),
             )
             ZoneTag(if (est != null) RiskZone.of(est.dba) else zone, modifier = Modifier.padding(top = 4.dp))
+            // The estimate notice stays visible in always-on too (grey, no fill).
+            if (!s.calibrated && !s.simulated) {
+                Text(
+                    stringResource(R.string.uncalibrated_short), style = VType.Caption, color = VColor.TextSecondary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
     }
 }
