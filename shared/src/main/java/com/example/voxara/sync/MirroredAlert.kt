@@ -40,6 +40,6 @@ data class MirroredAlert(val kind: AlertKind, val value: Double, val level: Int,
             enabled &&
                 alert.kind.tier == Tier.LIMIT &&
                 alert.atMs > lastShownAtMs &&
-                nowMs - alert.atMs in -60_000L..MAX_AGE_MS
+                nowMs - alert.atMs in -HeadphoneWire.CLOCK_TOLERANCE_MS..MAX_AGE_MS
     }
 }
