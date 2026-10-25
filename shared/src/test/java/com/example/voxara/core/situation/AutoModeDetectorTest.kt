@@ -50,15 +50,14 @@ class AutoModeDetectorTest {
     @Test
     fun `nothing is decided before the window has enough votes, then the hysteresis holds one more`() {
         val d = AutoModeDetector()
-        // Idle cadence: one burst a minute.
+        // Idle cadence: one burst a minute. (Phase 5 retune: two votes make a candidate, was three.)
         assertNull(d.offer(vote(t0, leaning(SituationMode.TRANSPORT))).detected)
+        // Second vote: a candidate, but the hysteresis wants two evaluations in a row.
         assertNull(d.offer(vote(t0 + minute, leaning(SituationMode.TRANSPORT))).detected)
-        // Third vote: a candidate, but the hysteresis wants two evaluations in a row.
-        assertNull(d.offer(vote(t0 + 2 * minute, leaning(SituationMode.TRANSPORT))).detected)
-        val fourth = d.offer(vote(t0 + 3 * minute, leaning(SituationMode.TRANSPORT)))
-        assertEquals(SituationMode.TRANSPORT, fourth.detected)
-        assertTrue(fourth.changed)
-        assertTrue(fourth.confidence > 0.5)
+        val third = d.offer(vote(t0 + 2 * minute, leaning(SituationMode.TRANSPORT)))
+        assertEquals(SituationMode.TRANSPORT, third.detected)
+        assertTrue(third.changed)
+        assertTrue(third.confidence > 0.5)
     }
 
     @Test
@@ -76,17 +75,18 @@ class AutoModeDetectorTest {
     fun `a new mode waits for the minimum dwell of the current one`() {
         val cfg = AutoModeDetector.Config()
         val d = AutoModeDetector(cfg)
-        // Quiet detected at the 4th vote (t0 + 3 min).
-        d.feed(t0, 4, minute, leaning(SituationMode.QUIET), dba = 45.0)
+        // Quiet detected at the 3rd vote (t0 + 2 min).
+        d.feed(t0, 3, minute, leaning(SituationMode.QUIET), dba = 45.0)
         assertEquals(SituationMode.QUIET, d.detected)
-        val quietSince = t0 + 3 * minute
-        // The wearer walks out: strong Street votes every 10 s (the louder ladder step).
+        val quietSince = t0 + 2 * minute
+        // The wearer walks out: strong Street votes every 5 s, starting at once. The evidence is there
+        // long before the dwell is over, so the dwell is what holds the switch back.
         var switchedAt: Long? = null
-        var t = quietSince + 10_000
+        var t = quietSince + 5_000
         while (t < quietSince + 15 * minute) {
             val r = d.offer(vote(t, leaning(SituationMode.STREET, 0.9), dba = 72.0))
             if (r.detected == SituationMode.STREET && switchedAt == null) switchedAt = t
-            t += 10_000
+            t += 5_000
         }
         assertTrue("Street must win eventually", switchedAt != null)
         assertTrue("left Quiet after ${(switchedAt!! - quietSince) / 1000} s", switchedAt - quietSince >= cfg.minDwellMs)
