@@ -130,6 +130,8 @@ data class PhoneActions(
     val onDismissHeadphoneAlert: () -> Unit = {},
     /** "Lower to safe volume" on this phone's headphones. */
     val onLowerHeadphones: () -> Unit = {},
+    /** "Not headphones": this phone's output is left out of headphones mode until it disconnects (alerts for it stop). */
+    val onNotHeadphones: () -> Unit = {},
     val onOpenBatterySettings: () -> Unit = {},
     val onDismissBatteryHint: () -> Unit = {},
 )
