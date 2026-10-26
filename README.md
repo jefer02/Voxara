@@ -31,6 +31,7 @@ A small AI coach, **Tono**, explains your status in plain language. Alerts and n
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [How it works](#how-it-works)
+- [Algorithms](#algorithms)
 - [Project structure](#project-structure)
 - [Tech stack](#tech-stack)
 - [Getting started](#getting-started)
@@ -45,9 +46,9 @@ A small AI coach, **Tono**, explains your status in plain language. Alerts and n
 ### On the watch (Wear OS)
 
 - **Live level**: the sound around you in dBA, on a 250° ring with four zones: OK (< 70), Moderate (70–84), Loud (85–94) and Dangerous (≥ 95). The zone is always shown as a word and an icon, never by colour alone.
-- **Daily and weekly dose**: one progress ring for the share of today's limit or of the rolling last 7 days (NIOSH, 85 dBA for 8 h, 3 dB exchange rate). Calm haptic alerts at 50 %, 80 % and 100 %.
+- **Daily and weekly dose**: one progress ring for the share of today's limit (NIOSH: 85 dBA for 8 h, 3 dB exchange rate) or of the rolling last 7 days (WHO weekly sound allowance). Calm haptic alerts at 50 %, 80 % and 100 %.
 - **Headphones mode**: switches on by itself when headphones are connected to the watch or the phone. It shows the estimated listening level, warns above a safe volume and offers **Lower volume**. It never lowers thresholds and never stops measuring the room.
-- **Situation modes**: Auto, Quiet, Street, Transport, Work and Concert. Auto detects the scene with a small on-watch model, and concerts with a deterministic rule.
+- **Situation modes**: Auto, Quiet, Street, Transport, Work and Concert. Auto detects the scene with a small on-watch model (debug builds; see [the licence gate](#5-automatic-situation-detection-auto-mode)), and concerts with a deterministic rule.
 - **Tono**: a short coaching line and a conversation screen (voice or text) that explains your numbers.
 - **Guided calibration** against a sound level meter or a phone app, saved per microphone path and device model.
 - **Always-on**: ambient mode, a foreground monitoring service, tiles and watch-face complications (dose and listening).
@@ -117,6 +118,103 @@ Taken on an Android 15 emulator (1080 × 2400 px): the first-run setup and Setti
 - **Alerts**: `AlertEngine` decides deterministically and locally. Modes and headphones mode can never weaken an alert; tests such as `ModesNeverWeakenAlertsTest` and `AlertFloorsTest` guard this.
 - **Headphones**: one `HeadphoneWatcher` reacts to audio-output events on both devices. The phone sends idempotent listening spans to the watch through a persisted outbox, so nothing is counted twice.
 - **Tono**: an OpenAI-compatible chat client (DeepSeek by default) that receives a snapshot of the numbers and only writes the sentence. Cloud AI is enabled in **debug builds only**.
+
+## Algorithms
+
+Everything here is plain Kotlin in `:shared` (no Android imports where possible), deterministic, offline and unit-tested.
+
+### 1. Sound level measurement
+
+`AudioBurstSampler` (watch) reads short bursts of 48 kHz mono PCM from the microphone:
+
+1. **A-weighting** with an IIR biquad cascade, frame by frame.
+2. **RMS → dBFS → dBA**: `L = 20·log10(rms) + 94 + offset`, where `offset` is the calibration of the active microphone path (`UNPROCESSED` or `VOICE_RECOGNITION`).
+3. **Leq** of the burst by energy-averaging the frame levels: `Leq = 10·log10(mean(10^(Lᵢ/10)))`.
+
+**Calibration**: until you calibrate, the offset is a provisional value, and the UI says "uncalibrated estimate". Guided calibration does a 10 s steady capture against a reference meter. It requires a steady reading (standard deviation ≤ 2 dB), warns when the room is too quiet (< 50 dBA) or too loud (> 90 dBA), and stores `offset = reference − measured` per microphone path and device model.
+
+**Adaptive cadence** (`SampleState`): the microphone opens only as often as the risk needs it.
+
+| State | Level | Burst / period | Duty cycle |
+|---|---|---|---|
+| IDLE | < 65 dBA | 1 s every 60 s | 1.7 % |
+| AMBIENT | 65–79 dBA | 1 s every 30 s | 3.3 % |
+| ACCRUING | 80–94 dBA | 2 s every 10 s | 20 % |
+| HAZARD | ≥ 95 dBA | continuous | 100 % |
+
+Each burst stands in for the time until the next one, so the dose is duty-cycle corrected.
+
+### 2. Noise dose (`NoiseDoseEngine`)
+
+**Daily dose (NIOSH REL)**: 85 dBA for 8 hours, with a 3 dB exchange rate. Only levels ≥ 80 dBA count.
+
+```
+Permitted time   T(L) = 8 h / 2^((L − 85) / 3)
+Daily dose       D    = 100 × Σ (Cᵢ / Tᵢ)            %    (Cᵢ = time spent at level Lᵢ)
+8 h equivalent   TWA  = 10 × log10(D / 100) + 85     dBA
+```
+
+So 85 dBA gives 8 h, 88 dBA 4 h, 91 dBA 2 h, 94 dBA 1 h and 100 dBA 15 min. Headroom left at the current level is `T(L) × (1 − D/100)`.
+
+**Weekly dose (WHO / ITU-T H.870)**: sound energy over the rolling last 7 days, `E = Σ p₀² · 10^(L/10) · t` in Pa²·h, compared with the weekly allowance of **1.6 Pa²·h** (0.51 Pa²·h for sensitive users). Ambient sound and headphone listening go into separate ledgers. A minute owned by the room is never counted again as headphones, and a minute reported by both the watch and the phone counts once (the louder one).
+
+### 3. Risk zones and alerts (`RiskZone`, `AlertEngine`)
+
+| Zone | Level |
+|---|---|
+| OK | < 70 dBA |
+| Moderate | 70–84 dBA |
+| Loud | 85–94 dBA |
+| Dangerous | ≥ 95 dBA |
+
+`AlertEngine` is a pure state machine that turns the numbers into alerts:
+
+- **Daily dose**: 50 % (advisory), 80 % (warning), 100 % and every further 100 % (limit).
+- **Weekly dose**: 80 % and 100 %, re-armed when it falls back below 70 %. Ambient and headphones are tracked separately.
+- **Loud room**: sustained above the threshold (85 dBA by default, adjustable 80–95) for 3 minutes, re-armed 5 dB below it.
+- **Headphone volume**: above 80 dBA for 8 s, in tiers (> 80, ≥ 90, ≥ 100 dBA); a higher tier always alerts.
+- **Three tiers**: *advisory* (loud room, 50 %) counts against a daily cap of 4. *Warning* (80 %, loud headphones) can be snoozed for 1 h. Both have a 30 min cooldown and are held during quiet hours (they fire afterwards if the condition still holds). *Limit* (100 %) is never rate-limited: no cap, no snooze, no quiet hours, no cooldown.
+- **Safety floor**: situation modes change how advice is worded and ordered, but they can never lower a threshold or delay an alert. `ModesNeverWeakenAlertsTest` and `AlertFloorsTest` guard this.
+
+### 4. Headphone listening estimate
+
+The microphone can't hear inside your ears, so headphone level is **estimated** from the output route and the volume setting (`estimateListening`). Full volume is taken as about **100 dBA** (the EN 50332 limit for portable players), minus the platform's own volume curve (`getStreamVolumeDb`), with a ±10 dB uncertainty. The UI always labels it as an estimate.
+
+- **Route** (`chooseRoute`): wired/USB, then BLE headset, then A2DP. Speakers and car kits never count. Without Bluetooth permission, an A2DP output is flagged as a "possible speaker".
+- **Detection** (`HeadphoneWatcher`): event-driven (device, playback and volume callbacks), plus a 2 s guard that runs only while something plays.
+- **Spans** (`ListeningTracker`): a span is cut at every event (connect, play, pause, volume change), so seconds follow your ears, not a sampling period.
+- **Two devices** (`effectiveListening`): when both the watch and the phone play, the louder estimate is the one that counts.
+- **Lower volume**: "Lower to safe volume" picks the highest volume step whose estimate is ≤ 80 dBA (`safeVolumeIndex`). It never raises the volume, and it reads the volume back to confirm.
+
+### 5. Automatic situation detection (Auto mode)
+
+Auto picks **Quiet, Street, Transport or Work** with a small neural network that runs on the watch, and **Concert** with a deterministic rule. It reuses the bursts the dosimeter already captures, so it adds no microphone time. Audio and features are never stored: each feature vector is dropped right after its vote.
+
+**Features** (`SceneFeatures`, 54 numbers per 0.98 s of unweighted audio): 1024-point Hann FFT frames, then 24 mel bands (50 Hz–12 kHz). From these: spectral shape (independent of gain), per-band temporal variation, centroid, flatness, frame-level variation, positive spectral flux and local tonality. There is no absolute level in the vector; the level comes from the calibrated dBA chain. The Kotlin extractor matches the Python training extractor to ≤ 1e-7 (`SceneFeaturesParityTest`).
+
+**Model** (`SceneModel`): an MLP **54 → 32 → 15** (ReLU, softmax). That is 2,363 parameters and about 2,200 multiply-adds per vote, as plain Kotlin constants with no TFLite. It was trained on **TUT Acoustic Scenes 2017** (15 scenes), with augmentation that imitates a wrist MEMS microphone. The 15 scene probabilities are summed into the 4 modes:
+
+| Mode | Scenes |
+|---|---|
+| Quiet | home, library, forest path, park, lakeside beach |
+| Street | city centre, residential area, café/restaurant, grocery store |
+| Transport | bus, tram, train, car, metro station |
+| Work | office |
+
+On the official evaluation split (109 locations never seen in training), it gets about **72 % mode accuracy per 10 s** (67 % balanced). Transport is the most reliable (85 % recall). Quiet is often taken for Street, and Work is the weakest class.
+
+**Detector** (`AutoModeDetector`): turns noisy votes into a calm decision.
+
+1. **Level vetoes**: below 38 dBA it's Quiet. Quiet is impossible above 70 dBA, Work above 80 dBA, and Transport below 50 dBA.
+2. **Priors**: headphones playing boost Transport (×1.3), and night (22:00–06:00) halves Work.
+3. **Voting**: a 5-minute window weighted by recency (half-life 60 s), at least 2 votes, at most one every 5 s. Mean confidence and agreement must both be ≥ 0.5.
+4. **Hysteresis**: a new mode must win 2 evaluations in a row, then stay at least 90 s. While unsure, extra "fast votes" (every 15 s, from a small budget) speed things up.
+5. **Doubt**: the current mode is kept while unsure. After 10 min without support, or 15 min without votes, Auto falls back to **Street**.
+
+**Concert rule** (no training data has concerts): it enters Concert when, over the last 3 minutes, the median level is ≥ 90 dBA, ≥ 35 % of the votes are music-like (local tonality ≤ −3.12 dB) and no headphones are playing, and all of this holds for 2 minutes. It leaves after 20 minutes below 80 dBA. The tonality threshold was derived **only from freely licensed live music**. On 142 loud transport recordings (metro, train, tram, bus, car, city centre) it triggered no false Concert.
+
+> [!NOTE]
+> **Licence gate**: the TUT dataset is licensed for non-commercial use only. So the model's weights live only in `shared/src/debug`. **Release builds contain no weights**: there, Auto runs the Concert rule only and otherwise means Street. A Gradle check (`verifyReleaseHasNoSceneWeights`) and `SceneWeightsLayoutTest` enforce this. Shipping the model needs commercially licensed training data; the pipeline stays the same.
 
 ## Project structure
 
