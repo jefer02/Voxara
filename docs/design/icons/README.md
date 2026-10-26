@@ -1,12 +1,11 @@
 # Voxara icons
 
-**Mark: "Gauge V"** (concept A of `concepts/`): the watch's 270° dose arc, open at the bottom, and a V
+**Mark: "Gauge V"** (concept A of three; regenerate the others with `tools/concepts.py`): the watch's 270° dose arc, open at the bottom, and a V
 whose point drops through the opening like a gauge needle. Drawn from scratch as round-cap strokes,
 so there are no third-party assets and no licence to track.
 
 | Folder | What |
 |---|---|
-| `concepts/` | The three concepts, `compare.png`, and the rationale (`README.md`) |
 | `final/` | Source SVGs (`voxara-icon.svg` = full icon; launcher layers; watch variants; `notification.svg`) and `preview.png` |
 | `store/` | Play Store: `play-icon-512.png` (listing icon), `play-icon-wear-512.png` (watch art, only if a separate Wear listing ever exists), `feature-graphic-1024x500.png` |
 | `tools/` | `final.py` (the generator), `concepts.py`, `render.js` (resvg) |
