@@ -19,6 +19,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.core.graphics.drawable.toDrawable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -86,7 +88,10 @@ class MainActivity : ComponentActivity() {
                 reduceMotion = reduceMotion(),
                 levelZone = RiskZone.ofPercent(state.head.dosePercent),
             ) {
-                PhoneApp(state, vm.actions, snackbar)
+                // test tags become resource ids, so the Baseline Profile journeys (:baselineprofile) find the tabs and lists
+                androidx.compose.foundation.layout.Box(
+                    androidx.compose.ui.Modifier.semantics { testTagsAsResourceId = true },
+                ) { PhoneApp(state, vm.actions, snackbar) }
             }
         }
     }
