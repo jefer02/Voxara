@@ -82,7 +82,6 @@ object DebugTools {
                     style = PillStyle.OUTLINED,
                 )
             }
-            if (DetectionLog.available) row { DetectionLog.SettingsEntries() }
             row { Panel { CalibrationProbePanel(env.state, actions.onProbe, actions.onSaveSourceOffset) } }
             if (env.state.simulated) {
                 row { BodyText(stringResource(R.string.bench_note)) }

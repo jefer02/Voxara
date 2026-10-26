@@ -18,11 +18,6 @@
     <string name="debug_role_mode">cambio de modo</string>
     <string name="debug_role_confirm">confirmación</string>
     <string name="debug_role_headphones">modo auriculares</string>
-    <string name="debug_detection_title">Registro de detección del modo Auto</string>
-    <string name="debug_detection_stats">Registro de detección: %1$d filas · %2$d KB</string>
-    <string name="debug_detection_export">Exportar registro de detección</string>
-    <string name="debug_detection_exported">Guardado en %1$s. En el ordenador: adb pull %1$s</string>
-    <string name="debug_detection_clear">Borrar registro de detección</string>
     <string name="bench_note">El micrófono no está disponible, así que el anillo usa un nivel simulado. Nada de esto es una medición y nada se suma a tu dosis.</string>
     <string name="scenario_chip">%1$s %2$d</string>
     <string name="probe_title">Lectura de calibración · depuración</string>
