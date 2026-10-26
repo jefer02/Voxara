@@ -64,7 +64,7 @@ object Palette {
     }
 
     /** Caution tier (zone LOUD). */
-    fun caution(dark: Boolean): Tone = if (dark) Tone(WARNING, WARNING) else Tone(0xFFB7791F, 0xFF92400E)
+    fun caution(dark: Boolean): Tone = if (dark) Tone(WARNING, WARNING) else Tone(0xFFD56E00, 0xFF944D00)
 
     /** Danger tier (zone DANGEROUS). */
     fun danger(dark: Boolean): Tone = if (dark) Tone(DANGER, 0xFFFF6B93) else Tone(DANGER, 0xFF9F1239)
