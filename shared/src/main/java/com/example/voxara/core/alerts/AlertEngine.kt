@@ -1,5 +1,7 @@
 package com.example.voxara.core.alerts
 
+import com.example.voxara.core.headphones.HeadphoneProfile
+import com.example.voxara.core.headphones.headphoneTierOf
 import kotlin.math.floor
 
 /**
@@ -28,7 +30,13 @@ enum class AlertKind(val tier: Tier) {
     WEEK_100(Tier.LIMIT),
     HEADPHONE_WEEK_80(Tier.WARNING),
     HEADPHONE_WEEK_100(Tier.LIMIT),
-    HEADPHONE_LOUD_NOW(Tier.WARNING);
+    HEADPHONE_LOUD_NOW(Tier.WARNING),
+    /**
+     * Estimated listening level above the recommended 80 dBA ([com.example.voxara.core.headphones.HeadphoneProfile.SAFE_DBA]).
+     * [Alert.level] is its tier (1 above, 2 from 90, 3 from 100). A WARNING: always vibrates, snoozable,
+     * held during quiet hours, and it alerts again when the tier goes up or after the cooldown.
+     */
+    HEADPHONE_OVER_SAFE(Tier.WARNING);
 
     val snoozable: Boolean get() = tier != Tier.LIMIT
 }
@@ -74,6 +82,11 @@ data class AlertInputs(
     val weeklyAmbientPercent: Double,
     val weeklyHeadphonePercent: Double = 0.0,
     val sustainedHeadphoneDba: Double? = null,
+    /**
+     * The estimated listening level right now (a short window, about 10 s), or null when nothing is playing
+     * to headphones. Drives [AlertKind.HEADPHONE_OVER_SAFE].
+     */
+    val headphoneNowDba: Double? = null,
 )
 
 /** One alert to deliver. [level] is the dose multiple (100, 200, ...) for LIMIT alerts. */
@@ -94,6 +107,9 @@ data class AlertMemory(
     val lastAmbientLoudMs: Long = 0L,
     val hpLoudArmed: Boolean = true,
     val lastHpLoudMs: Long = 0L,
+    /** Highest "over the recommended level" tier already alerted in this episode (0 = none). */
+    val hpSafeTier: Int = 0,
+    val lastHpSafeMs: Long = 0L,
     val snoozedUntil: Map<AlertKind, Long> = emptyMap(),
 )
 
@@ -184,6 +200,21 @@ object AlertEngine {
             }
         }
 
+        // Over the recommended listening level: a higher tier always alerts; the same tier again only after the
+        // cooldown. Dropping to 75 or below (5 dB of hysteresis) or ending the episode re-arms it.
+        inputs.headphoneNowDba?.let { hp ->
+            val tier = headphoneTierOf(hp)
+            if (hp <= HeadphoneProfile.SAFE_DBA - AlertDefaults.REARM_HYSTERESIS_DB && m.hpSafeTier != 0) {
+                m = m.copy(hpSafeTier = 0)
+            }
+            if (tier > 0 && holdable(AlertKind.HEADPHONE_OVER_SAFE) &&
+                (tier > m.hpSafeTier || (tier == m.hpSafeTier && cooledDown(m.lastHpSafeMs, now)))
+            ) {
+                out += Alert(AlertKind.HEADPHONE_OVER_SAFE, hp, tier)
+                m = m.copy(hpSafeTier = maxOf(tier, m.hpSafeTier), lastHpSafeMs = now)
+            }
+        }
+
         // ---------------------------------------------------------------- ADVISORY (capped)
         fun capLeft() = m.advisoriesToday < settings.dailyCap
         inputs.sustainedAmbientDba?.let { amb ->
@@ -243,6 +274,8 @@ object AlertMemoryCodec {
         append(";alast=").append(m.lastAmbientLoudMs)
         append(";harm=").append(m.hpLoudArmed)
         append(";hlast=").append(m.lastHpLoudMs)
+        append(";hst=").append(m.hpSafeTier)
+        append(";hslast=").append(m.lastHpSafeMs)
         append(";snz=").append(m.snoozedUntil.entries.joinToString(",") { "${it.key.name}:${it.value}" })
     }
 
@@ -275,6 +308,8 @@ object AlertMemoryCodec {
             lastAmbientLoudMs = l("alast", d.lastAmbientLoudMs),
             hpLoudArmed = b("harm", d.hpLoudArmed),
             lastHpLoudMs = l("hlast", d.lastHpLoudMs),
+            hpSafeTier = i("hst", d.hpSafeTier),
+            lastHpSafeMs = l("hslast", d.lastHpSafeMs),
             snoozedUntil = snz,
         )
     }

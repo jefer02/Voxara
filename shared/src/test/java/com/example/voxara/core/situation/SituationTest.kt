@@ -3,6 +3,7 @@ package com.example.voxara.core.situation
 import com.example.voxara.core.ai.AggregateSnapshot
 import com.example.voxara.core.ai.SnapshotBuilder
 import com.example.voxara.core.ai.SnapshotInputs
+import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.settings.SettingField
 import com.example.voxara.settings.SettingsDoc
@@ -83,6 +84,27 @@ class SituationTest {
         assertNull(WatchStatus.fromJson(older)?.situationMode)
         // It is a status, never a setting: no settings field carries the mode IN force.
         assertTrue(SettingField.entries.none { it.key == "situation_mode_active" })
+    }
+
+    @Test
+    fun `headphones mode travels in WatchStatus with its source, and older watches mean off`() {
+        val status = WatchStatus(
+            atMs = 1L, appVersion = "1", monitoring = MonitoringStatus.RUNNING, micGranted = true,
+            notificationsGranted = true, calibrated = false, calibratedAtMs = null, dosePercent = 1.0,
+            weeklyPercent = 2.0, headphoneWeeklyPercent = 3.0, lastDba = 60.0, lastReadingAtMs = 1L,
+            sensitiveListener = false, powerSaveMode = false, ignoringBatteryOptimizations = false,
+            tonoEnabled = true, retentionDays = 35, situationMode = SituationMode.TRANSPORT,
+            headphonesMode = true, headphonesSource = LayerSource.PHONE,
+        )
+        val back = WatchStatus.fromJson(status.toJson())
+        assertEquals(status, back)
+        val older = status.toJson().replace(",\"hp_mode\":true", "").replace(",\"hp_source\":\"PHONE\"", "")
+        assertTrue(!older.contains("hp_mode") && !older.contains("hp_source"))
+        val old = WatchStatus.fromJson(older)
+        assertEquals(false, old?.headphonesMode)
+        assertEquals(LayerSource.NONE, old?.headphonesSource)
+        // An unknown source from a newer watch falls back safely.
+        assertEquals(LayerSource.NONE, WatchStatus.fromJson(status.toJson().replace("PHONE", "SOMETHING_NEW"))?.headphonesSource)
     }
 
     @Test

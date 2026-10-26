@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.voxara.core.alerts.AlertDefaults
 import com.example.voxara.core.alerts.AlertPolicy
@@ -23,6 +24,7 @@ import com.example.voxara.core.calibration.CalibrationRecord
 import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.calibration.ReferenceType
 import com.example.voxara.core.headphones.HeadphoneCategory
+import com.example.voxara.core.headphones.HeadphoneModeChoice
 import com.example.voxara.core.ledger.LedgerSnapshot
 import com.example.voxara.core.ledger.acceptsWrite
 import com.example.voxara.core.ledger.rollover
@@ -63,6 +65,7 @@ class VoxaraStore(context: Context) {
         /** Set while Concert is chosen: when it started (for the 6 h cap) and what to go back to. */
         val concertStartedAt = longPreferencesKey("concert_started_at")
         val choiceBeforeConcert = stringPreferencesKey("situation_before_concert")
+        val headphoneMode = stringPreferencesKey("headphone_mode")
         val sensitive = booleanPreferencesKey("sensitive_listener")
         val alertCap = intPreferencesKey("daily_alert_cap")
         val monitoring = booleanPreferencesKey("monitoring_enabled")
@@ -81,6 +84,9 @@ class VoxaraStore(context: Context) {
         val advisoryHaptics = booleanPreferencesKey("advisory_haptics")
         val snoozeMinutes = intPreferencesKey("snooze_minutes")
         val tonoEnabled = booleanPreferencesKey("tono_enabled")
+        /** "Not headphones": the remembered speakers (salted digests, never an address) and this install's salt. */
+        val speakerKeys = stringSetPreferencesKey("hp_speaker_keys")
+        val speakerSalt = stringPreferencesKey("hp_speaker_salt")
         /** When each synced setting last changed (either device's change time), for the conflict rule. */
         fun stamp(f: SettingField) = longPreferencesKey("settings_at_${f.key}")
         private fun cal(source: MicSource, field: String) = "cal_${source.name.lowercase()}_$field"
@@ -106,6 +112,8 @@ class VoxaraStore(context: Context) {
         val concertStartedAtMs: Long? = null,
         /** What leaving Concert returns to; null = Auto. */
         val choiceBeforeConcert: SituationChoice? = null,
+        /** Headphones mode: Auto (follow the detection), On or Off (synced with the phone). */
+        val headphoneMode: HeadphoneModeChoice = HeadphoneModeChoice.DEFAULT,
         val sensitiveListener: Boolean = false,
         val monitoringEnabled: Boolean = true,
         val lastDba: Double = 0.0,
@@ -143,6 +151,8 @@ class VoxaraStore(context: Context) {
                 ?: Situation.migrateLegacyMode(p[Keys.legacyMode]) ?: SituationChoice.DEFAULT,
             concertStartedAtMs = p[Keys.concertStartedAt],
             choiceBeforeConcert = SituationChoice.parse(p[Keys.choiceBeforeConcert]),
+            // Headphones mode is fully automatic: a stored or synced On/Off from an older app is never honoured.
+            headphoneMode = HeadphoneModeChoice.AUTO,
             sensitiveListener = p[Keys.sensitive] ?: false,
             monitoringEnabled = p[Keys.monitoring] ?: true,
             lastDba = p[Keys.lastDba] ?: 0.0,
@@ -320,6 +330,22 @@ class VoxaraStore(context: Context) {
         it[Keys.advisoryHaptics] = h.advisoryHaptics
     }
 
+    /**
+     * "Not headphones" memory: this install's salt (made on first use) and the remembered speakers' digests. Local
+     * to this watch: never synced, never sent.
+     */
+    suspend fun speakerMemory(): Pair<String, Set<String>> {
+        var salt = ""
+        var keys = emptySet<String>()
+        ds.edit { p ->
+            salt = p[Keys.speakerSalt] ?: java.util.UUID.randomUUID().toString().also { p[Keys.speakerSalt] = it }
+            keys = p[Keys.speakerKeys].orEmpty()
+        }
+        return salt to keys
+    }
+
+    suspend fun setSpeakers(keys: Set<String>) = ds.edit { it[Keys.speakerKeys] = keys }
+
     /** The language lives in LocaleStore; its change time lives here with the other settings. */
     suspend fun stampLanguage() = ds.edit { it[Keys.stamp(SettingField.LANGUAGE)] = now() }
 
@@ -411,6 +437,13 @@ class VoxaraStore(context: Context) {
                 SettingField.TONO_ENABLED -> p[Keys.tonoEnabled] = v.toBoolean()
                 SettingField.CLOUD_AI -> p[Keys.aiConsent] = v.toBoolean()
                 SettingField.SITUATION_MODE -> applyChoice(p, SituationChoice.valueOf(v), now())
+                // Legacy field (headphones mode used to be a manual Auto/On/Off): an older phone or watch may still
+                // send On or Off. It is ignored, and the watch answers Auto with a newer time so the older app settles on it.
+                SettingField.HEADPHONE_MODE -> {
+                    p[Keys.headphoneMode] = HeadphoneModeChoice.AUTO.name
+                    p[Keys.stamp(f)] = maxOf(stamped.atMs, now())
+                    continue
+                }
             }
             p[Keys.stamp(f)] = stamped.atMs
         }
@@ -445,6 +478,7 @@ class VoxaraStore(context: Context) {
                 tonoEnabled = p.tonoEnabled,
                 cloudAi = p.aiConsent,
                 situationChoice = p.situationChoice,
+                headphoneMode = p.headphoneMode,
             )
             return SettingField.entries.fold(SettingsDoc()) { doc, f ->
                 doc.with(f, typed.valueOf(f), p.settingStamps[f] ?: 0L)

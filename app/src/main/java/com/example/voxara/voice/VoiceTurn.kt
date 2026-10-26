@@ -212,7 +212,7 @@ class VoiceTurn(context: Context) {
                 context.getString(
                     R.string.answer_history,
                     state.dosePercent.roundToInt(),
-                    formatTwa(state.twaDba) ?: context.getString(R.string.value_none),
+                    formatTwa(state.twaDba, context.resources.configuration.locales[0]) ?: context.getString(R.string.value_none),
                 )
 
             VoiceIntent.MODE -> {

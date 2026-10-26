@@ -9,6 +9,14 @@ import com.example.voxara.core.alerts.AlertSettings
 import com.example.voxara.core.alerts.HapticPrefs
 import com.example.voxara.core.calibration.CalibrationRecord
 import com.example.voxara.core.headphones.HeadphoneCategory
+import com.example.voxara.core.headphones.HeadphoneModeChoice
+import com.example.voxara.core.headphones.HeadphoneAlert
+import com.example.voxara.core.headphones.LayerSource
+import com.example.voxara.core.headphones.LowerUi
+import com.example.voxara.link.LinkHealth
+import com.example.voxara.sync.LowerOutcome
+import com.example.voxara.sync.PhoneListeningState
+import com.example.voxara.core.headphones.ListeningLayerState
 import com.example.voxara.core.headphones.ListeningEstimate
 import com.example.voxara.core.ledger.DaySummary
 import com.example.voxara.core.calibration.MicSource
@@ -24,6 +32,7 @@ import com.example.voxara.core.scene.Scene
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.core.situation.SituationMode
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -100,8 +109,32 @@ data class ExposureState(
     val headphoneWeeklyFraction: Double = 0.0,
     /** Headphone ledger history, index 0 = today. */
     val headphoneDays: List<DaySummary> = emptyList(),
+    /** A Bluetooth output whose class could not be read: counted as headphones, but it may be a speaker. */
+    val headphonePossibleSpeaker: Boolean = false,
+    /** The output in use can be remembered as a speaker ("Not headphones": a Bluetooth device with a full address). */
+    val headphoneCanRememberSpeaker: Boolean = false,
+    /** How many outputs the wearer remembered as speakers ("Forget speakers" undoes it). */
+    val rememberedSpeakers: Int = 0,
+    /** Whose headphones the live estimate comes from: this watch or the phone ([LayerSource.NONE] when none). */
+    val headphoneSource: LayerSource = LayerSource.NONE,
+    /** Seconds of playback at the ears today (any ledger), so "listening minutes" is honest even when the room owned the dose. */
+    val listeningSecondsToday: Double = 0.0,
+    /** The over-the-recommended-level alert in force, for its in-view panel; null when there is none. */
+    val headphoneAlert: HeadphoneAlert? = null,
+    val lowerVolume: LowerUi = LowerUi.Idle,
+    /** Honest state of the link to the phone: connected, reconnecting, or disconnected since... */
+    val phoneLink: LinkHealth = LinkHealth.Unknown,
     /** "My headphones are usually…" (earbuds / over-ear), or null. */
     val usualHeadphones: HeadphoneCategory? = null,
+    /** Headphones mode: the wearer's choice (Auto follows the detection). */
+    val headphoneMode: HeadphoneModeChoice = HeadphoneModeChoice.DEFAULT,
+    /**
+     * The listening layer over the situation mode (headphones mode): on or off, and why. It only changes
+     * what is shown: measuring, the ledgers and the alerts do not read it ([com.example.voxara.core.headphones.ListeningLayerPolicy]).
+     */
+    val listening: ListeningLayerState = ListeningLayerState.OFF,
+    /** When the last alert was delivered (0 = none this run): a transition never plays over an alert. */
+    val lastAlertAtMs: Long = 0L,
     /** Explicit opt-in to cloud AI (Tono); OFF by default. */
     val aiConsent: Boolean = false,
     /** Whether this watch exposes the system battery-optimisation list. */
@@ -156,6 +189,66 @@ object ExposureRepository {
     @Volatile var serviceActive = false
 
     /**
+     * When an OLDER phone app last reported a listening span (its end, ms), 0 = never. Only used while no
+     * phone has ever sent a live state ([phoneListening]): that older app cannot say when listening stopped,
+     * so it counts for 16 minutes.
+     */
+    @Volatile var phoneHeadphonesAtMs = 0L
+        set(value) {
+            field = value
+            layerWake.trySend(Unit)
+        }
+
+    /**
+     * The phone's headphones, live (MessageClient) and durable (the state item). Newest sequence wins; an
+     * older or repeated one is dropped. Wakes headphones mode's loop at once.
+     */
+    @Volatile var phoneListening: PhoneListeningState? = null
+        private set
+
+    /**
+     * "Not headphones" for the PHONE's output: while true its reports count as "no headphones" here, and its spans
+     * and alerts are not taken as headphones. Cleared as soon as the phone says its headphones are gone, so the next
+     * connection is detected again (the phone also leaves the output out itself when it gets the command).
+     */
+    @Volatile var phoneOutputIgnored = false
+        set(value) {
+            field = value
+            layerWake.trySend(Unit)
+            listeningWake.trySend(Unit)
+        }
+
+    /** The phone's live state as headphones mode should see it: null while the wearer said it is not headphones. */
+    val phoneListeningForLayer: PhoneListeningState? get() = phoneListening.takeUnless { phoneOutputIgnored }
+
+    /**
+     * Set by "Not headphones": the dosimeter's layer loop re-reads the outputs and drops the layer at once instead
+     * of waiting out the 10 s exit hysteresis (the wearer asked; a flapping link did not).
+     */
+    val layerDropRequested = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** The latest live state (the sender's [PhoneListeningState.sequence] is the order); false when it was stale news. */
+    fun onPhoneListening(state: PhoneListeningState): Boolean {
+        val cur = phoneListening
+        if (cur != null && state.sequence <= cur.sequence && state.atMs <= cur.atMs) return false
+        // The phone says its headphones are gone: an output marked "not headphones" there is forgotten.
+        if (!state.connected) phoneOutputIgnored = false
+        phoneListening = state.copy(receivedAtMs = System.currentTimeMillis())
+        layerWake.trySend(Unit)
+        listeningWake.trySend(Unit)
+        return true
+    }
+
+    /** Wakes the dosimeter's listening loop: a phone state changed, so the live estimate and alerts must look now. */
+    val listeningWake = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * Wakes headphones mode's loop in the dosimeter: a device appeared or went, the phone reported, or the wearer
+     * changed the choice. Without it the loop looks every few seconds on its own.
+     */
+    val layerWake = Channel<Unit>(Channel.CONFLATED)
+
+    /**
      * Bumped when minutes were written from outside the dosimeter (phone companion sync), so it
      * reloads its ledgers and re-derives today's dose from them.
      */
@@ -163,6 +256,18 @@ object ExposureRepository {
 
     /** Bumped by a manual dose reset so the service drops its in-memory hourly profile too. */
     val resetGeneration = AtomicInteger(0)
+
+    /**
+     * The running dosimeter's two ledgers (empty while it is stopped). "Delete all" wipes them in place, under their
+     * own locks, so the minute in progress and the spans still on their way cannot write the deleted data back.
+     */
+    val liveLedgers = java.util.concurrent.CopyOnWriteArrayList<com.example.voxara.core.ledger.LedgerBook>()
+
+    /** When "delete all" last ran on this watch (0 = never, this process): queued history writes older than it are dropped. */
+    @Volatile var wipedAtMs = 0L
+
+    /** Bumped by "delete all": the service also forgets what it holds in memory (alert windows, listening seconds, open span). */
+    val wipeGeneration = AtomicInteger(0)
 
     /**
      * Debug calibration probe: when set, the service captures continuously through this source,
@@ -199,6 +304,8 @@ object ExposureRepository {
             hapticPrefs = p.hapticPrefs,
             snoozeMinutes = p.snoozeMinutes,
             tonoEnabled = p.tonoEnabled,
+            headphoneMode = p.headphoneMode,
+            listening = it.listening.withChoice(p.headphoneMode),
             situationChoice = p.situationChoice,
             detectedMode = if (p.situationChoice == SituationChoice.AUTO) it.detectedMode else null,
             mode = Situation.resolve(p.situationChoice, it.detectedMode),
@@ -234,6 +341,8 @@ object ExposureRepository {
                 hapticPrefs = p.hapticPrefs,
                 snoozeMinutes = p.snoozeMinutes,
                 tonoEnabled = p.tonoEnabled,
+                headphoneMode = p.headphoneMode,
+                listening = it.listening.withChoice(p.headphoneMode),
                 headphoneWeeklyPa2h = p.headphoneWeeklyPa2h,
                 headphoneWeeklyFraction = p.headphoneWeeklyPa2h /
                     (if (p.sensitiveListener) WHO_WEEKLY_PA2H_SENSITIVE else WHO_WEEKLY_PA2H_ADULT),
@@ -242,6 +351,16 @@ object ExposureRepository {
     }
 
     fun update(transform: (ExposureState) -> ExposureState) = _state.update(transform)
+
+    /** "Dismiss" on the headphone alert: hides its panel for this tier. The engine's cooldown and tiers decide the next one. */
+    fun dismissHeadphoneAlert() = _state.update { st ->
+        st.copy(
+            headphoneAlert = st.headphoneAlert?.copy(dismissed = true),
+            lowerVolume = if (st.lowerVolume is LowerUi.Working) st.lowerVolume else LowerUi.Idle,
+        )
+    }
+
+    fun setLowerVolume(ui: LowerUi) = _state.update { it.copy(lowerVolume = ui) }
 
     /** Manual reset of today's dose. The service notices [resetGeneration] and clears its copy. */
     fun resetDay() {

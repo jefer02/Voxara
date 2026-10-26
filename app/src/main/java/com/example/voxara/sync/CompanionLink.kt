@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.Uri
 import android.util.Log
 import com.example.voxara.audio.DeviceAudioInfo
 import com.example.voxara.audio.PowerPolicy
@@ -11,10 +12,12 @@ import com.example.voxara.core.calibration.MicSource
 import com.example.voxara.core.calibration.appliesTo
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_ADULT
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_SENSITIVE
+import com.example.voxara.core.headphones.ListeningLayerState
 import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.monitoring.monitoringStatus
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.data.AppLanguage
+import com.example.voxara.core.alerts.AlertHistoryWriter
 import com.example.voxara.data.ExposureDb
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
@@ -23,10 +26,16 @@ import com.example.voxara.settings.LanguageChoice
 import com.example.voxara.settings.SettingField
 import com.example.voxara.settings.SettingsDoc
 import com.example.voxara.settings.SettingsMerge
-import com.google.android.gms.wearable.CapabilityClient
+import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.tasks.await
 
 /**
  * The watch's side of the phone companion (Wearable Data Layer), outside the UI:
@@ -41,6 +50,8 @@ import kotlinx.coroutines.runBlocking
 object CompanionLink {
 
     private const val TAG = "VoxaraCompanion"
+    /** The phone's own future-dated stamps already accepted once (field name -> stamp), so a redelivery is not applied again. */
+    private const val FUTURE_SEEN_FILE = "voxara_phone_future_stamps"
 
     @Volatile private var lastSettingsJson: String? = null
 
@@ -48,9 +59,9 @@ object CompanionLink {
         runCatching { LanguageChoice.valueOf(LocaleStore.read(context).name) }.getOrDefault(LanguageChoice.SYSTEM)
 
     /** Publishes the watch's settings document when it changed since the last publish. */
-    fun publishSettings(context: Context, p: VoxaraStore.Persisted) {
+    fun publishSettings(context: Context, p: VoxaraStore.Persisted, force: Boolean = false) {
         val json = VoxaraStore.settingsDoc(p, language(context)).toJson()
-        if (json == lastSettingsJson) return
+        if (json == lastSettingsJson && !force) return
         lastSettingsJson = json
         put(context, WearContract.PATH_SETTINGS_WATCH, json)
     }
@@ -75,8 +86,13 @@ object CompanionLink {
         val store = VoxaraStore(app)
         val before = store.read()
         val own = VoxaraStore.settingsDoc(before, language(app))
-        val result = SettingsMerge.watchReceives(own, SettingsDoc.fromJson(json), System.currentTimeMillis())
-        if (result.refusedFuture.isNotEmpty()) Log.w(TAG, "refused future-dated settings: ${result.refusedFuture}")
+        val prefs = app.getSharedPreferences(FUTURE_SEEN_FILE, Context.MODE_PRIVATE)
+        val seen = SettingField.entries.mapNotNull { f -> prefs.getLong(f.name, 0L).takeIf { it != 0L }?.let { f to it } }.toMap()
+        val result = SettingsMerge.watchReceives(own, SettingsDoc.fromJson(json), System.currentTimeMillis(), seen)
+        if (result.clampedFuture.isNotEmpty()) {
+            Log.i(TAG, "phone clock ahead; settings stamped with the watch time: ${result.clampedFuture}")
+            prefs.edit().apply { result.futureSeen.forEach { (f, at) -> putLong(f.name, at) } }.apply()
+        }
         val changed = result.merged.fields.filter { (f, v) -> own[f] != v }
         if (changed.isNotEmpty()) {
             store.applySynced(changed)
@@ -86,6 +102,35 @@ object CompanionLink {
         if (ExposureRepository.isInitialised()) ExposureRepository.applySettings(after)
         publishSettings(app, after)
         return result.accepted
+    }
+
+    /**
+     * Reads the settings document the phone left in the Data Layer and applies it through the same merge as a
+     * live delivery (so it is idempotent). A change the phone made while this app could not be reached (stopped by
+     * the system, not installed yet, a listener that missed it) is never re-announced: the Data Layer delivers an
+     * item once, and the phone's resend of identical content is not a change. Called when the phone becomes
+     * reachable. Never throws.
+     */
+    suspend fun pullPhoneSettings(context: Context, phoneNodeIds: List<String>) {
+        val app = context.applicationContext
+        for (id in phoneNodeIds) {
+            try {
+                val uri = Uri.Builder().scheme(PutDataRequest.WEAR_URI_SCHEME).authority(id).path(WearContract.PATH_SETTINGS_PHONE).build()
+                val buffer = Wearable.getDataClient(app).getDataItems(uri).await()
+                val json = try {
+                    buffer.firstOrNull()?.let {
+                        DataMapItem.fromDataItem(it).dataMap.getByteArray(WearContract.KEY_PAYLOAD)?.toString(Charsets.UTF_8)
+                    }
+                } finally {
+                    buffer.release()
+                }
+                if (json != null) applyPhoneSettings(app, json)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "could not read the phone's settings: ${e.javaClass.simpleName}")
+            }
+        }
     }
 
     /** What the watch reports about itself right now. */
@@ -101,6 +146,8 @@ object CompanionLink {
         val calibration = p.calibrations[source]?.takeIf { it.appliesTo(device.deviceKey) }
         val power = PowerPolicy.read(app)
         val last = runCatching { ExposureDb.get(app).alerts.latest() }.getOrNull()
+        // The listening layer in force: the live one while the dosimeter runs; otherwise only a manual On can hold.
+        val layer = if (active) live.listening else ListeningLayerState().withChoice(p.headphoneMode)
         fun granted(permission: String) = app.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
         return WatchStatus(
             atMs = now,
@@ -130,24 +177,33 @@ object CompanionLink {
             lastAlertValue = last?.value,
             // The mode in force (Auto resolved). While the dosimeter runs, its live copy.
             situationMode = if (active) live.mode else Situation.resolve(p.situationChoice),
+            headphonesMode = layer.active,
+            headphonesSource = layer.source,
         )
     }
 
     /**
      * "Delete all data" asked by the phone: every minute, every alert and the running counters.
-     * Settings, calibration and onboarding stay. A running dosimeter reloads its (now empty)
-     * ledgers and re-arms the daily alerts.
+     * Settings, calibration and onboarding stay. A running dosimeter has its ledgers wiped in place (the minute in
+     * progress included, and every span that began before this instant keeps only the part after it), forgets its
+     * alert windows and re-arms the daily alerts: after this, nothing measured before it can come back.
      */
     fun deleteAll(context: Context) {
         val app = context.applicationContext
-        ExposureDb.get(app).clearAll()
+        val now = System.currentTimeMillis()
+        // Fence first: alert-history writes still queued, and the running ledgers (under their locks), then the
+        // database for whatever is not running.
+        ExposureRepository.liveLedgers.forEach { it.wipe(now) }
+        AlertHistoryWriter.wipe(fence = { ExposureRepository.wipedAtMs = now }, clear = { ExposureDb.get(app).clearAll() })
         runBlocking { VoxaraStore(app).clearExposure() }
+        ExposureRepository.engine.restore(dosePercent = 0.0, weeklyPa2h = 0.0, peakDbc = 0.0)
         ExposureRepository.resetDay()
+        ExposureRepository.wipeGeneration.incrementAndGet()
         ExposureRepository.ledgerGeneration.incrementAndGet()
         ExposureRepository.update {
             it.copy(
                 days = emptyList(), headphoneDays = emptyList(), weeklyFraction = 0.0,
-                headphoneWeeklyFraction = 0.0, headphoneWeeklyPa2h = 0.0,
+                headphoneWeeklyFraction = 0.0, headphoneWeeklyPa2h = 0.0, listeningSecondsToday = 0.0,
             )
         }
         Log.i(TAG, "all exposure data deleted at the phone's request")
@@ -160,14 +216,11 @@ object CompanionLink {
      */
     fun mirrorLimit(context: Context, alert: MirroredAlert) {
         val app = context.applicationContext
+        // Queued first, identified by kind, level and time: a retry or a reconnect never sends it twice, and one
+        // the phone could not take (out of range) goes out when it is back, unless it has gone stale.
         runCatching {
-            Wearable.getCapabilityClient(app)
-                .getCapability(WearContract.CAPABILITY_PHONE, CapabilityClient.FILTER_REACHABLE)
-                .addOnSuccessListener { info ->
-                    info.nodes.forEach { node ->
-                        Wearable.getMessageClient(app).sendMessage(node.id, WearContract.MSG_LIMIT_ALERT, alert.encode())
-                    }
-                }
+            PhoneOutbox.enqueueMirror(app, alert)
+            CoroutineScope(Dispatchers.IO).launch { PhoneOutbox.flush(app) }
         }.onFailure { Log.w(TAG, "Data Layer unavailable; limit alert not mirrored", it) }
     }
 

@@ -90,15 +90,58 @@ class SettingsMergeTest {
     }
 
     @Test
-    fun `a phone timestamp in the watch's future never wins`() {
+    fun `a phone timestamp in the watch's future is accepted at the watch's now, not lost and not eternal`() {
         val watch = doc(Triple(SettingField.ALERT_THRESHOLD, "85", now - 60_000))
-        val phone = doc(Triple(SettingField.ALERT_THRESHOLD, "95", now + SKEW_MS + 1))
+        val phone = doc(Triple(SettingField.ALERT_THRESHOLD, "95", now + 20_000))      // the phone's clock runs 20 s ahead
         val r = SettingsMerge.watchReceives(watch, phone, now)
-        assertEquals("85", r.merged[SettingField.ALERT_THRESHOLD]?.value)
-        assertEquals(setOf(SettingField.ALERT_THRESHOLD), r.refusedFuture)
+        // The change is NOT refused (the Data Layer would never deliver it again) ...
+        assertEquals("95", r.merged[SettingField.ALERT_THRESHOLD]?.value)
+        assertEquals(setOf(SettingField.ALERT_THRESHOLD), r.clampedFuture)
+        // ... but it is stamped with the watch's own now, so it cannot win every later comparison.
+        assertEquals(now, r.merged[SettingField.ALERT_THRESHOLD]?.atMs)
+        val laterOnWatch = r.merged.with(SettingField.ALERT_THRESHOLD, "88", now + 30_000)
+        val againFromPhone = SettingsMerge.watchReceives(laterOnWatch, phone, now + 31_000)
+        assertEquals("88", againFromPhone.merged[SettingField.ALERT_THRESHOLD]?.value)
         // Inside the skew it is not "future", just a normal (newer) change.
-        assertEquals("95", SettingsMerge.watchReceives(watch, doc(Triple(SettingField.ALERT_THRESHOLD, "95", now + SKEW_MS)), now)
-            .merged[SettingField.ALERT_THRESHOLD]?.value)
+        val inside = SettingsMerge.watchReceives(watch, doc(Triple(SettingField.ALERT_THRESHOLD, "95", now + SKEW_MS)), now)
+        assertEquals("95", inside.merged[SettingField.ALERT_THRESHOLD]?.value)
+        assertTrue(inside.clampedFuture.isEmpty())
+    }
+
+    @Test
+    fun `a future-dated phone value is accepted once, and its redelivery cannot undo a later change on the watch`() {
+        val f = SettingField.ALERT_THRESHOLD
+        val watch = doc(Triple(f, "85", now - 60_000))
+        val phone = doc(Triple(f, "95", now + 600_000))                              // the phone's clock is 10 minutes ahead
+        val first = SettingsMerge.watchReceives(watch, phone, now)
+        assertEquals("95", first.merged[f]?.value)
+        assertEquals(mapOf(f to now + 600_000), first.futureSeen)
+
+        // The wearer sets 88 on the watch a minute later; then the phone's document comes again (the pull on reconnect).
+        val laterOnWatch = first.merged.with(f, "88", now + 60_000)
+        val redelivered = SettingsMerge.watchReceives(laterOnWatch, phone, now + 120_000, first.futureSeen)
+        assertEquals("the wearer's later change stays", "88", redelivered.merged[f]?.value)
+        assertTrue(redelivered.clampedFuture.isEmpty())
+
+        // Without the memory the stale value would beat it (this is what the memory is for).
+        val forgetful = SettingsMerge.watchReceives(laterOnWatch, phone, now + 120_000)
+        assertEquals("95", forgetful.merged[f]?.value)
+
+        // A NEW change on the phone has a new stamp and is accepted again.
+        val newer = doc(Triple(f, "92", now + 700_000))
+        val second = SettingsMerge.watchReceives(laterOnWatch, newer, now + 130_000, first.futureSeen)
+        assertEquals("92", second.merged[f]?.value)
+    }
+
+    @Test
+    fun `a change from a phone with a fast clock is not pending for ever`() {
+        val watch = doc(Triple(SettingField.ALERT_THRESHOLD, "85", now - 60_000))
+        val phone = doc(Triple(SettingField.ALERT_THRESHOLD, "95", now + 20_000))
+        val applied = SettingsMerge.watchReceives(watch, phone, now).merged
+        // The watch holds the phone's value, stamped 20 s earlier than the phone's own stamp: nothing to apply.
+        assertTrue(SettingsMerge.pending(phone, applied).isEmpty())
+        // A different value is still pending.
+        assertEquals(setOf(SettingField.ALERT_THRESHOLD), SettingsMerge.pending(phone, watch))
     }
 
     @Test

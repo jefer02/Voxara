@@ -35,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -44,7 +43,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.voxara.ai.ReplySource
 import com.example.voxara.core.ai.CoachTask
-import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.phone.R
 import com.example.voxara.phone.ui.ChatTurn
 import com.example.voxara.phone.ui.PhoneActions
@@ -63,7 +61,7 @@ import com.example.voxara.ui.design.VoxIcons
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TonoScreen(s: PhoneUiState, actions: PhoneActions) {
+fun TonoScreen(s: PhoneUiState, actions: PhoneActions, onBack: (() -> Unit)? = null) {
     val tono = s.settings.tonoEnabled
     var question by rememberSaveable { mutableStateOf("") }
     val send = {
@@ -72,6 +70,7 @@ fun TonoScreen(s: PhoneUiState, actions: PhoneActions) {
     }
     VoxScreen(
         title = stringResource(R.string.tono_title),
+        onBack = onBack,
         bottomBar = { if (tono) AskBar(question, { question = it }, send) },
     ) {
         if (!tono) {
@@ -133,7 +132,7 @@ private fun ChatBubbles(turn: ChatTurn, actions: PhoneActions) {
     Column(Modifier.contentWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (turn.question != null) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                Surface(shape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp), color = c.brand, contentColor = if (c.dark) Color.Black else Color.White) {
+                Surface(shape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp), color = c.accent.fill, contentColor = c.accent.onFill) {
                     Text(turn.question, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).widthIn(max = 520.dp))
                 }
             }
@@ -147,7 +146,7 @@ private fun ChatBubbles(turn: ChatTurn, actions: PhoneActions) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val (icon, label, tint) = when (turn.source) {
                     ReplySource.CLOUD_AI -> Triple(VoxIcons.Sparkle, R.string.tono_source_ai, c.text3)
-                    ReplySource.SAFETY -> Triple(VoxIcons.Shield, R.string.tono_source_safety, c.zoneInk(RiskZone.MODERATE))
+                    ReplySource.SAFETY -> Triple(VoxIcons.Shield, R.string.tono_source_safety, c.caution)
                     else -> Triple(VoxIcons.Check, R.string.tono_source_offline, c.text3)
                 }
                 Icon(icon, null, tint = tint, modifier = Modifier.size(14.dp))
@@ -178,18 +177,21 @@ private fun AskBar(value: String, onChange: (String) -> Unit, onSend: () -> Unit
             OutlinedTextField(
                 value = value,
                 onValueChange = { onChange(it.take(200)) },
-                placeholder = { Text(stringResource(R.string.tono_placeholder), maxLines = 1) },
+                placeholder = { Text(stringResource(R.string.tono_placeholder), maxLines = 2) },
                 modifier = Modifier.weight(1f, fill = true).widthIn(max = ContentMaxWidth),
                 shape = CircleShape,
-                singleLine = true,
+                singleLine = false, maxLines = 3,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSend() }),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = c.brand, unfocusedBorderColor = c.outline),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = c.accent.fill, unfocusedBorderColor = c.outline,
+                    focusedContainerColor = c.surface2, unfocusedContainerColor = c.surface2, cursorColor = c.brand,
+                ),
             )
             Spacer(Modifier.width(8.dp))
             FilledIconButton(
                 onClick = onSend, enabled = value.isNotBlank(), modifier = Modifier.size(52.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = c.brand, contentColor = if (c.dark) Color.Black else Color.White),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = c.accent.fill, contentColor = c.accent.onFill),
             ) { Icon(VoxIcons.Forward, contentDescription = stringResource(R.string.tono_send)) }
         }
     }

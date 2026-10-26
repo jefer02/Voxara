@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Palette.LIGHT_BG / Palette.BLACK (window background before Compose draws). -->
-    <color name="vox_background">#FFF2F3F7</color>
+    <!-- Palette.LIGHT_BG / Palette.DARK_BG: the window and splash background before Compose draws.
+         On Android 12+ the app night mode follows Settings → Appearance, so values-night applies. -->
+    <color name="vox_background">#FFF3F5F9</color>
 </resources>

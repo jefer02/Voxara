@@ -24,6 +24,7 @@ import com.example.voxara.core.ai.CoachTask
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
 import com.example.voxara.ui.design.BodyText
+import com.example.voxara.ui.design.ScreenTitle
 import com.example.voxara.ui.design.HeroStatus
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
@@ -33,11 +34,13 @@ import com.example.voxara.ui.design.VColor
 import com.example.voxara.ui.design.VSpace
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.VoxList
+import com.example.voxara.ui.design.row
 import com.example.voxara.ui.theme.LocalReduceMotion
 import com.example.voxara.voice.VoiceTurn
 
 /**
- * ASK — talk to Tono. Speak (on-device recognition), or tap a quick reply. Symptoms get a fixed
+ * TONO — what Tono says about today (its full sentence, never cut), then talk to it: speak (on-device
+ * recognition), or tap a quick reply. The title is Tono's name, because what follows is Tono's statement. Symptoms get a fixed
  * safe answer; cloud AI is used only with consent; otherwise the on-device answers reply.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -54,33 +57,33 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
     val reply = coach.reply
 
     VoxList {
-        item {
-            SectionLabel(
-                if (tono) stringResource(R.string.home_ask, name).uppercase() else stringResource(R.string.voice_title),
-                color = VColor.BrandStart,
-            )
+        row {
+            // Named after who speaks: the line under it is Tono's statement, not a question asked of the wearer.
+            ScreenTitle(if (tono) name else stringResource(R.string.voice_title))
         }
         if (turn.heard.isNotBlank()) {
-            item { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary, maxLines = 3) }
+            row { BodyText(stringResource(R.string.voice_quoted, turn.heard), color = VColor.TextSecondary) }
         }
-        item {
+        row {
             val text = when {
                 listening -> stringResource(R.string.voice_listening)
                 turn.phase == VoiceTurn.Phase.THINKING || coach.loading -> stringResource(R.string.tono_loading, name)
                 !showCoach && turn.answer.isNotBlank() -> turn.answer
-                showCoach && reply != null -> reply.insight
+                // Tono's short statement leads (one glanceable line); the full insight follows as a sentence.
+                showCoach && reply != null -> reply.status
                 else -> stringResource(R.string.ask_hint, if (tono) name else stringResource(R.string.app_name))
             }
             HeroStatus(
-                text, maxLines = 5,
+                text,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
-        if (listening) item { ListeningWave(turn.amplitude) }
+        if (listening) row { ListeningWave(turn.amplitude) }
         if (showCoach && reply != null && !coach.loading && !listening) {
-            if (reply.why.isNotBlank()) item { BodyText(reply.why, color = VColor.TextSecondary) }
-            item { BodyText(reply.suggestion, color = VColor.BrandStart) }
-            item {
+            row { BodyText(reply.insight, color = VColor.Text) }
+            if (reply.why.isNotBlank()) row { BodyText(reply.why, color = VColor.TextSecondary) }
+            row { BodyText(reply.suggestion, color = VColor.AccentInk) }
+            row {
                 SectionLabel(
                     stringResource(
                         when (coach.source) {
@@ -92,9 +95,11 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                     color = VColor.TextTertiary,
                 )
             }
-            if (coach.cloudFailed) item { BodyText(stringResource(R.string.tono_cloud_failed), color = VColor.TextSecondary) }
+            if (coach.cloudFailed) row { BodyText(stringResource(R.string.tono_cloud_failed), color = VColor.TextSecondary) }
+            // Debug builds say why (a fixed code, no key, no question), so a watch that cannot reach the AI can be diagnosed.
+            coach.failure?.takeIf { coach.cloudFailed && env.debug }?.let { why -> row { BodyText(why, color = VColor.TextSecondary) } }
             if (reply.chips.isNotEmpty()) {
-                item {
+                row {
                     FlowRow(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(VSpace.xs, Alignment.CenterHorizontally),
@@ -105,7 +110,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 }
             }
         }
-        item {
+        row {
             PillButton(
                 label = stringResource(if (listening) R.string.action_stop else R.string.ask_speak),
                 onClick = actions.onVoiceArm,
@@ -114,7 +119,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
             )
         }
         if (tono) {
-            item {
+            row {
                 PillButton(
                     label = stringResource(R.string.ask_today),
                     onClick = { actions.onAsk(CoachTask.DAILY_INSIGHT, null) },
@@ -123,7 +128,7 @@ fun AskScreen(env: UiEnv, actions: VoxaraActions) {
                 )
             }
         }
-        item { BodyText(stringResource(R.string.tono_not_medical), color = VColor.TextTertiary) }
+        row { BodyText(stringResource(R.string.tono_not_medical), color = VColor.TextTertiary) }
     }
 }
 
@@ -139,7 +144,7 @@ private fun ListeningWave(amplitude: Float) {
             val h = size.height * (0.15f + 0.85f * a * shape)
             val x = gap * i
             drawLine(
-                VColor.BrandStart, Offset(x, (size.height - h) / 2), Offset(x, (size.height + h) / 2),
+                VColor.AccentInk, Offset(x, (size.height - h) / 2), Offset(x, (size.height + h) / 2),
                 strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round,
             )
         }

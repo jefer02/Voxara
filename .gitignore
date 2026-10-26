@@ -1,19 +1,25 @@
 # Gradle
 .gradle/
+build/
 **/build/
 !gradle/wrapper/gradle-wrapper.jar
 
-# Android Studio and IntelliJ IDEA
+# Android Studio and IntelliJ IDEA (any depth, e.g. phone/.idea/; no IDE file is tracked)
 *.iml
 .idea/
-!.idea/.gitignore
-!.idea/runConfigurations/
 
 # Local SDK and machine-specific configuration
 local.properties
+
+# Signing and secrets. The AI key is read from local.properties (AI_API_KEY) at build time, never from a tracked file.
 *.jks
 *.keystore
 keystore.properties
+secrets.properties
+.env
+.env.*
+*.pem
+*.p12
 
 # Native build output
 .cxx/
@@ -29,6 +35,37 @@ output-metadata.json
 .kotlin/
 *.hprof
 
+# Debug logs and exports (detection log, CSV exports)
+*.log
+detection*.csv
+voxara_*.csv
+
+# Audio and training data (add a small fixture under src/test/resources if a test needs one)
+*.wav
+*.flac
+*.mp3
+!**/src/test/resources/**
+!**/src/androidTest/assets/**
+
 # Operating system files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Local agent state
+.claude/settings.local.json
+.claude/projects/
+.github/modernize/
+
+# Generated design-review captures (regenerate with the screenshot tests)
+docs/design/watch-redesign/**/*.png
+docs/design/watch-redesign/**/*.jpg
+docs/design/watch-redesign/**/*.jpeg
+docs/design/watch-redesign/**/*.gif
+docs/design/watch-redesign/**/*.webp
+docs/design/watch-redesign/**/*.mp4
+
+# Phone redesign: the "before" and "after" renders are kept locally only (regenerate with PhoneRenderMatrixTest).
+# The hand-picked concept images in docs/design/phone-redesign/concepts/ are tracked.
+docs/design/phone-redesign/before/
+docs/design/phone-redesign/after/

@@ -24,8 +24,9 @@ import android.os.VibratorManager
  *   advisory  soft   (<= 0.6)  THRESHOLD, SOFT_TICK
  *   warning   firm   (0.8)     TWO_FIRM, QUICK_TRIPLE
  *   limit     full   (1.0)     DOSE_FULL, LONG_SHORT_LONG (and IMPULSE, the 140 dBC peak)
- * Not alerts: CALM (back to a safe level), MODE_CHANGE (automatic mode change), CONFIRM (a tap
- * the wearer just made). Each one has its own primitive and rhythm.
+ * Not alerts: CALM (back to a safe level), MODE_CHANGE (automatic mode change), HEADPHONES (headphones
+ * mode turned on or off by detection), CONFIRM (a tap the wearer just made). Each one has its own
+ * primitive and rhythm.
  */
 enum class Pattern(val isAlert: Boolean) {
     /** Advisory: sustained level over the threshold. Two soft rising pulses. */
@@ -48,6 +49,8 @@ enum class Pattern(val isAlert: Boolean) {
     MODE_CHANGE(false),
     /** The wearer picked a mode: the smallest possible tap, right under their finger. */
     CONFIRM(false),
+    /** Headphones mode turned on or off by detection: two soft ticks, one per ear. Rate-limited by ModeChangeHapticGate. */
+    HEADPHONES(false),
 }
 
 class HapticConductor(private val vibrator: Vibrator) {
@@ -145,6 +148,12 @@ class HapticConductor(private val vibrator: Vibrator) {
         Pattern.CONFIRM -> VibrationEffect.startComposition()
             .addPrimitive(PRIMITIVE_TICK, 0.3f, 0)
             .compose()
+
+        // Two soft low ticks, left then right: nothing else is a pair, and it is far below any alert.
+        Pattern.HEADPHONES -> VibrationEffect.startComposition()
+            .addPrimitive(PRIMITIVE_LOW_TICK, 0.45f, 0)
+            .addPrimitive(PRIMITIVE_LOW_TICK, 0.45f, 110)
+            .compose()
     }
 
     /** Older or cheaper actuators: hand-rolled envelopes with the same rhythm and strength order. */
@@ -173,6 +182,9 @@ class HapticConductor(private val vibrator: Vibrator) {
             longArrayOf(0, 60, 60, 60, 60), intArrayOf(0, 25, 45, 65, 0), -1
         )
         Pattern.CONFIRM -> VibrationEffect.createOneShot(15, 60)
+        Pattern.HEADPHONES -> VibrationEffect.createWaveform(
+            longArrayOf(0, 28, 82, 28), intArrayOf(0, 90, 0, 90), -1
+        )
     }
 
     companion object {
@@ -183,7 +195,7 @@ class HapticConductor(private val vibrator: Vibrator) {
             Pattern.THRESHOLD -> intArrayOf(PRIMITIVE_QUICK_RISE)
             Pattern.DOSE_FULL -> intArrayOf(PRIMITIVE_CLICK, PRIMITIVE_THUD)
             Pattern.IMPULSE -> intArrayOf(PRIMITIVE_SPIN, PRIMITIVE_THUD)
-            Pattern.CALM -> intArrayOf(PRIMITIVE_LOW_TICK)
+            Pattern.CALM, Pattern.HEADPHONES -> intArrayOf(PRIMITIVE_LOW_TICK)
             Pattern.SOFT_TICK, Pattern.CONFIRM -> intArrayOf(PRIMITIVE_TICK)
             Pattern.TWO_FIRM, Pattern.QUICK_TRIPLE -> intArrayOf(PRIMITIVE_CLICK)
             Pattern.LONG_SHORT_LONG -> intArrayOf(PRIMITIVE_THUD, PRIMITIVE_CLICK)

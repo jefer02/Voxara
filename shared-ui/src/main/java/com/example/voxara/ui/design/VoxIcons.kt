@@ -227,10 +227,15 @@ object VoxIcons {
         moveTo(4f, 9f); lineTo(4f, 15f); moveTo(20f, 9f); lineTo(20f, 15f)
     }
 
-    /** Every zone has its own shape, so it never depends on colour. */
+    /** A small sound wave: the Moderate zone (the info "i" read as "tap for more"). */
+    val Moderate = icon("moderate") {
+        moveTo(3f, 12f); lineTo(6f, 8f); lineTo(10f, 16f); lineTo(14f, 8f); lineTo(18f, 16f); lineTo(21f, 12f)
+    }
+
+    /** Every zone has its own shape, so it never depends on colour; none of them is an information or action icon. */
     fun zone(z: RiskZone): ImageVector = when (z) {
         RiskZone.OK -> Check
-        RiskZone.MODERATE -> Info
+        RiskZone.MODERATE -> Moderate
         RiskZone.LOUD -> Warning
         RiskZone.DANGEROUS -> Stop
     }

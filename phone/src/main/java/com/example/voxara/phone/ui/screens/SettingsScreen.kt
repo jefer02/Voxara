@@ -1,8 +1,12 @@
 package com.example.voxara.phone.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -14,16 +18,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.voxara.core.alerts.AlertDefaults
+import com.example.voxara.core.design.Accent
 import com.example.voxara.core.alerts.AlertPolicy
 import com.example.voxara.core.alerts.HapticStrength
-import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.designsystem.R as DsR
 import com.example.voxara.phone.R
 import com.example.voxara.phone.data.PhoneStoreState
+import com.example.voxara.phone.data.ThemeMode
 import com.example.voxara.phone.ui.PhoneActions
 import com.example.voxara.phone.ui.PhoneRoutes
 import com.example.voxara.phone.ui.PhoneUiState
+import com.example.voxara.phone.ui.components.AccentSwatches
 import com.example.voxara.phone.ui.components.Banner
 import com.example.voxara.phone.ui.components.ChoiceRow
 import com.example.voxara.phone.ui.components.Group
@@ -35,7 +41,11 @@ import com.example.voxara.phone.ui.components.StepperRow
 import com.example.voxara.phone.ui.components.SwitchRow
 import com.example.voxara.phone.ui.components.VoxScreen
 import com.example.voxara.phone.ui.components.contentWidth
+import com.example.voxara.phone.ui.components.headphonesSourceText
+import com.example.voxara.phone.ui.components.watchModeName
+import com.example.voxara.phone.ui.freshnessText
 import com.example.voxara.phone.ui.theme.Vox
+import com.example.voxara.settings.HeadphoneType
 import com.example.voxara.settings.LanguageChoice
 import com.example.voxara.settings.SettingField
 import com.example.voxara.settings.SettingLimits
@@ -48,7 +58,10 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
     val set = s.settings
     val p = s.pending
     fun change(f: SettingField, v: Any) = actions.onSetting(f, v.toString())
-    fun clock(m: Int) = "%02d:%02d".format(m / 60, m % 60)
+    // Quiet hours as the phone's clock shows them (12- or 24-hour, the app's language); storage stays minutes.
+    val is24 = android.text.format.DateFormat.is24HourFormat(androidx.compose.ui.platform.LocalContext.current)
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    fun clock(m: Int) = com.example.voxara.core.format.formatTimeOfDay(m, is24, locale)
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     VoxScreen(stringResource(R.string.settings_title)) {
@@ -56,13 +69,13 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
             item {
                 Banner(
                     VoxIcons.Refresh, stringResource(R.string.pending_sync), stringResource(R.string.settings_pending_note),
-                    tint = Vox.colors.zoneInk(RiskZone.MODERATE), modifier = Modifier.contentWidth(),
+                    tint = Vox.colors.caution, modifier = Modifier.contentWidth(),
                 )
             }
         }
 
         // ------------------------------------------------------------------ mode
-        item { GroupHeader(stringResource(R.string.sec_mode), Modifier.contentWidth()) }
+        item { GroupHeader(stringResource(R.string.sec_watch), Modifier.contentWidth()) }
         item {
             Group(Modifier.contentWidth()) {
                 SituationChoice.entries.forEachIndexed { i, choice ->
@@ -82,8 +95,27 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
         item { GroupNote(stringResource(DsR.string.situation_rule), Modifier.contentWidth()) }
 
+        // ------------------------------------------------------------------ headphones mode
+        item {
+            Group(Modifier.contentWidth()) {
+                // Fully automatic: nothing to switch. What the watch is doing now (its last status), as information.
+                val live = s.status
+                if (live != null) {
+                    GroupRow(
+                        stringResource(if (live.headphonesMode) R.string.hp_state_on else R.string.hp_state_off),
+                        subtitle = listOfNotNull(
+                            watchModeName(s), headphonesSourceText(live.headphonesSource), freshnessText(live.atMs, s.nowMs),
+                        ).joinToString(" · "),
+                        icon = VoxIcons.Headphones, iconTint = if (live.headphonesMode) Vox.colors.secondary else Vox.colors.text3,
+                    )
+                } else {
+                    GroupRow(stringResource(R.string.hp_mode_auto_title), icon = VoxIcons.Headphones)
+                }
+            }
+        }
+        item { GroupNote(stringResource(R.string.hp_mode_auto_note) + "\n\n" + stringResource(R.string.hp_mode_rule), Modifier.contentWidth()) }
+
         // ------------------------------------------------------------------ alerts
-        item { GroupHeader(stringResource(R.string.sec_alerts), Modifier.contentWidth()) }
         item {
             Group(Modifier.contentWidth()) {
                 StepperRow(
@@ -163,6 +195,19 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 SwitchRow(stringResource(R.string.hp_sampling), s.phoneSampling, actions.onPhoneSampling, icon = VoxIcons.Phone,
                     subtitle = stringResource(R.string.setup_off_default))
                 GroupDivider()
+                ChoiceRow(
+                    title = stringResource(R.string.hp_type),
+                    options = listOf(
+                        HeadphoneType.EARBUDS to stringResource(R.string.hp_type_earbuds),
+                        HeadphoneType.OVER_EAR to stringResource(R.string.hp_type_over),
+                        HeadphoneType.NONE to stringResource(R.string.hp_type_none),
+                    ),
+                    selected = set.headphoneType,
+                    onSelect = { change(SettingField.HEADPHONE_TYPE, it.name) },
+                    subtitle = stringResource(R.string.hp_type_note),
+                    pending = SettingField.HEADPHONE_TYPE in p,
+                )
+                GroupDivider()
                 GroupRow(stringResource(R.string.hp_title), icon = VoxIcons.Headphones, onClick = { navigate(PhoneRoutes.HEADPHONES) })
                 GroupDivider()
                 StepperRow(
@@ -193,8 +238,40 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
         item { GroupNote(stringResource(R.string.privacy_numbers) + "\n\n" + stringResource(R.string.privacy_backup), Modifier.contentWidth()) }
 
+        // ------------------------------------------------------------------ appearance (phone only)
+        item { GroupHeader(stringResource(R.string.sec_appearance), Modifier.contentWidth()) }
+        item {
+            Group(Modifier.contentWidth()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.set_accent), style = MaterialTheme.typography.titleSmall, color = Vox.colors.text)
+                    Text(stringResource(R.string.set_accent_note), style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2)
+                    AccentSwatches(
+                        selected = s.accent,
+                        onSelect = actions.onAccent,
+                        names = mapOf(
+                            Accent.PURPLE to stringResource(R.string.accent_purple),
+                            Accent.TURQUOISE to stringResource(R.string.accent_turquoise),
+                            Accent.BLUE to stringResource(R.string.accent_blue),
+                            Accent.EMERALD to stringResource(R.string.accent_emerald),
+                        ),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                GroupDivider()
+                ChoiceRow(
+                    stringResource(R.string.set_theme),
+                    listOf(
+                        ThemeMode.LIGHT to stringResource(R.string.theme_light),
+                        ThemeMode.DARK to stringResource(R.string.theme_dark),
+                        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
+                    ),
+                    s.themeMode, actions.onThemeMode,
+                )
+            }
+        }
+        item { GroupNote(stringResource(R.string.set_appearance_note), Modifier.contentWidth()) }
+
         // ------------------------------------------------------------------ language
-        item { GroupHeader(stringResource(R.string.sec_language), Modifier.contentWidth()) }
         item {
             Group(Modifier.contentWidth()) {
                 ChoiceRow(
@@ -228,7 +305,7 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 GroupRow(
                     stringResource(R.string.set_delete),
                     if (s.deletePending) stringResource(R.string.delete_pending_note) else stringResource(R.string.set_delete_note),
-                    icon = VoxIcons.Trash, iconTint = Vox.colors.zoneInk(RiskZone.DANGEROUS),
+                    icon = VoxIcons.Trash, iconTint = Vox.colors.danger,
                     onClick = { confirmDelete = true },
                 )
             }
@@ -255,7 +332,7 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
             text = { Text(stringResource(R.string.delete_confirm_body)) },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; actions.onDeleteAll() }) {
-                    Text(stringResource(R.string.action_delete), color = Vox.colors.zoneInk(RiskZone.DANGEROUS))
+                    Text(stringResource(R.string.action_delete), color = Vox.colors.danger)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },

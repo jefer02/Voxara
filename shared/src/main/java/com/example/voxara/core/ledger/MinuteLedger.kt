@@ -119,6 +119,11 @@ class MinuteAccumulator(private val kind: ExposureKind) {
         seconds = 0.0; energy = 0.0; dose = 0.0
         return r
     }
+
+    /** Forgets the minute in progress without producing a record ("delete all": it must never be written). */
+    fun discard() {
+        seconds = 0.0; energy = 0.0; dose = 0.0
+    }
 }
 
 /** Rolling window length: WHO-ITU H.870 budgets a week; here it rolls rather than resetting. */

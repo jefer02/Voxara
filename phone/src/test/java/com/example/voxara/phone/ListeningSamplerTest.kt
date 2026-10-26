@@ -1,5 +1,6 @@
 package com.example.voxara.phone
 
+import android.media.AudioDeviceInfo
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,5 +22,18 @@ class ListeningSamplerTest {
         assertEquals("seconds", ListeningSampler.KEY_SECONDS)
         assertEquals("volume_db", ListeningSampler.KEY_VOLUME_DB)
         assertEquals(900.0, ListeningSampler.MAX_SPAN_SECONDS, 0.0)
+    }
+
+    @Test
+    fun `the volume-curve device type is the headphone type itself`() {
+        // Every type outputKind accepts reaches getStreamVolumeDb unchanged.
+        val accepted = listOf(
+            AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET,
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLE_HEADSET, AudioDeviceInfo.TYPE_BLE_BROADCAST,
+        )
+        for (t in accepted) {
+            assertEquals(true, ListeningSampler.outputKind(t) != null)
+            assertEquals(t, ListeningSampler.outputDeviceType(t))
+        }
     }
 }

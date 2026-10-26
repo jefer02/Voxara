@@ -17,12 +17,18 @@ import com.example.voxara.core.scene.SceneModelSource
  *      Quiet whatever the spectrum says; Quiet above [Config.quietMaxDba], Work above
  *      [Config.workMaxDba] and Transport below [Config.transportMinDba] are ruled out. Mild
  *      priors: headphones playing makes Transport likelier, the night (22-06) halves Work.
- *  02  VOTING WINDOW — the votes of the last [Config.windowMs], soft-averaged. A winner needs
- *      [Config.minVotes] votes, a mean probability >= [Config.minConfidence] and the top spot in
- *      >= [Config.minAgreement] of them. At most one vote per [Config.minVoteGapMs].
+ *  02  VOTING WINDOW — the votes of the last [Config.windowMs], soft-averaged and weighted by AGE (a
+ *      vote loses half its weight every [Config.voteHalfLifeMs], so a new scene overtakes the old one in
+ *      a couple of votes while one odd burst still cannot). A winner needs [Config.minVotes] votes, a
+ *      weighted mean probability >= [Config.minConfidence] and the top spot in >= [Config.minAgreement]
+ *      of the weight. At most one vote per [Config.minVoteGapMs].
  *  03  HYSTERESIS — the winner must hold [Config.consecutive] evaluations in a row
  *      ([ConfidenceHysteresis], the same gate the scene label uses).
  *  04  DWELL — a detected mode stays at least [Config.minDwellMs] before another replaces it.
+ *  04b FAST VOTES — while it is unsure (nothing detected yet) or a different scene is knocking, the
+ *      detector asks for a vote every [Config.fastVotePeriodMs] instead of the sampling ladder's pace
+ *      ([fastVotePeriodMs]), from a small budget that refills slowly: a change is noticed sooner but
+ *      the microphone is never kept busy.
  *  05  DOUBT — in doubt the current mode is KEPT; only when it has lost support for
  *      [Config.doubtFallbackMs], or no vote arrived for [Config.staleAfterMs], does the detector
  *      give up and return null, which Situation.resolve turns into Street.
@@ -50,12 +56,19 @@ class AutoModeDetector(private val config: Config = Config()) {
         val sceneModel: Boolean = true,
         val windowMs: Long = 5L * 60_000,
         val maxVotes: Int = 60,
-        val minVotes: Int = 3,
+        val minVotes: Int = 2,
         val minVoteGapMs: Long = 5_000L,
         val minConfidence: Double = 0.50,
         val minAgreement: Double = 0.50,
         val consecutive: Int = 2,
-        val minDwellMs: Long = 4L * 60_000,
+        val minDwellMs: Long = 90_000L,
+        /** A vote's weight (its covered time) halves every this long: a new scene must hold about this long to win. */
+        val voteHalfLifeMs: Long = 60_000L,
+        /** Pace of the extra votes while unsure or while a different scene is knocking. */
+        val fastVotePeriodMs: Long = 15_000L,
+        /** Extra votes available at once, and the time it takes to earn one back. */
+        val fastBudget: Int = 8,
+        val fastRefillMs: Long = 90_000L,
         /** The current mode counts as unsupported when its mean probability is below this. */
         val doubtBelow: Double = 0.25,
         val doubtFallbackMs: Long = 10L * 60_000,
@@ -167,6 +180,30 @@ class AutoModeDetector(private val config: Config = Config()) {
     private var concertEvidenceSinceMs: Long? = null
     private var lastVoteAtMs: Long? = null
     private var confidence = 0.0
+    private var fastTokens = config.fastBudget.toDouble()
+    private var fastCheckedAtMs: Long? = null
+
+    /**
+     * The pace to take the next vote at when it should be faster than the sampling ladder's, or null.
+     * Asked once per loop; each fast answer spends one token of a budget that refills slowly, so a
+     * flickering scene cannot keep the microphone busy. Only meaningful with the scene model.
+     */
+    fun fastVotePeriodMs(nowMs: Long): Long? {
+        val last = fastCheckedAtMs
+        fastCheckedAtMs = nowMs
+        if (last != null && nowMs > last) {
+            fastTokens = minOf(config.fastBudget.toDouble(), fastTokens + (nowMs - last).toDouble() / config.fastRefillMs)
+        }
+        if (!useModel || fastTokens < 1.0) return null
+        val knocking = votes.lastOrNull()?.let { v ->
+            val top = v.p.indices.maxByOrNull { v.p[it] } ?: return@let false
+            detected != null && detected != SituationMode.CONCERT && SceneModel.MODES[top] != detected
+        } ?: false
+        val learning = detected == null && votes.size < config.minVotes + config.consecutive
+        if (!knocking && !learning) return null
+        fastTokens -= 1.0
+        return config.fastVotePeriodMs
+    }
 
     /** False while a new vote would be ignored (rate limit) — the caller can skip the model. */
     fun wantsVote(nowMs: Long): Boolean = lastVoteAtMs.let { it == null || nowMs - it >= config.minVoteGapMs }
@@ -280,9 +317,26 @@ class AutoModeDetector(private val config: Config = Config()) {
 
         // 02 — soft vote over the window.
         val mean = DoubleArray(SceneModel.MODES.size)
-        for (v in votes) for (i in mean.indices) mean[i] += v.p[i] / votes.size
+        var totalWeight = 0.0
+        val weights = DoubleArray(votes.size)
+        for ((k, v) in votes.withIndex()) {
+            // A vote stands for the stretch of time it covers (until the next vote; the last one for the
+            // gap before it), so quick extra votes never outvote a long quiet history by sheer count.
+            val next = votes.getOrNull(k + 1)?.atMs
+            val covered = (next ?: (v.atMs + (v.atMs - (votes.getOrNull(k - 1)?.atMs ?: (v.atMs - config.fastVotePeriodMs))))) - v.atMs
+            val seconds = covered.coerceIn(config.minVoteGapMs, config.windowMs / 5).toDouble() / 1000.0
+            val w = seconds * Math.pow(0.5, (nowMs - v.atMs).coerceAtLeast(0L).toDouble() / config.voteHalfLifeMs)
+            weights[k] = w
+            totalWeight += w
+            for (i in mean.indices) mean[i] += w * v.p[i]
+        }
+        for (i in mean.indices) mean[i] /= totalWeight
         val winner = mean.indices.maxByOrNull { mean[it] } ?: return
-        val agreement = votes.count { v -> v.p.indices.maxByOrNull { v.p[it] } == winner }.toDouble() / votes.size
+        var agreeing = 0.0
+        for ((k, v) in votes.withIndex()) {
+            if (v.p.indices.maxByOrNull { v.p[it] } == winner) agreeing += weights[k]
+        }
+        val agreement = agreeing / totalWeight
         val candidate = SceneModel.MODES[winner].takeIf {
             votes.size >= config.minVotes && mean[winner] >= config.minConfidence && agreement >= config.minAgreement
         }

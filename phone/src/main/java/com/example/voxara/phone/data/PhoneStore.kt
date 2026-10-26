@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.voxara.core.design.Accent
 import com.example.voxara.link.SyncProblem
 import com.example.voxara.link.SyncRecord
 import com.example.voxara.settings.SettingsDoc
@@ -19,7 +20,28 @@ import kotlinx.coroutines.flow.map
 
 private val Context.phoneStore: DataStore<Preferences> by preferencesDataStore("voxara_phone")
 
-/** Everything the phone keeps besides the history: settings documents, watch status, sync record. */
+/** The phone app's theme. Phone only: it is not a synced setting and never reaches the watch. */
+enum class ThemeMode {
+    LIGHT, DARK, SYSTEM;
+
+    /** Dark or not, given whether the system is dark right now. */
+    fun isDark(systemDark: Boolean): Boolean = when (this) {
+        LIGHT -> false
+        DARK -> true
+        SYSTEM -> systemDark
+    }
+
+    companion object {
+        val DEFAULT = LIGHT
+
+        fun parse(name: String?): ThemeMode = entries.firstOrNull { it.name == name } ?: DEFAULT
+    }
+}
+
+/**
+ * Everything the phone keeps besides the history: settings documents, watch status, sync record,
+ * and the phone-only appearance (accent, theme).
+ */
 data class PhoneStoreState(
     /** The phone's view of the synced settings (its own changes plus what it took from the watch). */
     val phoneSettings: SettingsDoc = SettingsDoc(),
@@ -38,6 +60,10 @@ data class PhoneStoreState(
     val deletePending: Boolean = false,
     /** Newest alert time already mirrored, so each alert notifies at most once. */
     val lastMirroredAlertMs: Long = 0L,
+    /** Appearance (phone only, never synced to the watch): the accent colour. Purple by default. */
+    val accent: Accent = Accent.DEFAULT,
+    /** Appearance (phone only, never synced to the watch): light, dark or the system's. Light by default. */
+    val themeMode: ThemeMode = ThemeMode.DEFAULT,
 ) {
     companion object {
         const val DEFAULT_RETENTION_DAYS = 90
@@ -62,6 +88,8 @@ class PhoneStore(private val ds: DataStore<Preferences>) {
         val mirror = booleanPreferencesKey("mirror_alerts")
         val deletePending = booleanPreferencesKey("delete_pending")
         val lastMirrored = longPreferencesKey("last_mirrored_alert")
+        val accent = stringPreferencesKey("accent")
+        val themeMode = stringPreferencesKey("theme_mode")
     }
 
     val flow: Flow<PhoneStoreState> = ds.data.map { p ->
@@ -80,6 +108,8 @@ class PhoneStore(private val ds: DataStore<Preferences>) {
             mirrorAlerts = p[Keys.mirror] ?: false,
             deletePending = p[Keys.deletePending] ?: false,
             lastMirroredAlertMs = p[Keys.lastMirrored] ?: 0L,
+            accent = Accent.parse(p[Keys.accent]),
+            themeMode = ThemeMode.parse(p[Keys.themeMode]),
         )
     }
 
@@ -112,6 +142,8 @@ class PhoneStore(private val ds: DataStore<Preferences>) {
     suspend fun setMirrorAlerts(v: Boolean) = ds.edit { it[Keys.mirror] = v }
     suspend fun setDeletePending(v: Boolean) = ds.edit { it[Keys.deletePending] = v }
     suspend fun setLastMirroredAlert(ms: Long) = ds.edit { it[Keys.lastMirrored] = ms }
+    suspend fun setAccent(v: Accent) = ds.edit { it[Keys.accent] = v.name }
+    suspend fun setThemeMode(v: ThemeMode) = ds.edit { it[Keys.themeMode] = v.name }
 
     /** "Delete all data": the watch's reports go with the history; settings and setup stay. */
     suspend fun clearData() = ds.edit {

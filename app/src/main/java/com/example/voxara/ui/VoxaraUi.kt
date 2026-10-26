@@ -12,19 +12,26 @@ import com.example.voxara.data.ExposureState
 import com.example.voxara.data.Scenario
 import com.example.voxara.voice.VoiceTurn
 
-/** Navigation routes. Home (Tono's status + cards) is the root; everything else is one tap away. */
+/**
+ * Navigation routes. Home (the pager of three glance pages: Now, Dose, More) is the root. The routes
+ * [NOW], [TODAY], [WEEK], [HEADPHONES] and [MENU] open that pager on a page and view: Now (also [HOME]),
+ * Dose on Today, Dose on Week (also [HEADPHONES], whose weekly share lives there) and More.
+ */
 object Routes {
     const val HOME = "home"
     const val NOW = "now"
     const val HEADPHONES = "headphones"
     const val TODAY = "today"
     const val WEEK = "week"
+    const val MENU = "menu"
     const val ASK = "ask"
     const val SETTINGS = "settings"
     const val CALIBRATION = "calibration"
     const val MODE = "mode"
-    /** Debug builds only: registered when DebugTools.available. */
-    const val DEBUG_HAPTICS = "debug_haptics"
+    /** What the Dose ring means (a tap on its number). */
+    const val DOSE_HELP = "dose_help"
+    /** "Not headphones": the way out of headphones mode (its chip on Now, or the row under it). */
+    const val HP_EXIT = "hp_exit"
 }
 
 /** Everything a screen may read. */
@@ -48,6 +55,17 @@ data class VoxaraActions(
     val onResume: () -> Unit = {},
     /** The wearer picked Auto or a fixed situation mode on the watch. */
     val onSituationChoice: (SituationChoice) -> Unit = {},
+    /** "Dismiss" on the headphone-volume alert: closes it for this tier, never switches alerts off. */
+    val onDismissHeadphoneAlert: () -> Unit = {},
+    /** "Lower to safe volume": brings the music volume to the recommended level (watch or phone headphones). */
+    val onLowerHeadphones: () -> Unit = {},
+    /**
+     * "Not headphones": headphones mode leaves and ignores the current output until it disconnects; with
+     * `rememberSpeaker` a Bluetooth device is remembered as a speaker. The room's alerts are never affected.
+     */
+    val onNotHeadphones: (rememberSpeaker: Boolean) -> Unit = {},
+    /** Forgets every output remembered as a speaker. */
+    val onForgetSpeakers: () -> Unit = {},
     val onCalibrationTrim: (Double) -> Unit = {},
     val onSaveCalibration: (CalibrationRecord) -> Unit = {},
     val onEnsureMonitoring: () -> Unit = {},

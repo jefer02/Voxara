@@ -21,6 +21,8 @@ data class CoachUi(
     val source: ReplySource? = null,
     /** Set when the cloud was tried and failed; the offline reply is shown instead. */
     val cloudFailed: Boolean = false,
+    /** Why it failed, as a fixed code (an exception class, an HTTP status, a validator reason): never the key or the question. */
+    val failure: String? = null,
 )
 
 /** The built-in answers ([OfflineCoach] in the apps, a fake in tests). */
@@ -87,7 +89,7 @@ class TonoCore(
                     is CoachResult.Failure -> {
                         onCloudFailure(r.reason)
                         return publish(
-                            CoachUi(reply = builtIn.reply(request), source = ReplySource.OFFLINE, cloudFailed = true)
+                            CoachUi(reply = builtIn.reply(request), source = ReplySource.OFFLINE, cloudFailed = true, failure = r.reason)
                         )
                     }
                 }

@@ -31,4 +31,12 @@ class MirroredAlertTest {
         // Each 100% kind has its own notification, levels replace each other per kind.
         assertEquals("DAILY_100:100", limit.notificationKey)
     }
+
+    @Test
+    fun `a watch whose clock is a couple of minutes ahead of the phone is still shown`() {
+        // The alert says it fired 2 minutes in the phone's future: clock difference, not time travel.
+        assertTrue(MirroredAlert.shouldShow(limit.copy(atMs = now + 120_000), true, 0, now))
+        // Hours ahead is nonsense and is not shown.
+        assertFalse(MirroredAlert.shouldShow(limit.copy(atMs = now + 3_600_000), true, 0, now))
+    }
 }

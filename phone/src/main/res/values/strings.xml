@@ -3,13 +3,9 @@
     <string name="phone_app_name">Voxara</string>
 
     <!-- v1 headphone-sampling copy, reused by the Headphones screen and the setup -->
-    <string name="phone_title">Voxara · headphone listening</string>
-    <string name="phone_what">Your Voxara watch can include headphone listening from this phone in its weekly hearing budget. This is optional and off until you turn it on.</string>
-    <string name="phone_sends">What is sent to your watch, about every 15 minutes while you listen: the time, how long, the media volume, and the type of output (wired, Bluetooth…). The watch turns this into an estimated level.</string>
+    <string name="phone_what">Your Voxara watch can include headphone listening from this phone in its weekly limit. This is optional and off until you turn it on.</string>
     <string name="phone_never">Never sent or stored: audio, song or video titles, app names, headphone names or Bluetooth addresses. Nothing goes to the internet; it travels only to your own watch.</string>
     <string name="phone_limits">Limits: sampling every 15 minutes cannot see pauses or volume changes in between, so these numbers are rough estimates. Wired headphones are only seen when a sample happens to run. Not a medical device.</string>
-    <string name="phone_turn_on">Turn on listening sync</string>
-    <string name="phone_turn_off">Turn off listening sync</string>
     <string name="phone_status_off">Off. Nothing is being sampled.</string>
     <string name="phone_status_waiting">On. Waiting for the first listening sample.</string>
     <string name="phone_status_synced">On. Last sent to your watch: %1$s</string>
@@ -17,7 +13,6 @@
     <!-- navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_trends">Trends</string>
-    <string name="nav_tono">Tono</string>
     <string name="nav_watch">Watch</string>
     <string name="nav_settings">Settings</string>
 
@@ -30,10 +25,8 @@
     <string name="action_install_on_watch">Install on the watch</string>
     <string name="action_open_wearable">Open the Galaxy Wearable app</string>
     <string name="action_continue">Continue</string>
-    <string name="action_skip">Not now</string>
     <string name="action_done">Done</string>
     <string name="action_allow">Allow</string>
-    <string name="action_see_all">See all</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_delete">Delete</string>
     <string name="action_decrease">Decrease %1$s</string>
@@ -75,18 +68,8 @@
     <string name="link_opened">Check your watch.</string>
 
     <!-- home -->
-    <string name="home_title">Voxara</string>
     <string name="home_status_fallback">Taking care of your ears</string>
-    <string name="home_score">Hearing Care Score</string>
-    <string name="home_score_sub">Listening habits, not a hearing test</string>
-    <string name="home_score_cd">Hearing Care Score %1$d of 100</string>
     <string name="stat_today">Today</string>
-    <string name="stat_today_sub">of today\'s sound allowance</string>
-    <string name="stat_week">7-day budget</string>
-    <string name="stat_week_sub">rolling, surroundings</string>
-    <string name="stat_headphones">Headphones</string>
-    <string name="stat_headphones_sub">this week, estimated</string>
-    <string name="stat_cd">%1$s: %2$d percent, %3$s. %4$s</string>
     <string name="zone_strip_title">Today, minute by minute</string>
     <string name="zone_strip_cd">Today so far: %1$s</string>
     <string name="zone_strip_part">%1$s from %2$s to %3$s</string>
@@ -94,16 +77,10 @@
     <string name="zone_not_measured">Not measured</string>
     <string name="last_alert_title">Last alert</string>
     <string name="last_alert_none">No alerts yet</string>
-    <string name="uncalibrated_title">Uncalibrated estimate</string>
-    <string name="uncalibrated_body">Readings can be off by ±3–5 dB or more until you calibrate on the watch.</string>
-    <string name="coverage">Measured %1$s today</string>
     <string name="coverage_none">Nothing measured yet today</string>
     <string name="home_empty_title">No data yet</string>
     <string name="home_empty_body">Once your watch has measured for a while, sync to see your day here.</string>
-    <string name="see_today">Today in detail</string>
     <string name="see_alerts">Alert history</string>
-    <string name="see_headphones">Headphones</string>
-    <string name="tono_says">%1$s says</string>
 
     <!-- today -->
     <string name="today_title">Today</string>
@@ -111,7 +88,6 @@
     <string name="today_avg">Average</string>
     <string name="today_loudest">Loudest minute</string>
     <string name="today_measured">Measured</string>
-    <string name="today_dose">Dose</string>
     <string name="today_alerts">Alerts today</string>
     <string name="today_no_alerts">No alerts today</string>
     <string name="today_empty">Nothing measured today yet.</string>
@@ -124,20 +100,11 @@
     <string name="range_week">Week</string>
     <string name="range_month">Month</string>
     <string name="trends_daily_dose">Daily dose</string>
-    <string name="trends_limit_line" formatted="false">Line = 100% of the daily limit</string>
-    <string name="trends_budget">Rolling 7-day budget</string>
-    <string name="trends_budget_note">Surroundings, at the end of each day.</string>
-    <string name="trends_compare">This week vs last week</string>
-    <string name="trends_compare_value">%1$d%% vs %2$d%%</string>
-    <string name="trends_compare_up">%1$d points more than last week</string>
-    <string name="trends_compare_down">%1$d points less than last week</string>
-    <string name="trends_compare_same">About the same as last week</string>
-    <string name="trends_split">Surroundings vs headphones</string>
-    <string name="split_ambient">Surroundings %1$d%%</string>
-    <string name="split_headphones">Headphones %1$d%%</string>
+    <string name="trends_budget">Weekly limit used</string>
+    <string name="trends_budget_note">At the end of each day, surroundings and headphones together. The line marks 100%, the whole weekly limit.</string>
     <string name="trends_empty">Trends appear after a few days of synced data.</string>
-    <string name="chart_bars_cd">Daily dose over the last %1$d days. Highest %2$d percent.</string>
-    <string name="chart_line_cd">Rolling 7-day budget. Now %1$d percent.</string>
+    <string name="chart_bars_cd">Daily dose over the last %1$d days. %2$s.</string>
+    <string name="chart_line_cd">Weekly limit used, now %1$d percent.</string>
 
     <!-- alerts -->
     <string name="alerts_title">Alerts</string>
@@ -150,21 +117,19 @@
     <string name="alerts_empty">No alerts in the synced history.</string>
     <string name="alert_level">Level %1$d%%</string>
     <string name="alert_kind_ambient_loud">Loud surroundings</string>
-    <string name="alert_kind_daily_50">Half of today\'s allowance</string>
-    <string name="alert_kind_daily_80" formatted="false">80% of today\'s allowance</string>
+    <string name="alert_kind_daily_50">Half of today\'s limit</string>
+    <string name="alert_kind_daily_80" formatted="false">80% of today\'s limit</string>
     <string name="alert_kind_daily_100">Daily limit reached</string>
-    <string name="alert_kind_week_80" formatted="false">80% of the weekly budget</string>
-    <string name="alert_kind_week_100">Weekly budget reached</string>
+    <string name="alert_kind_week_80" formatted="false">80% of the weekly limit</string>
+    <string name="alert_kind_week_100">Weekly limit reached</string>
     <string name="alert_kind_hp_week_80" formatted="false">Headphones: 80% of the week</string>
-    <string name="alert_kind_hp_week_100">Headphones: weekly budget reached</string>
+    <string name="alert_kind_hp_week_100">Headphones: weekly limit reached</string>
     <string name="alert_kind_hp_loud">Very loud listening</string>
     <string name="alert_row_cd">%1$s, %2$s, %3$s, %4$s, %5$s</string>
 
     <!-- headphones -->
     <string name="hp_title">Headphones</string>
     <string name="hp_sampling">Headphone listening from this phone</string>
-    <string name="hp_sampling_on">On</string>
-    <string name="hp_sampling_off">Off</string>
     <string name="hp_estimate_title">Estimated listening level</string>
     <string name="hp_estimate_label">estimated ±10 dB</string>
     <string name="hp_estimate_none">No headphone listening measured today.</string>
@@ -175,7 +140,7 @@
     <string name="hp_type_over">Over-ear</string>
     <string name="hp_type_none">Not set</string>
     <string name="hp_type_note">Used to estimate how much of the room reaches your ear. Earbuds vs over-ear is not something the phone can detect.</string>
-    <string name="hp_bt_needed">Allow Bluetooth so the phone notices when headphones connect.</string>
+    <string name="hp_bt_needed">Allow Bluetooth so the phone can tell headphones from a Bluetooth speaker.</string>
 
     <!-- tono -->
     <string name="tono_title">Tono</string>
@@ -197,13 +162,11 @@
     <string name="tono_turn_on">Turn Tono on</string>
     <string name="tono_thinking">Tono is thinking…</string>
     <string name="tono_not_medical">Not a medical device. Questions about symptoms get a fixed answer and are never sent.</string>
-    <string name="tono_you">You</string>
     <string name="tono_empty">Ask a question or tap a suggestion.</string>
 
     <!-- watch -->
     <string name="watch_title">Watch</string>
     <string name="watch_connected">Connected</string>
-    <string name="watch_not_connected">Not connected</string>
     <string name="watch_version">Voxara %1$s on the watch</string>
     <string name="watch_version_unknown">Version unknown until the first sync</string>
     <string name="watch_checklist">Checklist</string>
@@ -224,12 +187,10 @@
     <string name="battery_power_save">Power saving is on. It can pause monitoring.</string>
     <string name="battery_optimized">Battery optimization may pause Voxara.</string>
     <string name="check_unknown">Known after the first sync</string>
-    <string name="check_as_of">Checked %1$s</string>
     <string name="battery_tips_title">Keep Voxara running on One UI Watch</string>
     <string name="battery_tip_1">Keep power saving off on the watch while you monitor.</string>
     <string name="battery_tip_2">On this phone: Settings › Apps › Galaxy Wearable › Battery › Unrestricted.</string>
     <string name="battery_tip_3">If monitoring pauses, the watch shows a notification: one tap resumes it.</string>
-    <string name="cal_how_title">How calibration works</string>
     <string name="cal_how_body">Calibration runs on the watch, where the microphone is. You need a reference: a sound level meter, or a phone meter app (±3–5 dB). The watch measures 10 seconds of steady sound, you enter the reference level, and it saves the correction for that watch. The phone never sets corrections.</string>
     <string name="troubleshoot_title">Troubleshooting</string>
     <string name="ts_1">Watch not found: open the Galaxy Wearable app, check the watch is connected and Bluetooth is on.</string>
@@ -242,11 +203,10 @@
     <string name="settings_title">Settings</string>
     <string name="pending_sync">Pending sync</string>
     <string name="settings_pending_note">Changes reach the watch when it is connected. Until then it keeps its current settings.</string>
-    <string name="sec_alerts">Alerts</string>
     <string name="set_threshold">Loud-sound alert level</string>
     <string name="set_threshold_note">You are alerted after %1$d minutes above this level. Default 85 dBA.</string>
     <string name="set_sensitive">Sensitive listener</string>
-    <string name="set_sensitive_note">Uses the stricter WHO weekly budget (75 dB instead of 80 dB).</string>
+    <string name="set_sensitive_note">Uses WHO\'s stricter weekly limit (75 dB instead of 80 dB).</string>
     <string name="set_quiet">Quiet hours</string>
     <string name="set_quiet_from">From</string>
     <string name="set_quiet_to">To</string>
@@ -292,7 +252,7 @@
     <string name="sec_about">About</string>
     <string name="how_it_works">How Voxara works</string>
     <string name="version">Version %1$s</string>
-    <string name="licences">Inter font: SIL Open Font License 1.1</string>
+    <string name="licences">Plus Jakarta Sans and JetBrains Mono fonts: SIL Open Font License 1.1</string>
     <string name="setup_again">Run setup again</string>
     <string name="sync_failed_toast">Sync didn\'t complete. See Watch for help.</string>
     <string name="sync_done_toast">Synced.</string>
@@ -307,8 +267,8 @@
     <string name="how_sustained_body">Level alerts use a 3-minute average, so a single bang never triggers one.</string>
     <string name="how_niosh_title">Daily dose (NIOSH)</string>
     <string name="how_niosh_body" formatted="false">85 dBA for 8 hours is 100% of the day. Every 3 dB more halves the time: 88 dBA for 4 hours, 94 dBA for 1 hour.</string>
-    <string name="how_who_title">Weekly budget (WHO)</string>
-    <string name="how_who_body">The 7-day budget follows WHO-ITU H.870: 80 dB for 40 hours a week (75 dB for sensitive listeners). It rolls: old exposure drops off day by day.</string>
+    <string name="how_who_title">Weekly limit (WHO)</string>
+    <string name="how_who_body">The 7-day limit follows WHO-ITU H.870: 80 dB for 40 hours a week (75 dB for sensitive listeners). It rolls: old exposure drops off day by day.</string>
     <string name="how_headphones_title">Headphones</string>
     <string name="how_headphones_body">Headphone levels are estimated from the volume and the type of output (±10 dB); the microphone never listens to them. Each minute counts once: headphones or surroundings, whichever is louder at the ear.</string>
     <string name="how_accuracy_title">Accuracy</string>
@@ -322,7 +282,7 @@
     <string name="setup_step">Step %1$d of %2$d</string>
     <string name="setup_welcome_title">Welcome to Voxara</string>
     <string name="setup_welcome_body">Your watch measures the sound around you and estimates your headphone listening, so you know when it adds up.</string>
-    <string name="setup_point_1">Daily and weekly sound budgets</string>
+    <string name="setup_point_1">Daily and weekly sound limits</string>
     <string name="setup_point_2">Calm alerts on your wrist</string>
     <string name="setup_point_3">Tono explains it in plain words</string>
     <string name="setup_privacy_title">Numbers, never audio</string>
@@ -347,8 +307,124 @@
     <string name="widget_no_data">No data today</string>
     <string name="widget_as_of">As of %1$s</string>
     <!-- Situation modes (names and blurbs live in shared-ui) -->
-    <string name="sec_mode">Mode</string>
+    <string name="hp_mode_rule">The sound around you is still measured, and its alerts still work.</string>
     <string name="mode_selected_cd">Selected</string>
     <string name="watch_mode">Mode on the watch: %1$s</string>
     <string name="watch_mode_auto">Auto · %1$s</string>
+    <string name="mode_plus_headphones">%1$s + Headphones</string>
+    <string name="home_mode_cd">Mode on the watch: %1$s</string>
+    <string name="hp_state_on">Headphones mode is on</string>
+    <string name="hp_state_off">Headphones mode is off</string>
+    <string name="hp_source_watch">detected by the watch</string>
+    <string name="hp_source_phone">reported by this phone</string>
+    <string name="hp_source_manual">switched by hand</string>
+    <string name="hp_state_detail">%1$s · %2$s</string>
+    <!-- Settings → Appearance (phone only, never synced to the watch) -->
+    <string name="sec_appearance">Appearance</string>
+    <string name="set_accent">Accent colour</string>
+    <string name="set_accent_note">Buttons, switches and highlights use it. Levels and doses still turn amber or crimson when they get loud.</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_turquoise">Turquoise</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_emerald">Emerald</string>
+    <string name="set_theme">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">Follow system</string>
+    <string name="set_appearance_note">Only on this phone. Your watch keeps its own look.</string>
+    <!-- Home hero: the capsule meter of today's dose, spoken -->
+
+    <!-- Headphones: automatic, live on the phone, the volume alert, lowering the volume, the link, battery -->
+    <string name="hp_mode_auto_title">Headphones mode is automatic</string>
+    <string name="hp_mode_auto_note">Headphones mode turns on and off by itself, when headphones are detected on the watch or on this phone.</string>
+    <string name="hp_service_channel">Headphone listening</string>
+    <string name="hp_service_title">Voxara is watching for headphones</string>
+    <string name="hp_service_text">Estimating listening on this phone for your watch. Tap to open.</string>
+    <string name="hp_alert_channel">Headphone volume alerts</string>
+    <string name="hp_alert_title">Volume above the recommended level</string>
+    <string name="hp_alert_text">Estimated about %1$d dBA, above the recommended 80 dBA. Turning it down protects your ears.</string>
+    <string name="hp_lower_action">Lower to safe volume</string>
+    <string name="hp_dismiss_action">Dismiss</string>
+    <string name="hp_lower_working">Lowering…</string>
+    <string name="hp_lower_lowered_db">Volume lowered. About %1$d dBA now (estimated).</string>
+    <string name="hp_lower_lowered">Volume lowered.</string>
+    <string name="hp_lower_already">Already at a safe volume.</string>
+    <string name="hp_lower_fixed">This phone keeps the volume fixed. Lower it on the headphones.</string>
+    <string name="hp_lower_not_playing">Nothing is playing.</string>
+    <string name="hp_lower_failed">The volume couldn\'t be lowered.</string>
+    <string name="hp_live_title">Headphones on this phone</string>
+    <string name="hp_live_not_watching">Not watching yet. Open the app once, or turn on sharing above.</string>
+    <string name="hp_live_none">No headphones connected.</string>
+    <string name="hp_live_idle">Connected. Nothing is playing.</string>
+    <string name="hp_live_playing_unknown">Playing, but the volume is muted.</string>
+    <string name="hp_possible_speaker">Possible speaker</string>
+    <string name="hp_possible_speaker_note">A Bluetooth output was counted as headphones, but it may be a speaker. Allow Bluetooth so the phone can tell them apart.</string>
+    <string name="alert_kind_hp_safe">Headphone volume above recommended</string>
+    <string name="link_reconnecting">Reconnecting to your watch…</string>
+    <string name="link_disconnected_for">Not connected for %1$s</string>
+    <string name="link_health_body">Voxara reconnects by itself when the watch is back in range. Listening and settings wait and are sent then.</string>
+    <string name="link_pending_listening">Headphone listening waiting to reach the watch: %1$d</string>
+    <string name="battery_guide_title">Keep Voxara running</string>
+    <string name="battery_guide_body">Some phones, Samsung especially, stop apps in the background, so the watch link and headphone detection can drop. Open this app\'s settings, then Battery, and choose Unrestricted.</string>
+    <string name="battery_guide_action">Open settings</string>
+
+    <!-- phone redesign -->
+    <string name="action_calibrate">Calibrate</string>
+    <string name="home_link_line">%1$s · %2$s</string>
+    <string name="action_open_watch_tab">Open the Watch tab</string>
+    <string name="home_ring_cd">%1$d percent of today\'s limit, %2$s</string>
+    <string name="action_open_today">Today in detail</string>
+    <string name="home_of_allowance">of today\'s limit</string>
+    <string name="action_open_tono">Ask Tono</string>
+    <string name="home_ask_tono">Ask Tono</string>
+    <string name="home_ask_tono_ai">Ask Tono · AI-assisted</string>
+    <string name="uncalibrated_compact">Uncalibrated estimate: readings can be off by ±3–5 dB.</string>
+    <string name="tile_week">Last 7 days</string>
+    <string name="tile_week_caption">of the weekly limit, surroundings</string>
+    <string name="tile_week_cd">Last 7 days, surroundings: %1$d percent of the weekly limit, %2$s</string>
+    <string name="tile_headphones">Headphones</string>
+    <string name="tile_headphones_caption">of the weekly limit, last 7 days, estimated</string>
+    <string name="tile_headphones_cd">Headphones, last 7 days: %1$d percent of the weekly limit, %2$s</string>
+    <string name="home_hours">Today, hour by hour</string>
+    <string name="chart_loudest">Loudest: %1$d dBA at %2$s</string>
+    <string name="last_alert_cd">Last alert: %1$s, %2$s, %3$s</string>
+    <string name="chart_guide_85">85 dBA</string>
+    <string name="chart_limit_100">100%</string>
+    <string name="state_expanded">Expanded</string>
+    <string name="state_collapsed">Collapsed</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_min_ago">%1$d min ago</string>
+    <string name="time_hours_ago">%1$d h ago</string>
+    <string name="today_where">Where the day went</string>
+    <string name="today_where_note">How today\'s limit filled up, from midnight to now.</string>
+    <string name="chart_cumulative_cd">Today\'s limit filled up to %1$d percent by %2$s.</string>
+    <string name="chart_85_note">The line marks 85 dBA, the level the daily limit is built on.</string>
+    <string name="trends_ask_tono">Ask Tono</string>
+    <string name="trends_week_caption">of the weekly limit · all sound, last 7 days</string>
+    <string name="trends_week_breakdown">Surroundings %1$d%% + headphones %2$d%%</string>
+    <string name="trends_month_busiest">Busiest day: %1$s, %2$d%%.</string>
+    <string name="trends_month_average">A typical day: %1$d%% of the daily limit.</string>
+    <string name="trends_change_same">About the same as the 7 days before (%1$d%%).</string>
+    <string name="trends_daily_note">Each column is that day\'s share of the daily limit.</string>
+    <string name="chart_day_cd">%1$s: %2$s percent</string>
+    <string name="trends_month_title">Last 30 days</string>
+    <string name="trends_month_note">Each day in the zone it reached. Today has a ring.</string>
+    <string name="trends_headphone_share">%1$d%% of the last 7 days came from headphones.</string>
+    <string name="trends_score_line">Hearing Care Score %1$d of 100. Listening habits, not a hearing test.</string>
+    <string name="sec_watch">Watch and alerts</string>
+    <string name="how_sharing_title">Sharing headphone listening</string>
+
+    <plurals name="trends_month_caption">
+        <item quantity="one">day over the daily limit in the last 30 days</item>
+        <item quantity="other">days over the daily limit in the last 30 days</item>
+    </plurals>
+    <plurals name="trends_change_up">
+        <item quantity="one">%1$d point more than the 7 days before (%2$d%%).</item>
+        <item quantity="other">%1$d points more than the 7 days before (%2$d%%).</item>
+    </plurals>
+    <plurals name="trends_change_down">
+        <item quantity="one">%1$d point less than the 7 days before (%2$d%%).</item>
+        <item quantity="other">%1$d points less than the 7 days before (%2$d%%).</item>
+    </plurals>
+    <string name="how_sharing_body">Your Voxara watch can include headphone listening from this phone in its weekly limit. This is optional and off until you turn it on.\n\nWhat is sent to your watch whenever something changes (headphones connected or removed, play or pause, the volume moved): the time, how long, the media volume, and the type of output (wired, Bluetooth…). The watch turns this into an estimated level. While this is on, a small notification shows that Voxara is watching for headphones.\n\nNever sent or stored: audio, song or video titles, app names, headphone names or Bluetooth addresses. Nothing goes to the internet; it travels only to your own watch.</string>
 </resources>

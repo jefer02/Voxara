@@ -4,9 +4,11 @@ plugins {
 }
 
 /**
- * Voxara SHARED UI — what both apps draw the same way: the Voxara icon set, the Inter font and
- * the zone words. Compose UI only (no Material), so the watch (Wear Material 3) and the phone
- * (Material 3) each keep their own components on top of it.
+ * Voxara SHARED UI — what both apps draw the same way: the Voxara icon set, the fonts (Plus
+ * Jakarta Sans, JetBrains Mono), the zone words and the template-style visuals both apps draw
+ * (wave lines, capsules, level-reactive accent; docs/design/STYLE.md). Compose UI and foundation
+ * only (no Material), so the watch (Wear Material 3) and the phone (Material 3) each keep their own
+ * components on top of it.
  */
 android {
     namespace = "com.example.voxara.designsystem"
@@ -28,8 +30,10 @@ android {
 }
 
 dependencies {
-    implementation(project(":shared"))
+    api(project(":shared"))
     implementation(platform(libs.compose.bom))
     api(libs.ui)
     api(libs.ui.graphics)
+    api(libs.compose.foundation.phone)
+    implementation(libs.lifecycle.runtime.compose)
 }

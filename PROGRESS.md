@@ -9,8 +9,8 @@ Status legend: ✅ done · 🟡 in progress · ⛔ blocked / skipped
 ---
 
 ## Environment
-- Connected device: **Wear OS emulator only** (`emulator-5554`, API 37 / Android 17, 480×480 px @ 320 dpi = 240 dp).
-  No physical Galaxy Watch 7 was connected, so nothing was measured on real hardware.
+- Connected device (until pass 2): **Wear OS emulator only** (`emulator-5554`, API 37 / Android 17, 480×480 px @ 320 dpi = 240 dp).
+  Pass 3 also used the real **Galaxy Watch 7 (SM_L300, 432×432 px @ 340 dpi = 203 dp)** over wireless debugging.
   Only the Voxara debug app was installed/updated on the emulator; no settings were changed.
 - Layout targets assumed: Galaxy Watch 7 44 mm ≈ 480 px (~240 dp), 40 mm ≈ 432 px (~216 dp),
   plus the Wear OS small-round minimum (192 dp).
@@ -194,7 +194,7 @@ What was done:
 
 Files created:
 - `…/voxara/core/headphones/Headphones.kt`
-- `…/voxara/audio/HeadphoneMonitor.kt`
+- `…/voxara/audio/HeadphoneMonitor.kt` (deleted later: replaced by `shared/…/audio/HeadphoneWatcher.kt`, see "Headphones automatic" and the note under "Current watch detection" below)
 - `…/voxara/ui/screens/HeadphonesScreen.kt`
 - `…/voxara/tile/ListeningTileService.kt`
 - `…/voxara/complication/ListeningComplicationService.kt`
@@ -694,9 +694,10 @@ Result at that point: watch 116/116, shared 41/41, phone 31/31 ✅; both debug A
 - Unit tests: watch **116/116**, shared **43/43**, phone **31/31** ✅ (watch baseline before v2: 112, all still pass).
 - Release APKs: the API key is absent from both (checked against local.properties without printing it) and neither
   declares INTERNET. The debug APKs contain the key (debug-only by design, as before).
-- Lint: no NewApi errors in any module at minSdk (phone 28, watch 30). Pre-existing and unchanged: one WrongConstant
-  error in `phone/…/ListeningSampler.kt:46` (v1 code; the type is always an output type there) and InlinedApi
-  warnings in the watch's HapticConductor / MainActivity (guarded at runtime).
+- Lint: no NewApi errors in any module at minSdk (phone 28, watch 30). Pre-existing at the time: one WrongConstant
+  error in `phone/…/ListeningSampler.kt:46` (v1 code; the type is always an output type there; **fixed
+  later, see "Phone lint: WrongConstant fixed"**) and InlinedApi warnings in the watch's HapticConductor /
+  MainActivity (guarded at runtime).
 - Strings: every English string has a Spanish counterpart in all four modules.
 
 ### How to verify each change
@@ -1288,3 +1289,862 @@ derived **only from freely licensed live music**:
   being clearly louder than the crowd.
 - The metro check uses TUT recordings (Finland, binaural, uncalibrated) with the level gate assumed
   passed. A real loud metro on the watch is still untested.
+
+---
+
+## UI restyle (template style, both apps) ✅ (no watch or phone connected: renders only)
+
+Spec: **[docs/design/STYLE.md](docs/design/STYLE.md)** (written before coding). Source of the style:
+`docs/design/voxara_template.html`. Only its **style** was taken (colours, type, shapes, the look of
+its visuals). None of its features were copied: no VoxBuds / pairing sheet, no headphone limiter or
+"shield", no "−15 dB" buttons, no L/R balance, earbud battery, anti-fatigue EQ or rest timer, none of
+its dose math, 80/88 dB thresholds or "OMS" texts. Every number, zone and sentence still comes from
+`NoiseDoseEngine`, `RiskZone`, `AlertEngine`, the ledgers and the existing string resources. Screens
+still take (state, actions) only. No git commands that modify the repo were used.
+
+### What it looks like now
+- **Colour:** deep blue-black (`#090B10`, cards `#131722`) and paper-white (`#F3F5F9`, cards
+  `#FFFFFF`) neutrals with 1 dp borders; the watch stays pure black (AMOLED, dark only).
+- **Accent:** Purple by default (the watch is always Purple); on the phone the user picks Purple,
+  Turquoise, Blue or Emerald. Each has light/dark fill, ink and on-fill variants (STYLE.md §1),
+  contrast-tested for every accent × theme.
+- **Level-reactive accent:** OK and MODERATE use the accent, LOUD amber `#FFB800`, DANGEROUS crimson
+  `#FF2A6D`, animated (400 ms) between tiers, on Voxara's own boundaries (70/85/95 dBA, 50/80/100 %).
+  Words and icons still name every zone.
+- **Type:** Plus Jakarta Sans for words, JetBrains Mono (tabular) for every number. Inter removed.
+- **Watch:** 270° bezel arc with rounded caps and a glow stroke, harmonic wave rings and halo behind
+  the main number, glow number, source pill, editorial headers with a pulsing dot, page dots on
+  onboarding, icon-tile cards, hourly capsules, a round dark overlay with a crimson border for the
+  limit alert. Ambient: hairline bezel, outline number, no glow, no animation.
+- **Phone:** editorial large titles (pulsing-dot label over an extra-bold title), cards with borders
+  and soft shadows, a hero card with wave lines and a 26-capsule dose meter, icon tiles in every row,
+  the template switch, accent pill segmented controls, a metric triplet on Today, an accent-soft pill
+  in the bottom bar / rail, chart series in accent + secondary indigo.
+
+### New phone setting: Appearance (STEP 2)
+- Settings → **Appearance**: accent (4 round swatches, the selected one scaled with a ring; each a
+  radio button named for TalkBack) and theme **Light / Dark / Follow system**. Defaults: **Purple,
+  Light**.
+- Stored in `PhoneStore` (DataStore keys `accent`, `theme_mode`). Phone only: not in the synced
+  `SettingField` list, never sent to the watch, kept by "Delete all data".
+- Applied live through `VoxaraPhoneTheme` (CompositionLocals) without recreating the activity:
+  system bar icons (`enableEdgeToEdge` with a light/dark `SystemBarStyle`), the window background,
+  and on Android 12+ `UiModeManager.setApplicationNightMode`, so the next splash matches
+  (`configChanges="uiMode"` on `MainActivity`, so this does not restart it). The setup wizard is
+  inside the same theme. The Glance widget reads the same keys and is re-rendered on a change.
+
+### Files
+Created:
+- `docs/design/STYLE.md`, `docs/design/screenshots/{before,after}/…` (see below)
+- `shared-ui/src/main/java/com/example/voxara/ui/design/Visuals.kt` (VoxTone, level tone, wave clock,
+  WaveLines, HarmonicRings, capsules, PulseDot)
+- `shared-ui/src/main/res/font/plus_jakarta_sans.ttf`, `shared-ui/src/main/res/font/jetbrains_mono.ttf`
+  (variable fonts from github.com/google/fonts, `ofl/plusjakartasans`, `ofl/jetbrainsmono`)
+- `shared-ui/src/main/assets/licenses/PlusJakartaSans-OFL.txt`, `…/JetBrainsMono-OFL.txt`
+- `app/src/main/java/com/example/voxara/ui/design/WatchVisuals.kt` (LocalAnimate, WaveHalo, GlowNumber,
+  SourcePill, PageDots, CircularOverlay)
+- `phone/src/main/java/com/example/voxara/phone/ui/components/Template.kt` (EditorialLabel, IconTile,
+  VoxSwitch, HeroCard, CapsuleMeter, MetricTriplet, AccentSwatches)
+- `shared/src/test/java/com/example/voxara/core/design/AccentPaletteTest.kt` (6 tests)
+- `phone/src/test/java/com/example/voxara/phone/data/AppearanceStoreTest.kt` (5 tests)
+
+Deleted: `shared-ui/src/main/res/font/inter_variable.ttf` and `shared-ui/src/main/assets/licenses/Inter-OFL.txt`
+(nothing used Inter any more); `shared/src/test/…/core/design/LightPaletteTest.kt` (replaced by
+AccentPaletteTest, which covers every accent × theme with the same 4.5:1 / 3:1 thresholds).
+
+Modified:
+- `shared/…/core/design/Palette.kt` (rewritten: template neutrals, `Accent`, `Tone`, `level()`, `over()`)
+- `shared-ui/build.gradle.kts` (foundation + lifecycle-runtime-compose, `:shared` as api),
+  `shared-ui/…/ui/design/SharedDesign.kt` (`JakartaFamily`, `MonoFamily`, `TABULAR`)
+- Watch: `ui/design/Tokens.kt`, `Components.kt` (BezelArc, LevelBezel, Eyebrow, EditorialHeader,
+  IconTile, ZoneIconCircle; the ZoneGauge is replaced by the bezel), `Layout.kt` (token renames),
+  `ui/theme/VoxaraTheme.kt`; screens `HomeScreen`, `NowScreen`, `TodayWeekScreens` (DoseBezel, hourly
+  capsules), `HeadphonesScreen`, `AskScreen`, `ModeScreen`, `SettingsScreen`, `OnboardingScreen`,
+  `OverlayScreens`, `CalibrationScreen` and `CalibrationProbePanel` (colour roles);
+  `tile/VoxaraTileService.kt`, `tile/ListeningTileService.kt` (270° rounded ProtoLayout arcs, tier
+  colours); `complication/DoseComplicationService.kt`, `complication/ListeningComplicationService.kt`
+  (colour ramp)
+- Phone: `ui/theme/PhoneTheme.kt` (rewritten), `ui/components/Components.kt`, `ui/components/Charts.kt`,
+  `ui/PhoneApp.kt` (nav colours), `ui/PhoneUi.kt` + `ui/PhoneViewModel.kt` (appearance state and
+  actions), `MainActivity.kt` (live theme, bars, night mode), `data/PhoneStore.kt` (`ThemeMode`, keys),
+  every screen, `widget/DoseWidget.kt`, `AndroidManifest.xml` (`configChanges="uiMode"`),
+  `res/values{,-night}/colors.xml` (new window backgrounds)
+- Strings EN + ES: phone +14 (Appearance, accent and theme names, the hero capsule description); the
+  licence lines in both apps now name Plus Jakarta Sans and JetBrains Mono.
+- Tests: `app/src/test/…/core/DesignSystemTest.kt` (watch tokens and tiers on black and cards),
+  `app/src/test/…/ui/DesignSystemScreenshotTest.kt` (new components),
+  `phone/src/test/…/ui/PhoneScreenshotTest.kt` (Home in every accent, light and dark; dark Trends,
+  Settings and Home at 2.0; the Appearance section on a tall canvas)
+
+### Battery and accessibility rules (how they hold)
+- Free-running animation only while interactive and resumed: `LocalAnimate` (not ambient, animator
+  scale ≠ 0) and `animationsActive()` (lifecycle RESUMED). Otherwise the waves, rings and pulse dot
+  are drawn as a still frame. The wave phase is read in the draw phase only (no recomposition per
+  frame); Paths and Strokes are reused; the halo brush is rebuilt only on a colour change. No blur.
+- Touch targets ≥ 48 dp (swatches, steppers, segments); nothing below 12 sp; headings via
+  `heading()`; zones always word + icon.
+- Found and fixed while reviewing the renders: watch card labels breaking mid-word at 192 dp × 1.3
+  (compact card), capsule marks colliding at font 2.0 (placed by priority, overlaps dropped),
+  triplet labels breaking at 1.3 (stacks by cell width), capsules turning into circles on tablets
+  (max 10 dp wide), "120 min" and "Follow system" cut in segmented controls (smaller label for 4+
+  segments, two lines allowed, equal heights).
+- `AppearanceStoreTest` runs PhoneStore on an in-memory DataStore: the file-backed DataStore cannot
+  replace its file on the Windows JVM ("Unable to rename …"), a test-environment limit.
+
+### Screenshots
+`docs/design/screenshots/before/` and `after/`: watch Home, Now, Today (216 dp, 1.0×); phone Home,
+Trends, Settings, light and dark (360 dp, 1.0×). `after/accents/`: phone Home in all 4 accents ×
+light/dark; `after/phone_settings_appearance*.png`: the Appearance section. Full sets:
+`app/build/screenshots/` (96) and `phone/build/screenshots/` (all sizes, font scales 1.0/1.3/2.0,
+light/dark, accents) after `testDebugUnitTest`.
+
+### Could not apply the template style fully
+- **Tiles and complications:** ProtoLayout cannot animate, glow or load bundled fonts, so they get
+  the tier colours and the 270° rounded arc only, in the system font.
+- **Glance widget:** colours, radius and the accent label only (no waves, system font).
+- **Watch toggles:** the template switch was not ported to the watch; the Wear M3 pill buttons stay
+  (they carry the accent). The watch Calibration flow keeps its layout and takes the new tokens only.
+- **Splash on Android 9–11:** before the app's first frame the window follows the system's night
+  mode (`values-night`); from Android 12 the app night mode makes it match the chosen theme.
+- **Phone hero has no live level:** the phone never shows one, so its reactive colour comes from
+  today's dose zone.
+
+### Results
+- Unit tests: `:shared:testDebugUnitTest` **101/101** (97 before − 2 light-palette tests + 6
+  accent tests), `:app:testDebugUnitTest` **124/124**, `:phone:testDebugUnitTest` **37/37**
+  (31 + 5 appearance-store tests + 1 accent screenshot test).
+- Builds: `:app:assembleDebug` ✅, `:phone:assembleDebug` ✅.
+- Lint: `:app:lintDebug` ✅ 0 errors. `:phone:lintDebug` reported **1 error** at the end of the
+  restyle, the pre-existing WrongConstant at `phone/…/ListeningSampler.kt:46` (v1 sampling code,
+  recorded in "Final checks" above, not touched by the restyle); now fixed, see the next section. Warnings added by the restyle were fixed (non-lambda `offset`,
+  `UseKtx`); the 59 UnusedResources in the app are strings of screens deleted in Phase 6.
+
+### Still to check on a real Galaxy Watch 7 (and a phone)
+- Wave rings / halo frame cost and battery: the animation runs only on Now and Home while the screen
+  is on and resumed; measure with a Perfetto trace (frame time, CPU) and compare an hour with the
+  app open against the previous build.
+- Ambient: the hairline bezel and outline number on the real AMOLED panel (burn-in, < 5 % lit).
+- The bezel arc sits inside the 216 / 240 dp round display; check it does not collide with the
+  physical bezel or the time text at 40 mm.
+- Variable-font rendering (Plus Jakarta Sans, JetBrains Mono weights) on One UI Watch, and the
+  tile / complication colours on the real watch face.
+- Phone: live theme switch (system bar icons flip, no activity restart), the splash after choosing
+  Dark / Light on Android 12+, Follow system while toggling the system dark mode, and the widget
+  colours after changing the accent.
+
+---
+
+## Phone lint: WrongConstant fixed ✅
+
+`phone/src/main/java/com/example/voxara/phone/ListeningSampler.kt:46` passed `AudioDeviceInfo.getType()`
+straight into `AudioManager.getStreamVolumeDb(streamType, index, deviceType)`. `getType()` is typed
+as any device type (inputs included), but `deviceType` only accepts output types, so lint reported
+WrongConstant even though `outputKind()` had already narrowed the device to six headphone outputs.
+
+- Fix: a small `outputDeviceType(type)` maps the device to the same output constant through a
+  `when` (wired headphones / headset, USB headset, Bluetooth A2DP, BLE headset, BLE broadcast).
+  For every type `outputKind()` accepts it returns the number it was given, so the volume curve
+  the phone reads is unchanged. No WrongConstant suppression.
+- The two BLE constants (API 31 / 33, minSdk 28) are inlined compile-time ints that can only match
+  on devices reporting those types, so that one function carries `@SuppressLint("InlinedApi")` with
+  the reason in a comment (the same situation as the watch's inlined `TYPE_BLE_*` warnings).
+- Test: `phone/src/test/java/com/example/voxara/phone/ListeningSamplerTest.kt` (+1) checks the identity for
+  all six accepted types.
+- Results: `:phone:lintDebug` ✅ **0 errors**, 80 warnings (same count as before; none new);
+  `:phone:testDebugUnitTest` **38/38** ✅. No git commands that modify the repo were used.
+
+---
+
+## App icons ✅ (no watch or phone connected: renders only)
+
+Original icon system for both apps, drawn from scratch as vectors: no icon packs, no Material
+Symbols, no traced or third-party artwork, so there is no licence to track. No git commands that
+modify the repo were used.
+
+### Concept chosen: A, "Gauge V"
+Three concepts were drawn and compared (`docs/design/icons/concepts/`, `compare.png`, rationale in its
+`README.md`): **A Gauge V**, **B Quiet wave** (a loud wave meets a curved guard and leaves as a calm
+dot), **C Cochlea** (sound rings wound into the inner ear). **A was chosen**: the watch's 270° dose
+arc, open at the bottom, and a V whose point drops through the opening like a gauge needle. It
+carries the name, reuses the app's most recognisable visual (the bezel arc) and is the clearest
+silhouette at 24–48 px. A "V in a circle" can recall the vegan Ⓥ or the VW roundel; the open ring
+and the point leaving through the gap are what set it apart. That check was done from memory, not
+with a trademark or reverse-image search.
+
+Fixed while reviewing the renders: curled V arms read as the Aries ♈ glyph, then bowed arms as a
+"Y" (now straight); the 10 % wide-stroke glow showed as a hard ghost outline at 192–512 px and as a
+lilac rim on the light splash (removed; the glow is now the background's soft radial halo).
+
+### Design rules
+- Launcher layers 108 dp; the mark stays inside r ≈ 24 dp on the phone and ≈ 26 dp on the watch
+  (bigger, 8 % bolder strokes for the small round screen), well inside the 66 dp safe zone, so every
+  mask (circle, squircle, rounded square, teardrop) keeps a margin.
+- Background: `#090B10` lifted to `#1A1F33`, with a soft `#8B5CF6` halo. Mark: `#C4B5FD → #8B5CF6 →
+  #6366F1` gradient strokes with round caps.
+- Monochrome (themed icons, Android 13+): the same strokes in white (only alpha is used).
+- Notification / complication icon: 24 dp, white, no gradients, 2.4 dp strokes, gaps ≥ 1.2 dp.
+- The launcher foreground also serves as the splash icon: the mark sits inside the splash's visible 2/3
+  circle (phone 288 → 192 dp; watch core-splashscreen `values-watch` 90 → 60 dp).
+
+### Files
+Generator and sources (`docs/design/icons/`): `README.md`, `tools/final.py` (the generator),
+`tools/concepts.py`, `tools/render.js` (resvg); `concepts/` (3 concepts × 5 SVGs, `compare.png`,
+`README.md`); `final/` (`voxara-icon.svg`, `voxara-mark.svg`, `launcher-{background,foreground,
+monochrome}.svg`, `launcher-{foreground,monochrome}-watch.svg`, `notification.svg`, `preview.png`);
+`store/` (`play-icon-512.png`, `play-icon-wear-512.png`, `feature-graphic-1024x500.png`).
+
+Watch (`:app`):
+- Replaced: `res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml`,
+  `ic_voxara_status.xml` (notification small icon for the dosimeter, alerts and the watchdog
+  prompt, the ongoing-activity static icon, and both complications' icons),
+  `res/mipmap-anydpi/ic_launcher.xml` + `ic_launcher_round.xml` (now with a monochrome layer).
+- Created: `res/drawable/ic_launcher_monochrome.xml`; tile previews `res/drawable-nodpi/` and
+  `res/drawable-round-nodpi/` `tile_preview_dose.png`, `tile_preview_listening.png` (a drawn likeness
+  of each tile's real layout and copy; the old preview was the template's "Hello, Tile!").
+- Deleted: `res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher{,_round}.webp` (10 Android Studio robot
+  rasters, never used at minSdk 30), `res/drawable/splash_icon.xml` (Android robot),
+  `res/drawable/tile_preview.png`.
+- Modified: `AndroidManifest.xml` (`android:roundIcon`; each tile points at its own preview),
+  `res/values/styles.xml` (splash icon → `@drawable/ic_launcher_foreground`), `lint.xml` (removed the
+  IconLocation ignore for the deleted preview).
+
+Phone (`:phone`):
+- Created: `res/mipmap-anydpi/ic_launcher.xml` + `ic_launcher_round.xml` (adaptive with monochrome),
+  `res/drawable/ic_launcher_{background,foreground,monochrome}.xml`, `res/drawable/ic_voxara_status.xml`
+  (mirrored-alert notification), `res/values-v31/themes.xml` + `res/values-night-v31/themes.xml`
+  (Android 12+ splash: mark on `@color/vox_background`).
+- Deleted: `res/drawable/ic_voxara.xml` (a generic warning circle used as launcher and notification icon).
+- Modified: `AndroidManifest.xml` (`@mipmap/ic_launcher` + `roundIcon`), `MirroredAlerts.kt`
+  (`R.drawable.ic_voxara_status`).
+
+Not changed: `VoxIcons` (shared-ui) has no app-logo icon. `Waves` is the generic "sound" icon used
+across many screens, including the welcome steps, so the in-app set stays as it is. The Glance widget
+has no preview image; the picker shows the new app icon.
+
+### Deviations from the brief
+- Phone adaptive icons are in `mipmap-anydpi`, not `mipmap-anydpi-v26`: with minSdk 28 lint reports
+  the `-v26` folder as ObsoleteSdkInt (a new warning). The behaviour is identical on every supported
+  device.
+- One Play icon is enough: phone and watch share the applicationId, so they share one Play listing.
+  `play-icon-wear-512.png` (the watch's bigger mark) exists only in case a separate Wear listing is
+  ever made.
+- Splash and launcher foreground are the same drawable (one fewer resource to keep in sync).
+
+### How to regenerate
+```sh
+npm install --prefix <some-dir> @resvg/resvg-js         # once, outside the repo
+NODE_PATH=<some-dir>/node_modules python docs/design/icons/tools/final.py
+```
+It rewrites the source SVGs, every VectorDrawable and adaptive-icon XML above, the tile previews, the
+store PNGs and `final/preview.png`. The preview is rendered from the VectorDrawable XML that ships
+(parsed back into SVG), so it shows what is installed. Edit the generator, not the generated XML.
+After moving resource folders, run `./gradlew :phone:clean` (a stale incremental merge reported
+`mipmap/ic_launcher not found` once).
+
+### Results
+- Unit tests: `:shared` **101/101**, `:app` **124/124**, `:phone` **38/38** ✅.
+- `:app:assembleDebug` ✅, `:phone:assembleDebug` ✅.
+- `:app:lintDebug` ✅ 0 errors, 170 warnings (172 before: SquareAndRoundTilePreviews fixed, unused
+  `ic_launcher_round` fixed). `:phone:lintDebug` ✅ 0 errors, 80 warnings (same set as before). No
+  IconLauncherShape, IconMissingDensityFolder, MonochromeLauncherIcon or other icon warnings.
+
+### Still to check on a real Galaxy Watch 7 and a phone
+- One UI launcher masks (squircle) and One UI's own icon frame on the phone; Samsung's "icon frames"
+  setting can add a frame around adaptive icons.
+- Themed icons: One UI 6+/7 supports them via the monochrome layer; check the tint on the real
+  wallpaper colours.
+- Galaxy Watch app list (One UI Watch): the round mask and the size at 40 mm and 44 mm; the splash
+  through core-splashscreen on Wear OS 5 (API 34+ uses the platform splash with the same drawable).
+- Status bar and notification shade on both devices: the 24 dp silhouette at real density, and the
+  ongoing-activity chip on the watch face.
+- Complications: the monochrome image on a few watch faces (some draw it very small).
+- The tile picker: the previews are drawn likenesses with example values, not captures of the live
+  tile.
+
+---
+
+## Watch redesign ("Orbit") ✅
+Replaced the watch's card stack with one hero per page (impeccable: init → document → critique/audit →
+shape → two concepts → **Concept A, "Orbit"**, chosen → build → animate → polish). Product truth, data,
+the `(env, actions)` screen contract and every destination are unchanged; no logic changes.
+Everything is in `docs/design/watch-redesign/`: `before/` (117 renders), `after/` (171), `compare/`
+(before | after at 216 dp ×1.0 and 192 dp ×1.3), `concepts/` (both concepts, README, numeral probe),
+`motion/` (frame strips of the arc sweep, the number roll and the limit pulse), `baseline-critique.md`,
+`after-critique.md`. Scores: critique 26 → 31 /40, audit 11 → 15 /20 (a self-assessment).
+
+**Structure.** Home is a `HorizontalPager` (`HorizontalPagerScaffold`, Wear page indicator): Home · Now ·
+Today · Week · Headphones · Ask/Settings. Each glance page is a `HeroList`: the first item is one screen
+tall (the hero), details scroll below with per-item scale/fade (`TransformingLazyColumn`
+`TransformationSpec`). The old routes `now`, `today`, `week`, `headphones` open the pager on that page.
+Lists (Settings, Mode, Ask, Calibration, Onboarding, limit alert details) use `VoxList` + `row {}`.
+
+**Per screen.**
+- *Home*: bezel = today's dose, rolling dBA, zone badge (or resume pill when paused), Tono's one line
+  (tap = Ask; a sparkle marks cloud-AI wording). *Now*: bezel = live level, dose/headroom foot, the
+  "Uncalibrated estimate" line; scene, mode chip (morphs on Auto changes) and Concert note below.
+- *Today*: dose % on the arc, 8-hour equivalent; hour capsules below. *Week*: worse weekly share, both
+  shares in the foot; bars, pace, streak, score, Tono summary below. *Headphones*: estimated level (≈, finer
+  rings) over the week's share, or the share alone; confidence, time left, bars, why, phone note below.
+- *Ask/Settings/Mode*: one title, no uppercase eyebrows, list rows scale/fade. *Calibration*, *Onboarding*:
+  `VoxList`. *Limit alert*: icon, title and Got it fit the first screen; explanation and Why? below; the
+  border pulses per haptic beat. *Ambient*: unchanged idea (hairline arc, grey number, zone badge).
+- Tiles/complications: sentence-case strings and the existing 270° arcs (no animation).
+
+**Design system.** New: `Numerals.kt` (`TabularNumber`, `RollingNumber`), `OrbitStage`, `LevelNumber`,
+`CircularOverlay(pulse)`, `ResumePill`, `pressable`, `ScreenTitle`, `GroupLabel`, `HeroList`, `row`,
+`Glance.kt` (`GlanceHero`, `FootLine`, compact rules). `BezelArc` sweeps in; `WaveHalo` follows the level
+with a spring and drifts slowly when quiet. Removed: `EditorialHeader`, `Eyebrow`, `SourcePill`,
+`GlowNumber`, `ProgressRing`, `AlertSheet`, `DoseBezel`, `VType.Eyebrow`. Watch numerals moved off
+JetBrains Mono (its dotted zero cannot be turned off; probe in `concepts/numeral_probe.png`) to Plus
+Jakarta Sans in fixed-width digit cells. Strings: uppercase labels are sentence case in EN and ES
+(`dBA`, scene and environment names, paused, headphones, language, tile/complication titles); shortened
+`now_accruing` / `now_not_accruing`; removed the strings the old Home/Week cards left unused. DESIGN.md
+(new) and STYLE.md (watch sections) describe the new world.
+
+**Motion** (all gated by `LocalAnimate` / `LocalReduceMotion`, none in ambient, no blur, no per-frame
+allocation): arc sweep-in 650 ms · zone crossfade 400 ms · digit roll 220 ms · mode chip morph 220 ms ·
+press 96 % 100 ms · limit pulse 420 ms per haptic beat (daily 0/150/300/470 ms, weekly 0/220/400 ms,
+mirroring `HapticConductor`) · wave amplitude/speed follow the level · page slide and list scale/fade
+from the Wear pager and `TransformationSpec`.
+
+**Tests/tooling added.** `ScreenshotHarness` also renders font 2.0; `ScreenLayoutTest` adds Mode, the
+pages below their heroes (`LocalInitialItem`, review only) and the menu page; `MotionFramesTest` (frame
+strips with a manual clock); `DesignSystemScreenshotTest` gains `numerals`.
+
+### Results
+- Unit tests: `:shared` **101/101**, `:app` **134/134**, `:phone` **38/38** ✅ (contrast tests unchanged).
+- `:app:assembleDebug` ✅, `:phone:assembleDebug` ✅, `:app:lintDebug` ✅ 0 errors.
+- Gradle on this machine needs `JAVA_HOME` = Android Studio's `jbr` (the default JDK has no `jlink`).
+- Wear OS emulator (API 37, 480×480): the app runs; Spanish and English text; tapping Tono's line opens
+  Ask; swiping through the six pages. Frame stats (`dumpsys gfxinfo`): idle rings 609 frames in 10 s,
+  0 missed vsync, 22 ms median (software GPU); a six-page swipe 887 frames, 2.9 % janky, 5 missed vsync,
+  99th percentile 65 ms. The emulator's GPU is not a watch's, so this shows no regression only in kind;
+  no "before" run was made (it needs the old build installed).
+
+### Still to check on a real Galaxy Watch
+- Battery with the wave clock running (one clock at rest; none in ambient) and always-on legibility of
+  the hairline hero; ambient-to-interactive transition.
+- Smoothness of the page swipe, the arc sweep and the rolling digits at 60/120 Hz; the first
+  composition of a page (the emulator showed 17 slow UI frames over a six-page swipe).
+- 40 mm (216 dp) and 44 mm fit with the real bezel: the clock band, the foot line and the page indicator
+  against the arc's gap; crown scrolling on the detail lists.
+- TalkBack: hero descriptions, page order and the Home status as a button.
+- Pager vs system swipe-back on One UI Watch (first page must still dismiss).
+- Dotted zero is gone in Plus Jakarta Sans on device (emulator confirms "30" without a dot).
+
+
+---
+
+## Watch redesign — pass 2 ✅
+Second pass after reviewing "Orbit" on the emulator. Renders, comparisons, motion strips and the critique are in
+`docs/design/watch-redesign/pass2/` (`before/` = pass 1, `after/`, `compare/`, `motion/strip_*.png`, `pages_216.png`,
+`pages_es_216.png`, `critique.md`). Scores (self-assessed): critique 31 → 34 /40, audit 15 → 16 /20.
+
+**Each page is its own picture.** All on the shared 270° ring (`design/Orbit.kt`): Overview = today's dose with 50/80/100 %
+ticks; Now = the 30–110 dBA scale as four zone segments that light up to the level, with a marker; Today = 24 hourly
+bars from the ledger (noon at the top, marker on this hour); Week = seven day segments in each day's dose-zone colour;
+Headphones = indigo scale with the estimate's confidence band (or the week's share when not listening). Home and Now stay
+separate: Home is "am I fine today?" (Tono's line, dose, live level), Now is "how loud is it?". Each page has a short
+sentence-case name with an icon (EN/ES: Overview/Resumen, Now/Ahora, Today/Hoy, Week/Semana, Headphones/Auriculares,
+More/Más) above the page dots and an accent (Now: the zone colour, Headphones: indigo), and TalkBack hears "Page n of 6, name".
+Changing page draws the new picture in (650 ms) while the old retracts (250 ms) and turns the pictures with the swipe.
+
+**Fixes.** `ZoneTag` (filled, no outline, scrim, animated swap) replaces the outlined badge; waves fill the ring's inside
+at lower opacity with a legibility scrim; uncalibrated note neutral + info icon (amber/crimson only for zone warnings);
+edge scrims fade content under the clock and the page indicator, lists get a bottom inset; last page: Ask is a normal
+button ("Ask Tono" / "Preguntar"), Mode and Settings, disclaimer clear of the dots; "Surroundings" row names the scene;
+copy: two short week lines, "estimated" spelled out, "Same as 54.0 dBA for 8 hours" / "Como 54,0 dBA durante 8 horas".
+**Locale:** `formatDecimal` / `formatTwa(locale)` in `:shared`; the watch passes the configuration locale (the in-app language
+is a configuration context, not `Locale.getDefault()`), also for dates and the tile's time. The phone shows no decimals
+through the shared formatters (`formatClock` is digits only), so it needed no change.
+**Layout rules:** foot and caption move to the first detail row from font 1.15 or on screens under 200 dp; figure capped at
+1.3×; page name capped at 1.5×. Allocation: the pictures use a `StrokeCache` and precomputed colour arrays.
+Tests added: indigo contrast, zone tag over the brightest waves, `FormatTest` (decimal comma), Spanish renders, a
+page-transition frame strip.
+
+**Detection log and developer tools.** Still in, for validating Auto mode on a real watch: **remove it after on-device
+validation** (`app/src/debug/.../DetectionLog.kt`, the `DetectionLog.record` call in `DosimeterService`, the
+`debug_detection_*` strings, and the "Developer tools" section in `DebugTools.settingsSection`). Everything for testing now
+lives in one collapsed "Developer tools" section at the very end of Settings (haptics lab, detection log export, calibration
+readout, bench scenarios), built by `DebugTools.settingsSection` in `src/debug`; its strings, the calibration probe panel
+(`CalibrationProbePanel.kt`) and the haptics route moved to the debug source set. Release builds: the section, the panel and
+all their strings are absent (checked in `app-release-unsigned.apk`: no "Developer tools", "Haptics lab", "detection log",
+"Calibration readout", "debug_haptics" or probe strings in dex or `resources.arsc`). What remains are two empty stubs
+(`DebugTools`, `DetectionLog`: `available = false`, no-op `record`) and the `DetectionTrace` data class, because the service
+calls them behind the constant.
+
+### Results
+- Unit tests: `:shared` **104**, `:app` **138**, `:phone` **38**, all passing. `:app:assembleDebug`, `:app:assembleRelease`
+  and `:phone:assembleDebug` build; `:app:lintDebug` 0 errors.
+- The Wear emulator stopped answering to `adb` during this pass (it had been the one used in pass 1), so pass 2 was verified
+  on the JVM renders only; nothing was re-run on the emulator.
+
+### Still to check on a real Galaxy Watch (in addition to pass 1's list)
+- The page name above the dots at 40 mm, and whether it should move to the top; the dots' timing and how they sit over the name.
+- The picture turning with the swipe (smoothness, and swipe-back from the first page).
+- Wave rings filling the ring at low opacity: legibility in sunlight; battery with the larger rings (same one clock).
+- Decimal comma on the watch with the in-app language set to Spanish while the system is English.
+- Developer tools section (debug build): collapse/expand, export of the detection log.
+
+---
+
+## Watch redesign — pass 3 ✅
+The UI looked small on the XL round display (a wide black margin round a ring that was 11 % in from the glass, a different
+ring size on each page, Tono's line cut with an ellipsis). Evidence in `docs/design/watch-redesign/pass3/` (`before/`,
+`after/`, `compare/`), measured on the **real Galaxy Watch 7 (SM_L300: 432×432 px at 340 dpi = 203 dp)** and the
+`Wear_OS_XL_Round` emulator (240 dp), plus JVM renders at 192 / 216 / 227 / 240 dp × font 1.0 / 1.3 / 2.0.
+
+**How scaling works now.** `ui/design/Face.kt` holds every proportion as a fraction of the display, and nothing in a page's
+geometry is a fixed dp any more: the ring's OUTER edge is 4 % of the display in from the glass (`RING_INSET`), stroke 2.7 %
+(`BEZEL`: 5.2 dp at 192, 6.5 dp at 240), the ring is 250° with a 110° gap at the bottom (was 270°/90°: with the ring at the
+edge the old gap put the ring's ends on the foot lines), the waves' box is 3.5 % in so they fill the ring's inside, the centre
+column starts at 15 % and is at most 72 % wide, the foot at most 66 % wide and 9 % clear of the bottom. Figures scale 0.9 to
+1.15× with the display (216 dp = 1.0), words 1.0 to 1.12× (12 sp floor); `OrbitStage` provides `LocalTextScale`,
+`LocalFigureScale`, `LocalDisplay`. Every picture sets its stroke's outer edge on the shared rim
+(`ringRadius(w) = rim − w/2`); Today's bars hang inward from it. Real watch, outer edge in px from the glass across the five
+pages: before 61 / 58 / 78 / 57 / 61, after 18 / 12–17 (glow) / 20 / 18–22 / 18.
+The system clock sat under the ring, so it steps aside on the glance pages (`ClockChrome`, `HideClock`) and stays on More,
+lists and ambient (the ambient hairline sits 11 % in, clear of it).
+
+**The four reported problems.**
+1. *Ring size* — one rim for every page (above); Overview, Now, Today, Week and Headphones now share the radius.
+2. *Tono's line* — `FittedStatus`: two lines at most, at 15 sp then two steps down (never under 12 sp), then `shortenToFit`
+   (whole clauses, then whole words, never a cut word or an ellipsis); the line is held at 1.3× the font; the full text is on Ask.
+3. *The slab "1"* — cause: every numeral style asked for `tnum`, and Plus Jakarta Sans' tabular alternates draw "1" with a foot
+   ("11", "13" read as another, serif font). The digit cells already make figures tabular, so `TABULAR` was removed from
+   `VType.Hero/Display/Numeral/Value`; every numeral is the same plain glyph set (checked on the real watch).
+4. *Week* — seven clearly separated segments, a day with data shows at least a stub (fill = share ÷ 28.6 %, so an ordinary
+   day reads half full), a day with none is a dotted line, today is wider and underlined in white, caption "of your weekly
+   limit" / "de tu límite semanal", and every day is spoken ("Monday: 3 %. … Friday (today): 12 %"; weekday names follow the
+   app language, not the system's).
+5. *Headphones caption* — "of your weekly listening limit" / "de tu límite semanal de escucha".
+Also: hero words are held at 1.5× the font (zone tag, captions, chip), buttons' labels at 1.5× (no "Pregunta/r" at 2.0), the
+"uncalibrated estimate" note sits under the figure on Now (the foot keeps only the dose line).
+
+**Tests.** `FaceGeometryTest` (inset, glow on the display, foot clear of the ring's ends, scales), `StatusFitTest`,
+contrast for the indigo fill / chip text / moon disc in `DesignSystemTest`; renders at 227 dp added to `ScreenshotHarness`,
+the harness now uses the app's scaffold (no clock under the ring).
+
+---
+
+## Headphones mode ✅ (listening layer, automatic + manual)
+**Model — kept as asked, no problem found.** It is a LISTENING LAYER over the situation, not a sixth situation: the situation
+stays (the chip reads "Auto · Transport + Headphones"), because on a bus both exposures matter. `ListeningLayerState(active,
+source = WATCH | PHONE | MANUAL | NONE, detected, detectedBy)`; code in `shared/…/core/headphones/ListeningLayer.kt`.
+**Setting.** `SettingField.HEADPHONE_MODE` (`headphone_mode`: AUTO default / ON / OFF), `normalize()`, merge rule (newest
+wins, ties to the watch, future phone stamps refused: unchanged machinery), DataStore key + stamp in `VoxaraStore`, phone
+Settings → "Headphones mode" (3 rows), EN + ES strings on both apps.
+**Detection.** `HeadphoneMonitor.rawConnected()` [historical: now `HeadphoneWatcher.current().connected`, see "Current watch detection"] (the watch's outputs: wired / USB / Bluetooth A2DP / BLE, speakers and car
+kits excluded when `BLUETOOTH_CONNECT` is granted) and the phone's opt-in listening sync (`ListeningSyncService` records the end
+of the latest span in `ExposureRepository.phoneHeadphonesAtMs`; a report counts for 16 min, labelled "Auto · from phone").
+Hysteresis in `ListeningLayer`: ~3 s to enter, ~10 s to leave (a flapping link never replays the transition), manual choices
+immediate, detection tracked underneath so going back to Auto continues from what is really connected. The service has its
+own loop (`layerLoop`) because the burst ladder can be a minute apart when quiet: a device event, a phone report or a
+choice change wakes it at once (`ExposureRepository.layerWake`), otherwise it looks every 5 s (1 s while a change waits).
+**Measured on the real watch** (the watch's own clock, simulated phone report): on after **3.1 s**, off after **10.1 s**.
+**Safety — the layer can only ADD.** `ListeningLayerPolicy` spells it out and `ListeningLayerSafetyTest` pins it, walking every
+layer state: the alert settings are the wearer's own (never lowered), the same day through the real `AlertEngine` gives
+identical alerts with the layer on, off, manual or detected, a loud room still raises AMBIENT_LOUD / DAILY_100 / WEEK_100, room
+minutes are still written (`planBurst.foldAmbient`), the double-count rule is unchanged (one ledger per span), and a manual Off
+with headphones connected still records the listening estimate. One real fix came out of it: while headphones owned a span the
+room level used to skip the sustained-level alert window, so a loud room could go unwarned exactly when headphones were on
+(the dose rule is unchanged: the span still belongs to one ledger); `feedSustained` is now always true.
+**What changes while it is on.** The Overview hero (ring splits into two indigo ear-cup arcs that rise with the estimated
+level, stereo waves, figure = "≈ level" or the week's share of the listening allowance when nothing plays, the outside level as a
+moon in the top gap, a chip "Headphones / Auto or Manual" in the bottom slot; Tono's line and the outside level move to the first
+details); the Headphones page moves to second place (the pager keeps the wearer on their page, by key); Mode screen: a
+"Headphones mode" section (Auto / On / Off, what was detected, the rule); the Overview's first detail is a one-tap quick
+switch (it returns to Auto when Auto would give the same answer: `quickToggleChoice`); the chip on Now and the More page read
+"Auto · Street + Headphones"; the ongoing notification, the tile (indigo line) and the complication's description say so;
+ambient shows a still two-arc outline with a small headphones icon and the estimated level; TalkBack announces
+"Headphones mode on, outside sound still measured". Haptic: `Pattern.HEADPHONES` (two soft low ticks, not an alert) through its
+own `ModeChangeHapticGate` (30 min apart, 6 a day, not in the first 5 min, not near an alert, not in quiet hours or power
+save); a manual switch gives the usual `CONFIRM` tap instead.
+**The transition** (`LayerTransition.kt`, `HomeScreen.kt`, `Orbit.kt`; about 900 ms in, 700 ms out), staged: (1) the 250° ring
+opens at the top into two arcs with a spring (damping 0.55) and turns indigo; (2) from 120 ms the wave rings morph to the
+stereo shape (two lobes, left half mirroring the right); (3) from 240 ms the old centre fades out and the listening centre
+fades in, the digits rolling from the outside level to the estimate; (4) from 300 ms the outside level leaves as the moon in a
+half orbit and settles in the top gap with its own zone colour; (5) the curved label "Headphones mode" appears at the bottom,
+holds and fades while the old foot and page name fade under it, then the chip appears. Out: the moon returns to the centre and
+is the figure again, the arcs rejoin. Reduced motion: only the centre cross-fades (250 ms). Ambient or screen not resumed: no
+animation (state jumps). Only while visible: a page composed later shows the final state, no replay. If an alert was
+delivered within the last minute, or arrives during it, the alert wins and the picture jumps to its end (`lastAlertAtMs`).
+No blur; `Stroke`s cached, colours inline; the halo brush is not rebuilt per frame (rings are tinted apart from the halo).
+Frame strips and recordings: `docs/design/watch-redesign/headphones-mode/` (real-watch GIFs `watch_enter.gif`,
+`watch_leave.gif`, mp4s, strips, plus deterministic JVM frame strips from `MotionFramesTest`).
+
+**Debug tooling (debug build only).** `Bench` takes display-only commands over adb (`am broadcast -a com.example.voxara.DEBUG
+--es hp ON|OFF|AUTO --ei listen 85 --ed dba 66.0 --ez phone true --ez alert true`); absent from the release APK (checked in
+every dex).
+
+### Results
+- Unit tests: `:shared` **126**, `:app` **174**, `:phone` **38**, all passing (new: `ListeningLayerTest`,
+  `ListeningLayerSafetyTest`, `LayerTransitionTest`, `StatusFitTest`, `FaceGeometryTest`, contrast additions; contrast
+  thresholds untouched). `:app:assembleDebug`, `:app:assembleRelease`, `:phone:assembleDebug` build; `:app:lintDebug`
+  **0 errors**.
+- Real watch (SM_L300, 203 dp, Spanish), debug build: all pages at font 1.0 / 1.3 / 2.0, headphones mode pages, the transition
+  (recorded at ~41 fps), the hysteresis. Frame stats (`dumpsys gfxinfo`): idle Overview 510 frames in 8 s, 0.39 % janky,
+  idle in headphones mode 488 frames, 0.82 % janky; across five enter + leave cycles 1370 frames, 3.4 % janky, 99th
+  percentile 125 ms (a hitch at the start of each transition, the first composition of the second centre).
+- XL emulator: the same pages and states. Its software GPU janks the transition (a few frames a second): use the watch for timing.
+
+### Not verified, and what to test by hand with real headphones
+- Real Bluetooth / wired headphones were not available: detection by the watch's own outputs is covered by the state-machine
+  tests and by the service loop driven from a simulated phone report, not by a real connect. Pair earbuds to the watch: the
+  layer should turn on ~3 s after they connect (and the soft double tick if it is more than 5 min since the monitor started),
+  off ~10 s after they go; try a short Bluetooth drop (< 10 s: nothing should happen).
+- A Bluetooth speaker or car kit: without the optional Bluetooth permission it is indistinguishable from headphones and turns
+  the layer on; grant "Allow Bluetooth details" and it must not.
+- The phone's report is coarse (one span per 15 min and at connect edges; it cannot say when listening stopped), so "Auto · from
+  phone" can lag up to 16 min after the earbuds come off; switch it off by hand then.
+- The soft haptic: distinct from the alert patterns and from the mode-change swell? Quiet hours / power save should suppress it.
+- Playing music: the hero should lead with "≈ level" and the Headphones page rise to second place; pause: the week's share.
+- Battery with the mode on for hours (one wave clock, as before; the layer loop wakes every 5 s).
+- Transition feel on the wrist at 60 Hz, and the hitch at its start (first composition): tell me if it is visible.
+- TalkBack: the announcement, the chip and the Overview description.
+
+
+---
+
+## Phone: headphones mode setting and the watch's "situation + headphones" ✅
+- **Settings.** The three-row list (Auto / On / Off with blurbs, a second tall block under Mode) is now one group like Alerts and
+  Appearance: a status row (headphones icon, indigo while on: "Headphones mode is on", the watch's mode, why, how fresh) above a
+  segmented Auto / On / Off control ("How it switches", the selected choice's blurb, the "Pending sync" tag). The rule note stays.
+- **Watch status carries the layer.** `WatchStatus.headphonesMode` + `headphonesSource` (`hp_mode`, `hp_source`; older watches
+  mean off, an unknown source falls back to none). `CompanionLink.status` fills them from the live layer while the dosimeter runs,
+  otherwise only a manual On holds. The status is still sent when the phone syncs, so it is "as of" like the rest.
+- **Home.** A pill in the hero under Tono's line: "Auto · Transport + Headphones" (indigo + headphones icon while on, neutral with
+  the watch icon otherwise), spoken as "Mode on the watch: …".
+- **Watch screen.** "Mode on the watch: Auto · Transport + Headphones" and, while on, an indigo line "Headphones mode is on ·
+  detected by the watch / reported by this phone / switched by hand".
+- Strings EN + ES; `ModeState.kt` holds the helpers. Tests: WatchStatus round trip (shared), `PhoneScreenshotTest.headphonesMode`
+  (Home, Watch, Settings at 1.0 / 1.3 / 2.0, dark). All shared / app / phone tests, `assembleDebug` (app, phone), `assembleRelease`
+  and both lints pass.
+
+
+---
+
+## Watch redesign — pass 4 ✅
+Six pager pages were too many (users got overwhelmed): **Overview, Now, Today, Week, Headphones, More** became **Now, Dose, More**,
+with no function lost. impeccable distill, layout, animate, polish and audit (native) on the watch; evidence, the map of where every
+piece of information went, the distill and critique notes and the by-hand checklist are in `docs/design/watch-redesign/pass4/`
+(`README.md`; `before/`, `after/` and `compare/` from the real Galaxy Watch 7 and the XL emulator, `jvm/` renders, morph frame strips).
+
+**Now (Ahora)** = Overview + Now. The Now design is kept (dBA scale with four zones, marker, big rolling figure, zone tag, "Uncalibrated
+estimate"). Tono's line is a small tappable tag (`TonoTag`: sparkle for cloud wording, tap = Ask) in the ring's gap over a short dose
+line ("46% of today" / "Not adding · 46% today"). The gap is only about 49 dp tall at 203 dp, so `PageStage` now hands the foot its
+room: the tag is 2 lines, 1 line, or the first detail row (never an ellipsis); the full dose sentence is the first detail. The visible page
+name is gone (TalkBack: "Page 1 of 3, Now"). Headphones mode transforms this page exactly as it did Overview: `NowRing` opens the dBA scale
+at the top into the two arcs, the same waves, moon, label and chip; the figure is one continuous rolling number from the outside level to
+the estimate.
+
+**Dose (Dosis)** = Today + Week on one ring: `DoseMorph` draws the 24 hourly bars and the seven day segments and morphs between them (bars
+retract into the rim in turn, segments fill in, 520 ms; the figure rolls; reduced motion = cross-fade). The **Today | Week** switch (a 48 dp
+two-tab pill where the page name was; selected segment = the label) or the **crown** flips the view. The crown flips only while the page
+rests at its top (`HeroList(onRotary)` is an `onPreRotaryScrollEvent`); scrolled, or on Week turning on clockwise, it scrolls the details,
+so it does not fight the pager or the list. Today keeps its details; Week gets "Around you 10% · Headphones 3%" as its first detail and the
+headphones group (listening history, empty state, phone note, and the live rows when headphones mode is off). Each view keeps its spoken
+description. At large fonts or under 200 dp the gap shows only the view's name and the switch is the first detail row.
+
+**More** unchanged in content. The reported bug (the last items under the page dots): the bottom scrim is now solid black exactly where
+the dots sit and fades in above them, and the pager's lists keep their bottom inset, so a list's last visible item never shows through the
+dots and every item scrolls clear of them (checked at rest and scrolled to the end on the watch and the emulator).
+
+**The Headphones page is gone**: its live estimate is Now in headphones mode (status, range, time left and "why estimated" in its details), its
+weekly share is Dose / Week, its settings are in Mode (the Bluetooth permission button moved to the Mode screen's headphones section) and Settings.
+
+**Links.** `Routes.HOME/NOW` open Now, `TODAY` and `WEEK` open Dose on that view, `HEADPHONES` opens Dose on Week, `MENU` opens More
+(`GlanceTarget`). `PageLinks` (`voxara://watch/<page>` and the `voxara.page` extra) opens a page as the root, so swiping back leaves the app. Before this
+pass tiles and complications named no page (they all opened Overview): the dose tile and complication now open Dose / Today, the listening
+tile and complication open Dose / Week.
+
+**Other.** `LevelNumber`'s glow no longer takes layout room (the figure is as tall as its line; the look is the same). The debug `Bench` takes a
+`--ef crown <clicks>` broadcast that delivers a real rotary scroll event (the emulator cannot be sent one over adb); release builds do not have it.
+Strings: added `page_dose`, `week_breakdown`, `now_foot_idle` (EN + ES); removed `page_home`, `week_foot_room`, `week_foot_hp`, `card_week_share`, `cd_headphones_week`.
+Removed code: `HomePage`, `TodayScreen`, `WeekScreen`, `HeadphonesScreen`, `OverviewRing`, `DoseRing`, `DayClock`, `WeekRing`, `ListeningScale`, the page-order-by-mode logic.
+
+### Results
+- Unit tests: `:shared` **127**, `:app` **187**, `:phone` **39**, all passing. New: `GlancePagerTest` (3 pages and "Page n of 3", the crown flips Today and
+  Week both ways, the switch taps, each view's spoken description, the week breakdown, every route and link lands on its page and view,
+  swiping right on the first page returns to the screen behind), the morph frame strips in `MotionFramesTest` (and the reduced-motion one); the
+  screenshot harness adds 203 dp (the watch). Contrast tests untouched.
+- `:app:assembleDebug`, `:app:assembleRelease`, `:phone:assembleDebug` build; `:app:lintDebug` and `:phone:lintDebug` **0 errors**. The release APK has no Bench and no developer tools.
+- Real watch (SM_L300, 203 dp, Spanish, debug build): Now (calm, uncalibrated), Now in headphones mode (playing and idle), Dose on Today and Week, More at rest and
+  scrolled to its end, font 1.3 and 2.0, the morph driven by a real rotary event (`compare/watch_morph_strip.png`). XL emulator: the same pages and the crown.
+  A real crown or touch bezel, real headphones and the tile and complication taps were **not** exercised: see the checklist in `pass4/README.md`.
+- One bug found by the test, not the watch: the crown handler's "quiet after a flip" timer started at 0, so a rotation in the first 380 ms of a process's uptime was ignored; it now starts unset.
+
+
+---
+
+## Automatic headphones, live listening, volume alerts, faster Auto, stable link ✅ (no watch or phone connected: JVM only)
+No git command that modifies the tree was used. The API key was read from `local.properties` by scripts and never printed.
+**No device was reachable over adb**, so nothing below was measured on hardware; every claim that needs a watch or a phone is in
+"Not verified" at the end.
+
+### Diagnosis (what was wrong, with the evidence)
+1. **Headphones mode on, but no data.** The mode and the recording used two different detectors. The mode came from `layerLoop`
+   (raw, 3 s); recording came from `HeadphoneMonitor.snapshot()` [historical: removed, see "Current watch detection"] read once per burst (up to 60 s apart when quiet) through a second
+   debouncer, so it could be on for 1–2 minutes with nothing recorded. A phone report or a manual On never recorded on the watch (its
+   own category was null). The phone sampler (15 min, opt-in) credited the whole interval if playback happened to be active at that
+   instant and nothing otherwise, and reset its span at Bluetooth edges. The watch UI read headphone figures only from the dosimeter
+   service, so phone minutes written to SQLite never reached the screen while monitoring was off. Also by design (pinned by
+   `ListeningLayerSafetyTest`): a loud room owns a span, so the headphone ledger gets none of it.
+2. **Latency.** The estimate was published once per burst (60 s idle) and there was no volume or playback listener anywhere; the phone
+   sent one span per 15 min. The 30 s heartbeat is only proof of life and was not the cause.
+3. **Tono.** Cloud side is fine: key present (35 chars) and in the debug `BuildConfig`; `GET /models` = HTTP 200 with `deepseek-flash`
+   and `deepseek-v4-pro`; four real requests (EN and ES) answered in ~1.3 s and all passed a port of `ReplyValidator`. The causes on the
+   watch are the consent default (OFF), the Now page asking only once (`LaunchedEffect(tono)`, not on consent), the Bluetooth-proxied
+   network with 8 s / 12 s timeouts, and failures logged only as an opaque code. Release has no key and no INTERNET on purpose.
+4. **Disconnections.** The watch was passive (status only when the phone pulled), had no reachability tracking and no UI for it; the
+   phone refreshed the link only on capability events, app open and an hourly worker that never retried sooner; a mirrored limit alert
+   was fire-and-forget; battery optimisation was only displayed. Manifest filters were correct.
+5. **Auto detection.** Before: cold start / Street→Transport = 180 / 240 s (IDLE), 90 / 210 s (AMBIENT), 30 / 160 s (ACCRUING). Votes
+   were weighted equally over a 5 min window (old votes dragged the average), 3 votes + 2 evaluations + a 4 min dwell.
+
+### Phase 1 — automatic detection (watch and phone)
+- Manual headphones mode removed from both UIs. Compat: the `headphone_mode` field stays in the settings document; the watch ignores any
+  stored or received On/Off, answers Auto with a newer time so an older phone settles on Auto, and an older watch's value is carried and
+  ignored on the phone (`AutoHeadphonesCompatTest`).
+- `HeadphoneWatcher` (:shared, used by both): `AudioDeviceCallback`, `AudioPlaybackCallback` (a trigger; the answer is the documented
+  `isMusicActive`), the music-volume broadcast and the settings provider (best effort, undocumented, never trusted), and a 2 s guard that
+  runs **only while headphones play**. `chooseRoute` (pure): wired/USB → BLE headset → A2DP; speaker/car kit never; with
+  BLUETOOTH_CONNECT denied A2DP counts as headphones and is flagged **possible speaker** ("Posible altavoz" on the chip, Mode screen,
+  details, phone card).
+- Phone background (official docs checked): the four Bluetooth connection broadcasts are manifest-exempt; `ACTION_HEADSET_PLUG` is not;
+  a Bluetooth broadcast is **not** an exemption for starting a foreground service on Android 12+. So: `PhoneListeningService`
+  (`connectedDevice`, needs `FOREGROUND_SERVICE_CONNECTED_DEVICE` and a declared prerequisite permission, `CHANGE_NETWORK_STATE`) is started
+  from the visible app, at boot and after an update; from a Bluetooth broadcast as best effort; if refused, one sample is taken
+  (`ListeningSampler` is now only the fallback and stands down while the service runs). Battery optimisation off lifts the restriction.
+- BLUETOOTH_CONNECT is asked in context the first time something connects over Bluetooth while the phone app is in front.
+- The phone's sharing switch (opt-in, OFF by default) was **kept**: it is the consent for sending listening to the watch, not the mode.
+
+### Phase 2 — headphones record data
+- `ListeningTracker` cuts a span at every event (connect, play, pause, volume) at the level then in force; seconds follow the ears, not the
+  sampling period. Spans go to the headphone ledger with their origin (watch = 0, phone = 1) and count toward the weekly dose; a minute
+  reported by two devices counts once (the louder). No playback → nothing, even with headphones connected. Constants unchanged
+  (`HeadphoneProfile`: 100 dBA at full volume, ±10 dB); the estimate is labelled an estimate everywhere.
+- Today's **listening seconds** are counted separately (any ledger), so "Listening today: 40 min" is honest even when the room owned the
+  dose; a note says so. Phone spans carry a `coarse` flag: exact spans keep the estimate's confidence, the fallback sampler and older
+  phones stay VERY LOW.
+- Not changed, deliberately: the double-count rule between the room and the headphones (one ledger per span) and the daily dose
+  (ambient engine). See "Decisions".
+
+### Phase 3 — latency
+- Watch: events + guard tick (≤ 2 s) → UI in ≤ 3 s **by construction**; `HeadphoneWatcherLatencyTest` proves the guard fires within 2 s
+  of an unannounced volume change and that nothing ticks when nothing plays.
+- Phone → watch: `PhoneListeningState` sent on every change as a **message** (real time) and as **one overwritten data item** (durable,
+  a watch that was off reads it back), ≥ 0.4 s apart, repeated every 60 s while connected so "fresh" (3 min) stays true. Finished spans go
+  to the ledger as idempotent data items through a persisted outbox. Bound by design: ≤ 2 s guard + 0.4 s + Data Layer delivery ≈ the 10 s
+  target; the Data Layer's own delay was not measured.
+
+### Phase 4 — volume alerts
+- New `AlertKind.HEADPHONE_OVER_SAFE` (WARNING) in the existing `AlertEngine`: above 80 dBA after 8 s over; tiers 1 (>80), 2 (≥90),
+  3 (≥100); a higher tier always alerts, the same tier again after the engine's 30 min cooldown; ≤ 75 re-arms; held in quiet hours and
+  snoozable like any warning; always vibrates (QUICK_TRIPLE through `HapticConductor`). `ModesNeverWeakenAlertsTest` and
+  `AlertFloorsTest` untouched and passing.
+- In-view panel on Now (`HeadphoneAlertPanel`, round overlay like the limit alert): **Lower to safe volume** (≥ 48 dp, says what
+  happened, including fixed volume / nothing playing / phone unreachable; announced to TalkBack) and **Dismiss** (below the first screen;
+  closes the tier, writes nothing, mutes nothing). The same two actions on the notification (`AlertActionReceiver`). Phone headphones:
+  the watch sends `/voxara/hp/cmd/lower` with an id; the phone lowers, reads the volume back and answers with the same id; no answer in
+  6 s = "could not reach your phone" (never queued: a volume that drops minutes later would be a surprise). Headphones on the phone also
+  alert **on the phone** (same engine, its own notification and vibration; `VIBRATE` declared: lint caught that it was missing).
+- Lower target: the highest step whose estimate is ≤ 80 dBA (`safeVolumeIndex`), never raises, verified by reading the volume back.
+
+### Phase 5 — faster Auto (licence gate and weights untouched)
+Recency-weighted by the **time** each vote covers (half-life 60 s), `minVotes` 3→2, dwell 4 min→90 s, plus a small budget of fast
+votes (every 15 s, 8 tokens, one earned per 90 s) while unsure or while a different scene knocks. Measured on the real detector
+(`AutoModeLatencyTest`, a clear 0.8 lean), seconds, ladder alone → with fast votes:
+
+| step | cold start before | cold start now | Street→Transport before | now (ladder) | now (fast votes) |
+|---|---|---|---|---|---|
+| IDLE (60 s) | 180 | 120 → **30** | 240 | 120 | **75** |
+| AMBIENT (30 s) | 90 | 60 → **30** | 210 | 90 | **75** |
+| ACCRUING (10 s) | 30 | 20 | 160 | 60 | 60 |
+
+No more flicker: a 45 s blip and alternating evidence change nothing at any cadence, with or without fast votes. Two older tests that
+pinned the slow timings were updated on purpose (`AutoModeDetectorTest`: first detection at the 3rd vote; dwell measured from the real
+detection). Real scenes are less clear than 0.8, so real times will be longer: not measured on a watch.
+
+### Phase 6 — stable link
+- `LinkMonitor` (connected / reconnecting for 60 s / disconnected since X) on both devices; shown on the watch's More page and on the
+  phone's Home chip, Watch screen and Headphones screen. Watch: `PhoneLink` (capability lookup every 30 s while monitoring and every
+  15 s while the app is open, plus `HeadphoneSyncService` for capability changes with the app closed). Phone: `PhoneListenerService`
+  reacts to capability changes; when the watch is back it syncs and flushes by itself (`onWatchEvent`).
+- Idempotent pending queue (`Outbox`, keyed, persisted): phone listening spans and the watch's mirrored limit alert (dropped after 10 min).
+  Settings, status and the live headphone state are single overwritten data items, so a resend is never a duplicate.
+- `WearableListenerService` filters: new `HeadphoneSyncService` on the watch (`/voxara/hp` messages, `/voxara/hp/state` item, capability);
+  `/voxara/hp/cmd/lower` on the phone. Both started by Play services with the app closed.
+- Phone battery guidance (EN/ES): a card on Home, Watch and Headphones that opens the app's settings (Samsung: Battery → Unrestricted),
+  hidden for a week when dismissed. It guides; it never changes the setting. (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` was not added: it needs
+  a Play policy justification.)
+
+### Tono
+The Now status refreshes when cloud consent changes; timeouts 15 s connect / 25 s read; failure reasons carry the exception class and the
+time (never the key or the text); the Ask screen shows the reason in **debug builds only**.
+
+### Decisions made on your behalf (please review)
+1. Kept the phone's opt-in switch (consent), default OFF.
+2. Kept the room-vs-headphones ownership of a span (pinned by `ListeningLayerSafetyTest`); the listening minutes are shown separately.
+3. The daily dose is still the ambient engine's; the headphone ledger counts toward the weekly dose and its alerts. Adding headphone
+   NIOSH dose to today's figure would touch every surface, tile and alert input: not done.
+4. The "recommended level" is 80 dBA = the WHO 1.6 Pa²h/week reference at 40 h/week (a test checks the arithmetic).
+5. When the watch's dosimeter is not running, headphones on the **phone** still alert on the watch from the last saved figures
+   (`PhoneListeningAlerts`); the watch's own headphones are only tracked while monitoring runs (the mic service needs a visible start).
+
+### Results
+- Unit tests: `:shared` **180**, `:app` **216**, `:phone` **48**, all passing. New: `HeadphoneAutoDetectionTest`, `ListeningTrackerTest`,
+  `EffectiveListeningTest`, `HeadphoneOverSafeAlertTest`, `HeadphoneWireTest`, `LinkHealthAndOutboxTest`, `AutoModeLatencyTest`,
+  `HeadphoneWatcherLatencyTest`, `AutoHeadphonesCompatTest`, `WatchBridgeOutboxTest`, 3 reconnect tests in `SyncCoordinatorTest`,
+  2 in `PhoneListeningTest`.
+- `:app:assembleDebug`, `:app:assembleRelease`, `:phone:assembleDebug`, `:phone:assembleRelease` build; `lintDebug` and `lintRelease`
+  of both apps: **0 errors**. Release APKs: no API key, no scene-weights class, no INTERNET (checked on the built APKs).
+- Roborazzi captures (192, 203, 216, 240 dp; font 1.0 and 1.3, the alert panel also 2.0; EN and ES): `app/build/screenshots/hp_*`,
+  `es_hp_*`, `link_*` (watch) and `phone/build/screenshots/hp_live*`, `link_*`, `battery_guide_*` (phone, also ES). Reviewing them found
+  and fixed: a cut level line, a button label ending in an ellipsis at 1.3×, a clipped chip line, a link value cut off, stale 15-minute
+  wording in the phone's consent text. Debug-only: `--es hpalert 2:93.0[:phone]` and `--es hplower <OUTCOME>` show the panel on a device.
+
+### Not verified (needs hardware) — what to test yourself
+See the final message of this session; it is repeated here so it survives: Bluetooth and wired headphones on the watch and on the phone
+(connect, play, pause, volume up: how fast the watch follows; remove them); a Bluetooth speaker and a car kit (with and without "Allow
+Bluetooth details"); the alert's haptic, notification and both actions on the watch and on the phone, including "Lower" on a phone whose
+volume is fixed and with the phone out of range; turning the watch off and on, leaving the app, killing the phone app on Samsung with and
+without "Unrestricted"; the foreground service starting from a Bluetooth connect with the phone app closed (expected to be refused on
+Android 12+ unless excluded from battery optimisation); the `VOLUME_CHANGED_ACTION` event (undocumented) versus the 2 s guard; Tono on
+the real watch (consent on, Wi-Fi off, then the Ask screen's debug reason); Auto detection times in real places.
+
+## Reliability audit (watch ↔ phone) ✅ (JVM only: no watch or phone was connected)
+No git command that changes the tree was used. Documents: `docs/reliability/FEATURE_MAP.md` (every feature and every piece of
+cross-device data: owner, direction, transport, path, version, retry), `docs/reliability/AUDIT.md` (13 fixed problems with cause,
+fix, test and file:line; 8 left open with reasons), `docs/reliability/TEST_PLAN.md` (31 manual checks for the Galaxy Watch 7 + phone).
+
+### Fixed (details and tests in AUDIT.md)
+- **Data loss:** phone listening spans in the same minute erased each other on the watch (now added, once each: `mergePhoneMinute`,
+  `PhoneSpanReceiver`, `SeenKeys`); "Delete all data" left queued listening that came back (`WatchBridge.discardPending`); NaN / future-dated
+  spans (`sanitizePhoneSample`); a limit alert queued during an outbox flush was dropped.
+- **Disconnection:** a 20 s request timeout was swallowed as a cancellation and never shown as a sync problem; phone → watch settings were
+  lost when the phone clock was > 5 s ahead or the watch app was not running when they were sent (clamp instead of refuse, "pending" by value,
+  the watch now reads the phone's settings item when the phone becomes reachable); the reconnect catch-up was skipped when another message
+  had already marked the link connected (both devices); clock tolerance for mirrored alerts and the phone's live state raised to 5 min.
+- **Other:** CSV export off the main thread; sync window follows the phone's retention; `LinkMonitor` thread-safe; `mergeByMinute` deterministic.
+
+### Tests
+New: `FakeDataLayer` + `InMemoryMinuteStore` (shared test fixtures), `PhoneSpanSyncTest` (11), `SyncCompatibilityTest` (13: old ↔ new
+payloads, worst-case window, retention window, minute landing mid-fetch, threads), additions to `SettingsMergeTest`, `MirroredAlertTest`,
+`HeadphoneWireTest`, `SyncCoordinatorTest` (+5), `WatchBridgeOutboxTest` (+1). One existing test was changed on purpose: the one that
+pinned "a future phone timestamp is refused" now pins "accepted at the watch's now" (the old behaviour was bug F5). `ListeningLayerTest`
+only renamed `refusedFuture` → `clampedFuture`. `ListeningLayerSafetyTest`, `ModesNeverWeakenAlertsTest`, `AlertFloorsTest` untouched.
+
+### Not fixed / needs hardware
+See AUDIT.md "Not fixed" (release signing S1 first) and TEST_PLAN.md.
+
+### Results (checkpoint A)
+`:shared` 207, `:app` 216, `:phone` 54 unit tests, 0 failing. `:app`/`:phone` `assembleDebug` and `assembleRelease`, `lintDebug` (0 errors; 201 / 97
+warnings, none new by hand), `verifyReleaseHasNoSceneWeights` (both): build successful. Phone redesign (Part B) not started: waiting for checkpoint A.
+
+
+---
+
+## Reliability audit: follow-ups after checkpoint A ✅ (JVM only)
+Asked after checkpoint A: two items from the "not fixed" list, then `/code-review` on the Part A diff.
+
+**1. Delete all while the dosimeter runs (was S7).** The running dosimeter held the minute in progress, the open listening span and its
+alert windows in memory and would have written them back. Now: `LedgerBook.wipe(nowMs)` (synchronized) drops the in-progress minute,
+clears every stored minute of its kind and fences the ledger, so a span that began before the delete keeps only its part after it
+(`secondsAfter`); `CompanionLink.deleteAll` wipes the live ledgers (`ExposureRepository.liveLedgers`), clears the database, zeroes the
+engine (dose, weekly, peak) and bumps `wipeGeneration`; the service then forgets its alert windows, the open tracker span, today's listening
+seconds and the alert memory (`syncWipes`). The phone does the same for its side: `WatchBridge.discardPending` records the delete time
+(`PhonePrefs.wipedAtMs`), `enqueueSpan` and `flushSpans` clip every span to it (`clipToFloor`), and a flush that was running while the queue was
+emptied can no longer put the old items back. Tests: `DeleteAllPrivacyTest` (7), `WatchBridgeOutboxTest` (+1). Residual: a listening item already
+handed to the watch's listener at the very instant of the delete (the phone deletes its own unconsumed items).
+
+**2. Alert history off the main thread (was S3).** `AlertHistoryWriter` (`:shared`): one daemon thread, in order, after the haptic and the
+notification; a row for an alert delivered before the last delete is dropped; failures are reported, never thrown. `AlertFloorsTest` untouched.
+Tests: `AlertHistoryWriterTest` (5). Residual: "Got it" tapped within milliseconds of the alert could run before its row exists.
+
+**Code review (Part A diff, high).** 10 findings.
+- Fixed: (1) a future-dated phone setting is accepted once and its redelivery can no longer undo a later watch edit (`SettingsMerge.futureSeen`, kept
+  in `voxara_phone_future_stamps`); (2) `PhoneOutbox.flush` serialised with a mutex and saves the queue as it is NOW minus what it sent; (4) the watch's
+  catch-up runs again after a cancelled catch-up or a failed send (`wasReachable`); (5) an alert evaluation in flight during a delete delivers and
+  remembers nothing; (7) the history write and the delete are one step (`AlertHistoryWriter.wipe`); (9) the phone's live state is fresh by the watch's own
+  arrival time when known (`receivedAtMs`), so a phone clock that is ahead cannot stretch "live"; (10) the pending count ignores spans about to be dropped for age.
+- Fixed in part: (6) one failing span write no longer aborts the batch; the "key recorded before applying" trade (lose one span rather than count it twice) stays on purpose.
+- Dismissed: (3) the long sync in `onCapabilityChanged` is S2, left as is on request; (8) two spans with one end time cannot come from one tracker (its spans end at
+  strictly increasing instants) and the key is part of the wire format.
+- Tests added: `SettingsMergeTest` (+1), `HeadphoneWireTest` (+1), `SyncCompatibilityTest` (+1), `AlertHistoryWriterTest`.
+
+---
+
+## Phone redesign: Part B, checkpoint B (superseded by the section below)
+impeccable `context`/`init` (surface brief, mode Operate), dataviz for the charts. Everything is in `docs/design/phone-redesign/`:
+`SURFACE_BRIEF.md`, `before/` (280 renders: 3 widths × font 1.0/1.3/2.0 × light/dark, plus full length, states and every accent), `baseline-critique.md`
+(26/40) and `baseline-audit.md` (13/20), `concepts/` (two concepts for Home and Trends, README with the comparison, the information map and the
+decisions needed). Waiting for the choice of concept before B3.
+Tooling added: `PhoneFixtures` (shared fake data), `PhoneRenderMatrixTest` (the same matrix for before and after; opt-in with `VOXARA_SHOTS_DIR`),
+`PhoneConceptsRenderTest`, and `shared-ui/.../DigitCells.kt` (digit-cell numerals without Material, to be used by the phone and the watch).
+Material 3 in this build: `material3` 1.4.0 and `material3-adaptive-navigation-suite` 1.4.0 (BOM 2025.12.00), `adaptive` 1.2.0.
+
+## Phone redesign ✅ (JVM only: no phone or watch was connected)
+Chosen at checkpoint B: concept A (the ring) for Home, the Ledger's charts for Trends, four tabs, the care score as a line in Trends. Evidence, the
+information map, the animation list and the before/after scores are in `docs/design/phone-redesign/` (`README.md`); style in `docs/design/STYLE.md`
+(§2, §3, §4, §5e, §6, §8) and `DESIGN.md` (Voxara Phone). Critique 26/40 → 35/40, audit 13/20 → 18/20.
+
+### What was built
+- **Home**: status line, the 250° ring (figure that always fits, caption and zone word as its own label, both leave the ring at large text), Tono's sentence (opens Tono), the uncalibrated note while it applies, two tiles (last 7 days, headphones), the day hour by hour, the last alert; the phone's live headphone card appears while its headphones play. Two panes from 840 dp.
+- **Today** (the ring grows into it): where the day went (cumulative, ends exactly on the figure), hours, minutes, numbers, alerts. **Trends**: Material 3 segmented Day / Week / Month, one hero and one chart per range (hours; seven capped columns; a heat calendar with today ringed and the month named), the rolling weekly allowance, the headphones' share, the care score as a line, "Ask Tono"; two panes from 840 dp.
+- **Watch** (calibration and battery open in their rows, troubleshooting is one row), **Settings** (ten groups → six, headphone type moved in), **Headphones** (sharing moved to Settings), **How it works** (gained the sharing explanation), Setup, Tono, the Glance widget (the watch's ring and digits).
+- `HearingFigures` (one source of every number), `DigitCells.kt` in `:shared-ui` (the watch's `Numerals.kt` is now a wrapper), M3 `Switch`, wave pull-to-refresh, theme and accent crossfade, press feedback, shared-element transition, chart draw-in, number roll; all honour "remove animations".
+- Idempotent "Got it": `AlertHistoryWriter.resolve` is queued behind the alert's own row (notification actions and the headphone dismiss use it).
+
+### Fixed after the concept renders (fixture vs real logic)
+Numbers that disagreed (83 vs 89 %, 64 vs 90 %, "49 points more"): fixture (status typed by hand, not derived from the ledger) **and** label (surroundings only vs surroundings plus headphones, both called "this week"); plus a real-logic risk (Home read the watch's status, Trends the ledger). Calm state with an 80 % alert: fixture; the real engine cannot raise it (`FiguresConsistencyTest`; only "clear today" on the watch can leave an alert above the day's dose). Dates (header Tuesday, week and calendar disagreeing): fixture. Tono "afternoon": fixture (the real snapshot derives day parts from the hourly data). The month hero, the "OK of today's allowance" phrase, the struck-through "100%", "85" without unit, the tile tick, the tall cumulative chart, the alert row, the dark calendar, the loose digit cells: labels and drawing, fixed.
+
+### Tests
+Added `FiguresConsistencyTest` (8), `FontScaleLayoutTest` (2: 16 screens at 1.3 and 2.0), `ChartColorsTest` (3: every accent × theme, plus colour-blind distance), `WidgetArtRenderTest` (2), `AlertHistoryWriterTest` (+3). One colour changed to pass (Emerald dark fill `#10B981` → `#34D399`); no threshold was touched. Removed: the concept code (`phone/src/test/.../ui/concepts/`); `docs/design/phone-redesign/before/` is in `.gitignore`.
+
+### Not verified (needs hardware)
+Everything on a real phone: the ring and charts at real density, the shared-element and pull-to-refresh feel, the widget on a launcher (Glance tint and the 2×2 size), TalkBack reading order, font 2.0 on a real device, the Samsung Galaxy Watch 7 side of the link.
+
+## Current watch detection (what replaced `HeadphoneMonitor`, which is deleted on purpose)
+`app/…/audio/HeadphoneMonitor.kt` was removed when headphones became automatic and event-driven (the diagnosis it was removed for is under "Diagnosis" above: two detectors, one per minute). Nothing it did is missing:
+
+| It did | Now |
+|---|---|
+| Read the watch's own outputs: wired / USB / Bluetooth A2DP / BLE; speakers, car kits and hearing aids excluded by output type and Bluetooth class (`BLUETOOTH_CONNECT`) | `HeadphoneWatcher` (`shared/…/audio/HeadphoneWatcher.kt`): `kindOf` L258, `hintOf` L268, `btHint` L203, `read()` L174 calling `chooseRoute` (`shared/…/core/headphones/Headphones.kt` L126) and `categoryOf` (L46); without `BLUETOOTH_CONNECT` A2DP counts as headphones with `possibleSpeaker` (L117). Started in `DosimeterService.kt` L254 and L359, `usualCategory` set at L279 |
+| `rawConnected()` (raw input to headphones mode) | `headphones.current().connected` (`DosimeterService.kt` L605 in `layerLoop`), kept fresh by `AudioDeviceCallback` and playback/volume events and a 2 s guard tick only while playing (`HeadphoneWatcher.kt` L99, L104, L116, L251) |
+| The 3 s in / 10 s out hysteresis | `ListeningLayer.update` (`shared/…/core/headphones/ListeningLayer.kt` L85-L102; `ENTER_MS` 3 s L115, `LEAVE_MS` 10 s L117), pinned by `ListeningLayerTest` and `ListeningLayerSafetyTest` |
+| `snapshot()` once per burst, debounced, used for recording | `HeadphoneWatcher.refresh()` per event (`DosimeterService.onListening`, L880) → `ListeningTracker` spans (`watchTracker.update`/`drain`, L894-L899) → `foldListeningSpan` (L932) into the headphone ledger under the double-count rule. The recording no longer waits for a burst, and no longer has its own debouncer |
+
+One behaviour difference, on purpose: the recording is event-exact (a span closes at the event) instead of debounced, so a Bluetooth link that flaps now produces short spans rather than being held for 3 s; the mode (what is shown) still has the 3 s / 10 s hysteresis. `Debouncer` (`Headphones.kt` L212) is no longer used in production, only by `app/src/test/…/HeadphonesTest.kt`.
+
+## UX/UI and copy pass (watch, and the phone where the same text appears) ✅ (JVM renders only: no watch was connected over adb)
+The brief: a smartwatch UX pass on every watch screen (1–2 s glances, users in motion), the six problems seen on the real watch, and a text budget. Evidence lives in `build/audit/` (not committed): `before/` and `after/` renders (EN/ES × 192/216/240 dp × font 1.0/1.3, long lists at several scroll positions; `CopyAuditCaptureTest`, opt-in with `VOXARA_AUDIT_DIR`), contact sheets, Agent A's audit (`AUDIT_A.md`), Agent B's review, the string table (`STRING_TABLE.md`) and the string diff.
+
+### The six problems from the real watch
+1. **Tono.** "Llevas 6 días seguidos cuidando tu sonido": the streak counted past days *without any measurement* as "within the limit", and forgave one slip, so "6 days in a row" was not true. Now a day keeps the streak only when it was measured for at least an hour and stayed under the limit (`keepsStreak`), the streak is strictly consecutive, and Tono (built-in and cloud prompt) and the Week page mention it only from 3 days. "Cuidando tu sonido" came from the cloud model: the prompt now says the ears are what is cared for, calls the limit a limit, asks for Latin American Spanish (audífonos, oídos, teléfono) and a status of at most 12 words; the validator rejects longer statuses. On the hero Tono's line is a whole sentence or nothing (`wholeSentencesToFit`; the clause/word cutter `shortenToFit` is gone); the Ask screen is titled "Tono" (its content is Tono's statement), leads with the short status and shows the full insight under it, never cut.
+2. **Headphones mode way out.** Detection stays automatic. The chip on Now (it looked like a button: now it is one), a "Not headphones" row under the hero and a button on the volume alert open **Not headphones?**: "Ignore for now" leaves the output out until it disconnects (the next connection is detected again); "It's a speaker" (a Bluetooth device with a full address) also remembers it for later connections, stored as a salted SHA-256 digest only (`OutputIgnoreList`, `speakerKeyOf`, `HeadphoneWatcher.notHeadphones`; watch: `SpeakerMemory` + `VoxaraStore`, phone: `PhonePrefs`). Mode shows how many speakers are remembered and forgets them. For the phone's output the watch ignores the phone's reports until it says the headphones are gone and sends `/voxara/hp/cmd/not_headphones` to the phone. The layer leaves at once (no 10 s exit hold). Room alerts are never touched; headphone alerts stop only for that output. When the mode is off, Now shows it as a plain line, not a switch.
+3. **Information looked like a button.** `MetricCard` without an action is now a plain row (no card, no fill); with an action it is a card with a chevron. Settings' text panels are plain text.
+4. **"Modo: Auto · Tranquilo" cut at the bottom.** More is now a one-screen glance page: three pills (Tono, Mode, Settings) sized to the circle (70 / 84 / 70 % of the display), labels held at 1.3×; the phone link and the disclaimer are below the fold as plain lines. The clock steps aside on all three glance pages. List rows keep their own height (no `transformedHeight`: near the edge a tall paragraph was laid out shorter than it draws and the next row landed on it; rows still scale and fade), a single choice is one row per option (`choiceRows`), and the top scrim is solid under the clock.
+5. **The Dose ring.** One progress arc (`DoseArc`): 12 o'clock, clockwise, faint full track, full = 100 %; no hour marks, no "now" dot, no day segments, no waves on that page. Caption "of today's limit" / "of this week's limit" (shown at every size) with an info icon; the number opens **What the ring shows** (two sentences). Reduced motion: the arc jumps; ambient unchanged.
+6. **Terminology.** Spanish: *audífonos* everywhere (watch and phone), *teléfono* (never *móvil*), *límite* (never *lo permitido* / *presupuesto*), *en vivo*, *alertas*, one on/off pair (Sí/No for settings, Activo/Inactivo for a state). English: *limit* (never *allowance* / *budget*), *Around you* (never *Outside* / *Surroundings*), one zone vocabulary (the old Safe/Elevated/High/Critical words now match OK/Moderate/Loud/Dangerous).
+
+### From Agent A's audit (beyond the six)
+No ellipsis anywhere on the watch (lists wrap whole); the uncalibrated notice and "estimated" stay on the hero at every size and in ambient (which also gained its unit); the stepper's value wraps so "+" never leaves the screen; the Moderate zone icon is a small wave (the "i" read as "tap for info"); a selected choice is tonal with a check, not the primary purple; whole decibels for the day's level and rounded headphone time ("100h", not "100h 29m"); Dose/Today says "nothing measured" once, not three times; the limit alert's protective sentence is on its first screen; 104 unused strings removed (EN and ES).
+
+### From Agent B's independent review (after)
+Fixed after the review: buttons and rows drop their icon on small faces and at large text, so no word breaks mid-way ("Allow microphon/e"); both alerts keep their content inside the ring (inset by fractions of the display, the volume alert's rows too); "parlante" replaces Spain's "altavoz" everywhere in Spanish (watch and phone); the uncalibrated notice's icon is inline with its text; the raw mic path ("voice recognition") is debug-only; "low confidence" became "Could be 66–86 dBA"; Tono says "Moderate sound around you" at 70–84 dBA instead of "calm"; "Dismiss" became "Got it" like the limit alert; "Playing on this watch/your phone"; the Dose help reads "Full means the limit is reached" (no orphaned "%"); "No AI used" / "Sin IA" as the built-in source; "Not now" / "Ahora no"; "measuring" for the microphone, "listening" only for headphones.
+Left open on purpose (design decisions for the owner, listed in the final report): the Now ring's marker knob and its fill colour, the headphones hero's unlabelled outside-level moon and twin knobs, text-only toggles in Settings (a Wear `SwitchButton` refactor), the Hearing Care Score on the watch, the NIOSH/TWA explanations, the length of Settings and of the consent/why texts, the Today|Week name at 192 dp, the onboarding step counter.
+
+### Tests
+Added `OutputIgnoreTest` (5), formatter tests, streak and status-length tests in `CoachTest`; rewrote `StatusFitTest` for the whole-sentence rule. Updated to the new wording only: `FiguresConsistencyTest` ("limit"), `AutoHeadphonesCompatTest` ("teléfono"), render fixtures. `ModesNeverWeakenAlertsTest`, `AlertFloorsTest` and the contrast tests were not touched.
+
+### Not verified (needs the watch)
+Everything on the Galaxy Watch 7: the pills and ring at 203 dp, the chip tap target, "Not headphones" with a real speaker and with the phone's output (the phone must have the new build), whether the platform gives a full Bluetooth address without the Bluetooth permission (otherwise only "Ignore for now" is offered), TalkBack order on More and Dose.
+
+### Follow-up (Oct 24)
+- Streak checked in code: unmeasured days never count (`keepsStreak`, `Coach.kt:129`) and no slip is forgiven (`streakDays`, `Coach.kt:138`); `SnapshotStreakTest` (3) pins it through `SnapshotBuilder`.
+- Headphones mode on Now: the outside level is a pill with the "around you" waves icon and its unit ("58 dBA"), not a bare number.
+- Settings: quiet hours, sensitive ears, Tono and cloud AI are Wear M3 `SwitchButton` rows (`SwitchRow`); the "X: Sí/No" strings are gone.
+- Limit alert: on small faces or large text, title, "Protege tus oídos." and "Entendido" keep the base size and fit one screen; the full sentence is the first row below.
+- Hearing Care Score removed from the watch's Week page (domain code, tests and the phone's line kept).
+- ES: "Descansa entre canciones"; "Bus, tren o metro".

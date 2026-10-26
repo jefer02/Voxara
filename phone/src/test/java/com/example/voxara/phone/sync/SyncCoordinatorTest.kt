@@ -8,6 +8,7 @@ import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.MinuteRecord
 import com.example.voxara.core.ledger.MinuteStore
 import com.example.voxara.core.monitoring.MonitoringStatus
+import com.example.voxara.link.LinkHealth
 import com.example.voxara.link.LinkState
 import com.example.voxara.link.SyncProblem
 import com.example.voxara.link.WatchNode
@@ -25,7 +26,9 @@ import com.example.voxara.sync.WearContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -105,12 +108,19 @@ class SyncCoordinatorTest {
         var withApp = setOf(watchNode.id)
         var reachable = true
         var apiMissing = false
+        /** The watch does not answer within the gateway's time limit (what withTimeout throws). */
+        var timeoutOnRequest = false
+        /** The watch's own clock (the phone's is [now]). */
+        var watchClock: () -> Long = { now }
         val opened = ArrayList<String>()
+        val requested = ArrayList<String>()
 
         override suspend fun connectedWatches(): List<WatchNode> = if (apiMissing) throw WearApiUnavailable() else connected
         override suspend fun watchesWithApp() = withApp
         override suspend fun request(nodeId: String, path: String, body: ByteArray): ByteArray {
             if (!reachable) throw IOException("watch unreachable")
+            if (timeoutOnRequest) withTimeout(1) { delay(60_000) }
+            requested += path
             return responder.handle(path, body) ?: error("unhandled $path")
         }
         /**
@@ -119,7 +129,7 @@ class SyncCoordinatorTest {
          */
         override suspend fun publishSettings(json: String) {
             if (!reachable) return
-            watchDoc = SettingsMerge.watchReceives(watchDoc, SettingsDoc.fromJson(json), now).merged
+            watchDoc = SettingsMerge.watchReceives(watchDoc, SettingsDoc.fromJson(json), watchClock()).merged
             coordinator.onWatchSettings(watchDoc.toJson())
         }
         override suspend fun latestPayload(nodeId: String, path: String) =
@@ -274,5 +284,143 @@ class SyncCoordinatorTest {
         coordinator.refreshLink()
         assertTrue(coordinator.openOnWatch(WearContract.LINK_CALIBRATION))
         assertEquals(listOf(WearContract.LINK_CALIBRATION), gateway.opened)
+    }
+
+    // ------------------------------------------------------------------ reconnecting by itself
+
+    @Test
+    fun `the link is honest - reconnecting, then disconnected for how long, then connected again`() = runBlocking<Unit> {
+        assertEquals(LinkHealth.Unknown, coordinator.health.value)
+        coordinator.refreshLink()
+        assertTrue(coordinator.health.value is LinkHealth.Connected)
+
+        // The watch is switched off: gone from the connected nodes.
+        gateway.connected = emptyList()
+        now += 5_000
+        coordinator.refreshLink()
+        assertTrue("just lost", coordinator.health.value is LinkHealth.Reconnecting)
+        now += 30_000
+        coordinator.tickHealth()
+        assertTrue("still inside the minute in which it usually comes back", coordinator.health.value is LinkHealth.Reconnecting)
+        now += 60_000
+        coordinator.tickHealth()
+        val gone = coordinator.health.value as LinkHealth.Disconnected
+        assertEquals("since the moment it was seen to be gone", now - 90_000, gone.sinceMs)
+
+        gateway.connected = listOf(watchNode)
+        coordinator.refreshLink()
+        assertTrue(coordinator.health.value is LinkHealth.Connected)
+    }
+
+    @Test
+    fun `when the watch comes back the phone syncs and catches it up once, with no user action`() = runBlocking<Unit> {
+        addWatchMinutes(20)
+        coordinator.refreshLink()
+        gateway.connected = emptyList()
+        coordinator.refreshLink()
+        assertTrue(store.read().sync.lastSuccessMs == null)
+
+        var caughtUp = 0
+        gateway.connected = listOf(watchNode)
+        coordinator.onWatchEvent { caughtUp++ }
+        assertEquals(1, caughtUp)
+        assertEquals("history was pulled", now, store.read().sync.lastSuccessMs)
+        assertFalse(db.isEmpty())
+
+        // The same event again while it stays connected is not a reconnect: nothing runs twice.
+        coordinator.onWatchEvent { caughtUp++ }
+        assertEquals(1, caughtUp)
+
+        // Lost and back again: it catches up again.
+        gateway.connected = emptyList()
+        coordinator.refreshLink()
+        gateway.connected = listOf(watchNode)
+        coordinator.onWatchEvent { caughtUp++ }
+        assertEquals(2, caughtUp)
+    }
+
+    @Test
+    fun `a settings change made while the watch is away waits and is applied when it is back`() = runBlocking<Unit> {
+        coordinator.refreshLink()
+        gateway.reachable = false
+        coordinator.changeSetting(SettingField.SNOOZE_MINUTES, "30")
+        assertTrue(SettingField.SNOOZE_MINUTES in coordinator.pendingSettings())
+
+        gateway.reachable = true
+        gateway.connected = emptyList(); coordinator.refreshLink()
+        gateway.connected = listOf(watchNode)
+        coordinator.onWatchEvent()
+        assertTrue("sent after the reconnect", coordinator.pendingSettings().isEmpty())
+        assertEquals("30", watchDoc[SettingField.SNOOZE_MINUTES]!!.value)
+    }
+
+    // ------------------------------------------------------------------ audit regressions
+
+    @Test
+    fun `a watch that does not answer in time is a sync problem on screen, not a silent cancellation`() = runBlocking<Unit> {
+        coordinator.refreshLink()
+        gateway.timeoutOnRequest = true
+        // withTimeout throws a CancellationException subclass: it must not escape and must be recorded.
+        assertFalse(coordinator.sync())
+        assertEquals(SyncProblem.UNREACHABLE, store.read().sync.lastProblem)
+        assertTrue(coordinator.link.value is LinkState.Problem)
+        assertFalse("the spinner stops", coordinator.syncing.value)
+
+        gateway.timeoutOnRequest = false
+        assertTrue(coordinator.sync())
+        assertTrue(coordinator.link.value is LinkState.Linked)
+    }
+
+    @Test
+    fun `a phone that keeps 30 days asks the watch for 30 days, not 33`() = runBlocking<Unit> {
+        val start = Math.floorDiv(now, 60_000L)
+        for (d in 0 until 33) watchMinutes.put(MinuteRecord(start - d * 1440L, ExposureKind.AMBIENT, 60.0, 0.01, 0.2))
+        store.setRetentionDays(30)
+        assertTrue(coordinator.sync())
+        assertEquals(30, gateway.requested.count { it == WearContract.RPC_DAY })
+        assertEquals(30, db.minutes(0, Long.MAX_VALUE, ExposureKind.AMBIENT).size)
+        // The next sync finds nothing to fetch: the 31st day is no longer fetched and pruned every hour.
+        gateway.requested.clear()
+        assertTrue(coordinator.sync())
+        assertEquals(0, gateway.requested.count { it == WearContract.RPC_DAY })
+    }
+
+    @Test
+    fun `the catch-up still runs when a message got through before the reconnect event was handled`() = runBlocking<Unit> {
+        addWatchMinutes(20)
+        coordinator.refreshLink()
+        gateway.connected = emptyList(); coordinator.refreshLink()
+        gateway.connected = listOf(watchNode)
+        // The headphone sender reports "reached" first (it runs on its own coroutine) ...
+        coordinator.observeReachable(true)
+        var caughtUp = 0
+        // ... and only then is the capability event handled. The sync and the queued listening must still go out.
+        coordinator.onWatchEvent { caughtUp++ }
+        assertEquals(1, caughtUp)
+        assertEquals(now, store.read().sync.lastSuccessMs)
+    }
+
+    @Test
+    fun `a failed catch-up is tried again at the next event`() = runBlocking<Unit> {
+        coordinator.refreshLink()
+        gateway.reachable = false                 // listed as connected, but it does not answer
+        var caughtUp = 0
+        coordinator.onWatchEvent { caughtUp++ }
+        assertTrue(store.read().sync.lastSuccessMs == null)
+        gateway.reachable = true
+        coordinator.onWatchEvent { caughtUp++ }
+        assertEquals(now, store.read().sync.lastSuccessMs)
+        assertEquals(2, caughtUp)
+    }
+
+    @Test
+    fun `a phone whose clock runs ahead still gets its setting applied by the watch and shown as applied`() = runBlocking<Unit> {
+        coordinator.refreshLink()
+        now += 20_000                                 // the phone is 20 s ahead of the watch's clock
+        val watchNow = now - 20_000
+        gateway.watchClock = { watchNow }
+        coordinator.changeSetting(SettingField.SNOOZE_MINUTES, "30")
+        assertEquals("30", watchDoc[SettingField.SNOOZE_MINUTES]!!.value)
+        assertTrue("not stuck on 'pending sync'", coordinator.pendingSettings().isEmpty())
     }
 }

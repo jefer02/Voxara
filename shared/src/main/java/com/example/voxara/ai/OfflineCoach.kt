@@ -4,6 +4,7 @@ import android.content.res.Resources
 import com.example.voxara.core.ai.CoachReply
 import com.example.voxara.core.ai.CoachRequest
 import com.example.voxara.core.ai.CoachTask
+import com.example.voxara.core.ai.STREAK_WORTH_SAYING
 import com.example.voxara.shared.R
 
 /**
@@ -24,10 +25,15 @@ class OfflineCoach(private val res: Resources) : BuiltInCoach {
             week >= 80 -> res.getString(R.string.tono_status_week)
             s.dailyDosePercent >= 50 -> res.getString(R.string.tono_status_busy)
             s.listeningMinutesToday > 0 && s.headphoneCategory != null -> res.getString(R.string.tono_status_listening)
+            // Moderate around you (70–84 dBA): not a "calm day", whatever the dose says.
+            (s.currentDba ?: 0) >= 70 -> res.getString(R.string.tono_status_moderate)
             else -> res.getString(R.string.tono_status_calm)
         }
         val insight = when (req.task) {
-            CoachTask.WEEKLY_SUMMARY -> res.getString(R.string.tono_insight_week, week, s.streakDays)
+            // The streak only when it is true and worth saying: measured days in a row within the limit, three or more.
+            CoachTask.WEEKLY_SUMMARY ->
+                if (s.streakDays >= STREAK_WORTH_SAYING) res.getString(R.string.tono_insight_week, week, s.streakDays)
+                else res.getString(R.string.tono_insight_week_plain, week)
             else -> res.getString(R.string.tono_insight_today, s.dailyDosePercent, week)
         }
         val why = when (req.task) {

@@ -11,21 +11,36 @@ import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.designsystem.R
 
-/** Inter (SIL OFL 1.1, bundled): one variable font, weights by variation axis. */
+/** One weight of a bundled variable font, chosen by the weight axis. */
 @OptIn(ExperimentalTextApi::class)
-private fun inter(weight: FontWeight) = Font(
-    R.font.inter_variable,
+private fun variable(res: Int, weight: FontWeight) = Font(
+    res,
     weight = weight,
     variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
 )
 
-val InterFamily = FontFamily(
-    inter(FontWeight.Normal),
-    inter(FontWeight.Medium),
-    inter(FontWeight.SemiBold),
-    inter(FontWeight.Bold),
-    inter(FontWeight.ExtraBold),
+/** Plus Jakarta Sans (SIL OFL 1.1, bundled): every piece of UI text. */
+val JakartaFamily = FontFamily(
+    variable(R.font.plus_jakarta_sans, FontWeight.Normal),
+    variable(R.font.plus_jakarta_sans, FontWeight.Medium),
+    variable(R.font.plus_jakarta_sans, FontWeight.SemiBold),
+    variable(R.font.plus_jakarta_sans, FontWeight.Bold),
+    variable(R.font.plus_jakarta_sans, FontWeight.ExtraBold),
 )
+
+/**
+ * JetBrains Mono (SIL OFL 1.1, bundled): every dB, %, time and counter, always with tabular
+ * figures ([TABULAR]) so a changing number never jitters.
+ */
+val MonoFamily = FontFamily(
+    variable(R.font.jetbrains_mono, FontWeight.Medium),
+    variable(R.font.jetbrains_mono, FontWeight.SemiBold),
+    variable(R.font.jetbrains_mono, FontWeight.Bold),
+    variable(R.font.jetbrains_mono, FontWeight.ExtraBold),
+)
+
+/** OpenType feature string for tabular numerals. */
+const val TABULAR = "tnum"
 
 /** The zone's word. Every surface pairs it with [VoxIcons.zone], so colour never carries a zone alone. */
 @StringRes

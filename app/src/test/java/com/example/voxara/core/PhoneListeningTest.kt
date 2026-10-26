@@ -7,6 +7,7 @@ import com.example.voxara.core.headphones.OutputKind
 import com.example.voxara.core.headphones.PhoneListeningSample
 import com.example.voxara.core.headphones.PhoneSyncContract
 import com.example.voxara.core.headphones.phoneSampleToMinutes
+import com.example.voxara.core.headphones.toJson
 import com.example.voxara.core.headphones.resolvePhoneMinute
 import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.MinuteRecord
@@ -31,6 +32,23 @@ class PhoneListeningTest {
         assertTrue(minutes.all { it.confidence == Confidence.VERY_LOW.code })
         assertTrue(minutes.all { it.category == HeadphoneCategory.EARBUDS.code })
         assertEquals(80.0, minutes[0].laeq!!, 1e-9)                 // 100 dBA assumed - 20 dB volume
+    }
+
+    @Test
+    fun `a span cut at the change itself keeps the estimate's own confidence`() {
+        val exact = phoneSampleToMinutes(sample(120.0).copy(coarse = false), HeadphoneCategory.EARBUDS)
+        assertTrue(exact.all { it.confidence == Confidence.LOW.code })            // a dB curve from the platform
+        val noCurve = phoneSampleToMinutes(sample(120.0).copy(coarse = false, volumeDb = null), null)
+        assertTrue(noCurve.all { it.confidence == Confidence.VERY_LOW.code })      // index mapped linearly
+        // The default (and an older phone, which sends no flag) is the coarse, VERY LOW one.
+        assertTrue(phoneSampleToMinutes(sample(120.0), null).all { it.confidence == Confidence.VERY_LOW.code })
+    }
+
+    @Test
+    fun `a span survives the outbox text form`() {
+        val s = sample(300.0).copy(coarse = false)
+        assertEquals(s, com.example.voxara.core.headphones.phoneSampleFromJson(s.toJson()))
+        assertEquals(sample(300.0), com.example.voxara.core.headphones.phoneSampleFromJson(sample(300.0).toJson()))
     }
 
     @Test

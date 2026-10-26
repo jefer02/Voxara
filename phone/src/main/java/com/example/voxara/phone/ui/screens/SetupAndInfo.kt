@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -42,6 +43,7 @@ import com.example.voxara.phone.R
 import com.example.voxara.phone.ui.PhoneActions
 import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.components.ContentMaxWidth
+import com.example.voxara.phone.ui.components.IconTile
 import com.example.voxara.phone.ui.components.Group
 import com.example.voxara.phone.ui.components.LinkButton
 import com.example.voxara.phone.ui.components.PillButton
@@ -65,6 +67,7 @@ fun HowItWorksScreen(onBack: () -> Unit) {
         Triple(VoxIcons.Calendar, R.string.how_niosh_title, R.string.how_niosh_body),
         Triple(VoxIcons.Chart, R.string.how_who_title, R.string.how_who_body),
         Triple(VoxIcons.Headphones, R.string.how_headphones_title, R.string.how_headphones_body),
+        Triple(VoxIcons.Phone, R.string.how_sharing_title, R.string.how_sharing_body),
         Triple(VoxIcons.Tune, R.string.how_accuracy_title, R.string.how_accuracy_body),
         Triple(VoxIcons.Lock, R.string.how_privacy_title, R.string.how_privacy_body),
         Triple(VoxIcons.Shield, R.string.how_medical_title, R.string.how_medical_body),
@@ -74,8 +77,8 @@ fun HowItWorksScreen(onBack: () -> Unit) {
             item {
                 VoxCard(Modifier.contentWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(icon, null, tint = Vox.colors.brand, modifier = Modifier.size(22.dp))
-                        Spacer(Modifier.width(10.dp))
+                        IconTile(icon, Vox.colors.brand)
+                        Spacer(Modifier.width(12.dp))
                         Text(stringResource(title), style = MaterialTheme.typography.titleMedium, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
                     }
                     Text(stringResource(body), style = MaterialTheme.typography.bodyLarge, color = Vox.colors.text2)
@@ -105,9 +108,12 @@ fun SetupScreen(s: PhoneUiState, actions: PhoneActions, initialStep: Int = 0) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth().weight(1f)) {
-                Text(stringResource(R.string.setup_step, step + 1, STEPS), style = MaterialTheme.typography.labelMedium, color = c.text2)
-                Spacer(Modifier.size(8.dp))
-                LinearProgressIndicator(progress = { (step + 1f) / STEPS }, modifier = Modifier.fillMaxWidth(), color = c.brand, trackColor = c.surface2)
+                Text(stringResource(R.string.setup_step, step + 1, STEPS), style = MaterialTheme.typography.labelLarge, color = c.text2)
+                Spacer(Modifier.size(10.dp))
+                LinearProgressIndicator(
+                    progress = { (step + 1f) / STEPS }, modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = c.accent.fill, trackColor = c.track, strokeCap = StrokeCap.Round, gapSize = 0.dp, drawStopIndicator = {},
+                )
                 Spacer(Modifier.size(24.dp))
                 AnimatedContent(
                     targetState = step,
@@ -138,7 +144,7 @@ fun SetupScreen(s: PhoneUiState, actions: PhoneActions, initialStep: Int = 0) {
 
 @Composable
 private fun StepTitle(icon: ImageVector, title: String) {
-    Icon(icon, null, tint = Vox.colors.brand, modifier = Modifier.size(40.dp))
+    IconTile(icon, Vox.colors.brand, size = 56.dp)
     Text(title, style = MaterialTheme.typography.headlineLarge, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
 }
 
@@ -158,7 +164,7 @@ private fun StepContent(step: Int, s: PhoneUiState, actions: PhoneActions) {
                 VoxIcons.Ask to R.string.setup_point_3,
             ).forEach { (icon, text) ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(icon, null, tint = c.brand, modifier = Modifier.size(24.dp))
+                    IconTile(icon, c.brand)
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(text), style = MaterialTheme.typography.bodyLarge, color = c.text)
                 }
@@ -169,7 +175,7 @@ private fun StepContent(step: Int, s: PhoneUiState, actions: PhoneActions) {
             Body(stringResource(R.string.setup_privacy_body))
             VoxCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(VoxIcons.Shield, null, tint = c.zoneInk(RiskZone.MODERATE), modifier = Modifier.size(24.dp))
+                    IconTile(VoxIcons.Shield, c.caution)
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(R.string.setup_medical), style = MaterialTheme.typography.bodyLarge, color = c.text)
                 }

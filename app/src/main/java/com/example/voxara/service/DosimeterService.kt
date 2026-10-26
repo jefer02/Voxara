@@ -20,17 +20,37 @@ import com.example.voxara.BuildConfig
 import com.example.voxara.R
 import com.example.voxara.audio.AudioBurstSampler
 import com.example.voxara.audio.DeviceAudioInfo
-import com.example.voxara.audio.HeadphoneMonitor
+import com.example.voxara.audio.HeadphoneWatcher
+import com.example.voxara.audio.SpeakerMemory
 import com.example.voxara.audio.PowerPolicy
-import com.example.voxara.core.headphones.Attribution
 import com.example.voxara.core.headphones.HeadphoneCategory
+import com.example.voxara.core.headphones.BtClassHint
+import com.example.voxara.core.headphones.HeadphoneModeChoice
+import com.example.voxara.core.headphones.categoryOf
+import com.example.voxara.sync.PhoneListeningState
+import com.example.voxara.core.headphones.EffectiveListening
+import com.example.voxara.core.headphones.ListeningTracker
+import com.example.voxara.core.headphones.WatchListening
 import com.example.voxara.core.headphones.attribute
+import com.example.voxara.core.headphones.Attribution
+import com.example.voxara.core.headphones.effectiveListening
+import com.example.voxara.core.headphones.HeadphoneAlert
+import com.example.voxara.sync.PhoneLink
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import com.example.voxara.core.headphones.ListeningLayer
+import com.example.voxara.core.headphones.ListeningLayerPolicy
+import com.example.voxara.core.headphones.ListeningLayerState
+import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.audio.HeuristicSceneClassifier
 import com.example.voxara.complication.DoseComplicationService
 import com.example.voxara.core.advice.AdviceGrammar
 import com.example.voxara.core.alerts.AlertDefaults
 import com.example.voxara.core.alerts.AlertEngine
 import com.example.voxara.core.alerts.AlertInputs
+import com.example.voxara.core.alerts.AlertKind
+import com.example.voxara.core.headphones.HeadphoneProfile
+import com.example.voxara.core.headphones.LowerUi
 import com.example.voxara.core.alerts.AlertMemory
 import com.example.voxara.core.alerts.AlertSettings
 import com.example.voxara.core.alerts.inQuietHours
@@ -74,6 +94,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 /**
@@ -115,6 +136,22 @@ class DosimeterService : LifecycleService() {
         private const val CONTINUOUS_BURST_MS = 250L
         private const val HEARTBEAT_EVERY_MS = 30_000L
         private const val ERROR_BACKOFF_MS = 2_000L
+        /** Headphones mode looks this often while nothing is changing (a device event wakes it sooner)... */
+        private const val LAYER_POLL_MS = 5_000L
+        /** ...and this often while a change is waiting out its hold time. */
+        private const val LAYER_PENDING_POLL_MS = 1_000L
+        /** The phone link is looked at this often while monitoring (a cheap local Data Layer query). */
+        private const val LINK_LOOK_MS = 30_000L
+        /** While something plays to headphones the listening loop ticks this often (the alert's wait, the ledger hand-over)... */
+        private const val LISTEN_TICK_MS = 5_000L
+        /** ...and when nothing plays it waits for an event, or this long. */
+        private const val LISTEN_IDLE_MS = 60_000L
+        /** Finished listening spans reach the ledger at least this often while playing. */
+        private const val DRAIN_EVERY_MS = 30_000L
+        /** The level must stay above the recommended one this long before the alert fires. */
+        private const val OVER_SAFE_DWELL_MS = 8_000L
+        /** A room level older than this does not decide who owns a listening span. */
+        private const val ROOM_FRESH_MS = 2L * 60_000
 
         fun hasMic(context: Context) = ContextCompat.checkSelfPermission(
             context, Manifest.permission.RECORD_AUDIO,
@@ -159,6 +196,10 @@ class DosimeterService : LifecycleService() {
     /** When this dosimeter run started: no mode-change haptic in its first minutes. */
     private var startedAtMs = 0L
     private val modeHaptics = ModeChangeHapticGate()
+    /** Headphones mode has its own polite budget: a headphone switch must not use up the mode-change one. */
+    private val layerHaptics = ModeChangeHapticGate()
+    /** Headphones mode: detection with hysteresis (3 s in, 10 s out). Reads only; it never gates sampling or alerts. */
+    private val layer = ListeningLayer()
     /**
      * Automatic situation detection (Auto only). Probabilities and levels in memory, nothing else.
      * Licence gate: without SCENE_MODEL_ENABLED (release default) only the Concert rule runs.
@@ -175,7 +216,18 @@ class DosimeterService : LifecycleService() {
     private val sustained = SlidingLeq(AlertDefaults.SUSTAINED_WINDOW_MIN * 60_000L)
     /** The headphone minute ledger — separate from ambient, never double-counted. */
     private lateinit var listening: LedgerBook
-    private lateinit var headphones: HeadphoneMonitor
+    private lateinit var headphones: HeadphoneWatcher
+    /** What the watch's own ears got, in spans cut at every event (connect, play, pause, volume). */
+    private val watchTracker = ListeningTracker()
+    /** The room's last measured level, to decide which ledger owns a listening span (the double-count rule). */
+    private var lastRoomDba: Double? = null
+    private var lastRoomAtMs = 0L
+    private var lastListenDrainAt = 0L
+    /** When the estimate first went above the recommended level in this stretch (the alert waits a few seconds). */
+    private var overSinceMs = 0L
+    private var listeningDay = 0L
+    private var listeningSeconds = 0.0
+    private val alertMutex = Mutex()
     /** Sustained listening level for the "very loud listening" alert. */
     private val hpSustained = SlidingLeq(AlertDefaults.HEADPHONE_WINDOW_MIN * 60_000L)
     private lateinit var notifier: AlertNotifier
@@ -183,6 +235,7 @@ class DosimeterService : LifecycleService() {
     private var lastDaysAt = 0L
     private var seenResetGeneration = 0
     private var seenLedgerGeneration = 0
+    private var seenWipeGeneration = 0
     private var lastHeartbeatAt = 0L
     private var userStopped = false
 
@@ -197,7 +250,10 @@ class DosimeterService : LifecycleService() {
         notifier = AlertNotifier(this, haptics)
         ambient = LedgerBook(ExposureKind.AMBIENT, ExposureDb.get(this))
         listening = LedgerBook(ExposureKind.HEADPHONE, ExposureDb.get(this))
-        headphones = HeadphoneMonitor(this)
+        ExposureRepository.liveLedgers.addAll(listOf(ambient, listening))
+        seenWipeGeneration = ExposureRepository.wipeGeneration.get()
+        headphones = HeadphoneWatcher(this)
+        lifecycleScope.launch { SpeakerMemory.ensureLoaded() }
         Notifications.ensureChannel(this)
         seenResetGeneration = ExposureRepository.resetGeneration.get()
         lifecycleScope.launch {
@@ -232,6 +288,8 @@ class DosimeterService : LifecycleService() {
                         snoozeMinutes = p.snoozeMinutes,
                         tonoEnabled = p.tonoEnabled,
                         aiConsent = p.aiConsent,
+                        headphoneMode = p.headphoneMode,
+                        listening = it.listening.withChoice(p.headphoneMode),
                         situationChoice = p.situationChoice,
                         detectedMode = if (p.situationChoice == SituationChoice.AUTO) it.detectedMode else null,
                         mode = Situation.resolve(p.situationChoice, it.detectedMode),
@@ -280,6 +338,7 @@ class DosimeterService : LifecycleService() {
     override fun onDestroy() {
         running = false
         ExposureRepository.serviceActive = false
+        ExposureRepository.liveLedgers.clear()
         super.onDestroy()
     }
 
@@ -293,7 +352,25 @@ class DosimeterService : LifecycleService() {
             it.copy(monitoring = true, monitoringStatus = MonitoringStatus.RUNNING)
         }
 
+        // Event-driven: a device appearing, playback starting or stopping and the volume moving all land in
+        // onListeningEvent at once. The only timer runs while something is actually playing.
+        headphones.onChanged = {
+            ExposureRepository.layerWake.trySend(Unit)
+            ExposureRepository.listeningWake.trySend(Unit)
+        }
         headphones.start()
+        layer.reset()
+        watchTracker.reset()
+        val layerJob = lifecycleScope.launch { layerLoop() }
+        val listenJob = lifecycleScope.launch { listeningLoop() }
+        // The phone link, looked at while monitoring: reconnecting turns into connected (and the catch-up runs)
+        // by itself, or into "not connected for...", honestly.
+        val linkJob = lifecycleScope.launch {
+            while (running && lifecycleScope.isActive) {
+                runCatching { PhoneLink.refresh(this@DosimeterService) }
+                delay(LINK_LOOK_MS)
+            }
+        }
         var state = SampleState.IDLE
         var session: AudioBurstSampler.Session? = null
         var lastFoldAt: Long? = null
@@ -302,6 +379,7 @@ class DosimeterService : LifecycleService() {
         try {
             while (running && lifecycleScope.isActive) {
                 try {
+                    syncWipes()
                     syncResets()
                     syncLedgerChanges()
                     beatIfDue()
@@ -356,10 +434,8 @@ class DosimeterService : LifecycleService() {
                     // headphone listening needs no microphone and is still counted.
                     if (burst == null) {
                         lastFoldAt = null
+                        // Headphone listening needs no microphone: its own loop keeps counting it.
                         val nowMs = System.currentTimeMillis()
-                        val hp = headphones.snapshot(nowMs)
-                        hp.listeningDba?.let { foldListening(it, periodMs / 1000.0, nowMs, hp) }
-                        publishHeadphones(hp, nowMs)
                         if (auto) applyDetection(autoModes.tick(nowMs), nowMs)
                         ExposureRepository.update { it.copy(micGranted = false, monitoring = true) }
                         delay(periodMs)
@@ -378,18 +454,22 @@ class DosimeterService : LifecycleService() {
 
                     val leq = burst.leqDba
                     val engine = ExposureRepository.engine
-                    val hp = headphones.snapshot(now)
+                    val hp = headphones.current()
+                    lastRoomDba = leq
+                    lastRoomAtMs = now
                     // THE DOUBLE-COUNT RULE: while listening, this span belongs to exactly one ledger.
-                    when (attribute(hp.listeningDba, leq, hp.category ?: HeadphoneCategory.UNKNOWN)) {
-                        Attribution.AMBIENT -> {
-                            engine.accumulate(leq, represents)
-                            withContext(Dispatchers.IO) { ambient.add(leq, represents, now) }
-                            sustained.add(leq, represents, now)
-                        }
-                        Attribution.HEADPHONE -> foldListening(hp.listeningDba!!, represents, now, hp)
+                    // Headphones mode is passed in only to show that it changes nothing here: the room
+                    // is always measured and always reaches the alert window. The headphone side of the
+                    // same rule is applied by the listening loop (foldListeningSpan) with the same inputs.
+                    val plan = ListeningLayerPolicy.planBurst(
+                        repo.listening, hp.listeningDba, leq, hp.category ?: HeadphoneCategory.UNKNOWN,
+                    )
+                    if (plan.foldAmbient) {
+                        engine.accumulate(leq, represents)
+                        withContext(Dispatchers.IO) { ambient.add(leq, represents, now) }
                     }
+                    if (plan.feedSustained) sustained.add(leq, represents, now)
                     val impulse = engine.notePeak(burst.peakDbc)
-                    publishHeadphones(hp, now)
                     val weeklyPercent = 100.0 * ambient.weeklyPa2h(now) / weeklyBudgetPa2h
 
                     // Automatic situation: this burst's features, no extra microphone time.
@@ -472,8 +552,16 @@ class DosimeterService : LifecycleService() {
                 }
             }
         } finally {
+            layerJob.cancel()
+            listenJob.cancel()
+            linkJob.cancel()
+            headphones.onChanged = null
             headphones.stop()
+            watchTracker.reset()
             session?.close()
+            // Nothing is watching for headphones any more: Auto falls back to off, a manual choice stays.
+            layer.reset()
+            ExposureRepository.update { it.copy(listening = ListeningLayerState.OFF.withChoice(it.headphoneMode)) }
             ExposureRepository.serviceActive = false
             // Ended without the wearer asking: that is a pause, and the UI offers a resume.
             ExposureRepository.update {
@@ -497,13 +585,78 @@ class DosimeterService : LifecycleService() {
         }
     }
 
+    // ------------------------------------------------------------- headphones mode
+
+    /**
+     * HEADPHONES MODE. Looks at the watch's outputs and at the phone's last report, applies the
+     * hysteresis and publishes the layer. Its own loop, because the burst ladder can be a minute
+     * apart when it is quiet and putting headphones on should be noticed within seconds. It writes
+     * one state field and plays one soft haptic; the measuring, the ledgers and the alerts never read
+     * what it concludes ([ListeningLayerPolicy]).
+     */
+    private suspend fun layerLoop() {
+        while (running && lifecycleScope.isActive) {
+            val now = System.currentTimeMillis()
+            // Fully automatic: the choice is always Auto (a manual On/Off from an older app is ignored).
+            // "Not headphones": re-read the outputs now and leave without the exit hold (the wearer asked).
+            if (ExposureRepository.layerDropRequested.getAndSet(false)) {
+                headphones.refresh()
+                layer.reset()
+            }
+            val phone = ExposureRepository.phoneListeningForLayer
+            val phoneLive = phone != null && phone.connected && phone.isFresh(now)
+            // An older phone app only reports spans (it cannot say when listening stopped): 16 minutes, as before.
+            val phoneLegacy = phone == null && !ExposureRepository.phoneOutputIgnored &&
+                ListeningLayer.phoneReports(now, ExposureRepository.phoneHeadphonesAtMs)
+            val next = layer.update(
+                now, HeadphoneModeChoice.AUTO,
+                watchHeadphones = headphones.current().connected,
+                phoneHeadphones = phoneLive || phoneLegacy,
+            )
+            publishLayer(next, now)
+            val wait = if (layer.pending) LAYER_PENDING_POLL_MS else LAYER_POLL_MS
+            withTimeoutOrNull(wait) { ExposureRepository.layerWake.receive() }
+        }
+    }
+
+    /**
+     * Publishes a changed layer. When it turned on or off by detection, the wrist gets one soft
+     * double tick (HEADPHONES), inside ModeChangeHapticGate's limits and never near an alert. A manual
+     * switch already gave its own tap under the wearer's finger and is not repeated here.
+     */
+    private fun publishLayer(next: ListeningLayerState, now: Long) {
+        val before = ExposureRepository.state.value.listening
+        if (next == before) return
+        ExposureRepository.update { it.copy(listening = next) }
+        if (next.active == before.active) return
+        Log.i(TAG, "headphones mode ${if (next.active) "on" else "off"} (${next.source})")
+        refreshNotification(now)
+        VoxaraTileService.requestRefresh(this)
+        ListeningTileService.requestRefresh(this)
+        DoseComplicationService.requestRefresh(this)
+        if (next.source == LayerSource.MANUAL || before.source == LayerSource.MANUAL) return
+        val s = ExposureRepository.state.value
+        val allowed = layerHaptics.tryPlay(
+            ModeChangeHapticGate.Context(
+                nowMs = now,
+                localDay = localEpochDay(now),
+                serviceStartedAtMs = startedAtMs,
+                lastAlertHapticAtMs = haptics.lastAlertAtMs.takeIf { it > 0L },
+                quietHours = inQuietHours(s.alertSettings, localMinuteOfDay(now)),
+                powerSave = PowerPolicy.read(this).powerSaveMode,
+                advisoryHaptics = s.hapticPrefs.advisoryHaptics,
+            )
+        )
+        if (allowed) haptics.fire(Pattern.HEADPHONES)
+    }
+
     // ------------------------------------------------------------- automatic situation
 
     /**
      * One vote from this burst's scene features (if it completed any and the detector wants one),
      * otherwise just the staleness check. The feature vectors are dropped right here.
      */
-    private fun detectSituation(burst: AudioBurstSampler.Burst, now: Long, hp: HeadphoneMonitor.Snapshot) {
+    private fun detectSituation(burst: AudioBurstSampler.Burst, now: Long, hp: HeadphoneWatcher.Snapshot) {
         val t0 = System.nanoTime()
         val vote = if (burst.sceneFeatures.isNotEmpty() && autoModes.wantsVote(now)) {
             autoModes.voteOf(now, burst.sceneFeatures, burst.leqDba)
@@ -593,6 +746,25 @@ class DosimeterService : LifecycleService() {
     }
 
     /**
+     * "Delete all data" asked by the phone: the ledgers were wiped by [CompanionLink.deleteAll] (it cannot reach what
+     * only this loop owns), so here go the alert windows, the open listening span, today's listening seconds and the
+     * alert memory. Runs on the main thread like both loops, so it cannot interleave with them.
+     */
+    private fun syncWipes() {
+        val g = ExposureRepository.wipeGeneration.get()
+        if (g == seenWipeGeneration) return
+        seenWipeGeneration = g
+        sustained.clear()
+        hpSustained.clear()
+        watchTracker.reset()
+        listeningSeconds = 0.0
+        overSinceMs = 0L
+        hpNowDba = null
+        alertMemory = AlertMemory()
+        lastDaysAt = 0L
+    }
+
+    /**
      * A manual reset from the UI ("start today over") also clears today's ambient minutes, so the
      * history, the daily dose and the rolling budget agree, and re-arms the daily alerts.
      */
@@ -639,7 +811,7 @@ class DosimeterService : LifecycleService() {
         dose: Double,
         weeklyPercent: Double,
         repo: ExposureState,
-    ) {
+    ) = alertMutex.withLock {
         val settings: AlertSettings = Situation.alertSettings(repo.mode, repo.alertSettings)
         val (alerts, memory) = AlertEngine.evaluate(
             AlertInputs(
@@ -651,14 +823,24 @@ class DosimeterService : LifecycleService() {
                 weeklyAmbientPercent = weeklyPercent,
                 weeklyHeadphonePercent = 100.0 * listening.weeklyPa2h(now) / weeklyBudgetPa2h,
                 sustainedHeadphoneDba = hpSustained.value(now),
+                headphoneNowDba = hpNowDba,
             ),
             settings,
             alertMemory,
         )
+        // "Delete all" ran while this iteration was in flight: what it computed came from windows that are gone.
+        // Nothing is delivered or remembered from them; the next iteration starts from clean ones (syncWipes).
+        if (ExposureRepository.wipeGeneration.get() != seenWipeGeneration) return@withLock
         if (memory != alertMemory) {
             alertMemory = memory
             // Snoozes are owned by the notification actions: keep whatever is stored.
             ExposureRepository.store.updateAlertMemory { stored -> memory.copy(snoozedUntil = stored.snoozedUntil) }
+        }
+        // The in-view panel for "above the recommended level" (its haptic and notification come from the notifier).
+        alerts.firstOrNull { it.kind == AlertKind.HEADPHONE_OVER_SAFE }?.let { a ->
+            ExposureRepository.update {
+                it.copy(headphoneAlert = HeadphoneAlert(a.level, a.value, now, it.headphoneSource), lowerVolume = LowerUi.Idle)
+            }
         }
         notifier.deliver(alerts, Situation.hapticPrefs(repo.mode, repo.hapticPrefs))
     }
@@ -674,29 +856,129 @@ class DosimeterService : LifecycleService() {
         ExposureRepository.update { it.copy(days = days, headphoneDays = hpDays) }
     }
 
-    /** Folds an estimated listening span into the headphone ledger. */
-    private suspend fun foldListening(dba: Double, seconds: Double, now: Long, hp: HeadphoneMonitor.Snapshot) {
-        withContext(Dispatchers.IO) {
-            listening.add(
-                dba, seconds, now,
-                category = hp.category?.code ?: 0,
-                confidence = hp.estimate?.confidence?.code ?: 0,
-            )
+    // ------------------------------------------------------------- headphone listening (event-driven)
+
+    /**
+     * THE LISTENING LOOP. Not tied to the microphone's ladder: it looks when something CHANGES (headphones
+     * connected or gone, playback started or stopped, the volume moved, the phone reported) and, while
+     * something plays, every [LISTEN_TICK_MS] to carry the alert's short wait and hand finished spans to
+     * the ledger. When nothing plays it sleeps until an event (or a minute, to refresh the weekly figure).
+     */
+    private suspend fun listeningLoop() {
+        while (running && lifecycleScope.isActive) {
+            try {
+                onListening(System.currentTimeMillis())
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                Log.e(TAG, "listening iteration failed", t)
+            }
+            val wait = if (ExposureRepository.state.value.headphoneListening) LISTEN_TICK_MS else LISTEN_IDLE_MS
+            withTimeoutOrNull(wait) { ExposureRepository.listeningWake.receive() }
         }
-        hpSustained.add(dba, seconds, now)
+    }
+
+    private var lastListenCategory: HeadphoneCategory? = null
+
+    /** The estimate the alert engine sees right now (null while nothing plays or the level has not yet stayed over). */
+    private var hpNowDba: Double? = null
+
+    private suspend fun onListening(now: Long) {
+        syncWipes()
+        val snap = headphones.refresh()
+        val phone = ExposureRepository.phoneListeningForLayer
+        val eff = effectiveListening(
+            WatchListening(snap.connected, snap.playing, snap.listeningDba, snap.possibleSpeaker, snap.category),
+            phone, now,
+        )
+        if (snap.category != null) lastListenCategory = snap.category
+
+        // Today's listening seconds at the ears (any ledger), reset at midnight.
+        val day = localEpochDay(now)
+        if (day != listeningDay) { listeningDay = day; listeningSeconds = 0.0 }
+
+        // The watch's own ears: cut the running span at this event, then hand finished spans to the ledger
+        // every 30 s while playing, at once when playback stops, and whenever the level changes.
+        val levelBefore = watchTracker.currentDba
+        watchTracker.update(now, snap.listeningDba)
+        val due = now - lastListenDrainAt >= DRAIN_EVERY_MS || snap.listeningDba == null || snap.listeningDba != levelBefore
+        if (due) {
+            lastListenDrainAt = now
+            for (span in watchTracker.drain(now)) {
+                listeningSeconds += span.seconds
+                foldListeningSpan(
+                    span,
+                    snap.category ?: lastListenCategory ?: HeadphoneCategory.UNKNOWN,
+                    snap.estimate?.confidence?.code ?: 0,
+                    now,
+                )
+            }
+        }
+        publishHeadphones(snap, eff, phone, now)
+
+        // The over-the-recommended-level alert: only after the level has stayed over for a few seconds (a slider sweep is not an alert).
+        val level = eff.dba
+        hpNowDba = when {
+            level == null -> { overSinceMs = 0L; null }
+            level > HeadphoneProfile.SAFE_DBA -> {
+                if (overSinceMs == 0L) overSinceMs = now
+                if (now - overSinceMs >= OVER_SAFE_DWELL_MS) level else null
+            }
+            else -> { overSinceMs = 0L; level }
+        }
+        if (hpNowDba != null) {
+            val s = ExposureRepository.state.value
+            evaluateAlerts(now, s.sustainedDba, s.dosePercent, s.weeklyFraction * 100, s)
+        }
+    }
+
+    /**
+     * One finished span of the watch's listening into the headphone ledger, IF the headphones own it: the
+     * same double-count rule the burst loop applies to the room. A span the room owns is not lost: it is
+     * already in the ambient ledger, and still counted in today's listening seconds.
+     */
+    private suspend fun foldListeningSpan(span: ListeningTracker.Span, category: HeadphoneCategory, confidence: Int, now: Long) {
+        val room = lastRoomDba?.takeIf { now - lastRoomAtMs < ROOM_FRESH_MS }
+        if (attribute(span.dba, room, category) != Attribution.HEADPHONE) return
+        withContext(Dispatchers.IO) {
+            listening.add(span.dba, span.seconds, span.endMs, category = category.code, confidence = confidence)
+        }
+        hpSustained.add(span.dba, span.seconds, span.endMs)
     }
 
     /** Headphone status for every surface. Category only — never a device name. */
-    private fun publishHeadphones(hp: HeadphoneMonitor.Snapshot, now: Long) {
-        if (!hp.playing) hpSustained.clear()
+    private fun publishHeadphones(
+        snap: HeadphoneWatcher.Snapshot,
+        eff: EffectiveListening,
+        phone: PhoneListeningState?,
+        now: Long,
+    ) {
+        if (!eff.playing) hpSustained.clear()
         val used = listening.weeklyPa2h(now)
+        val estimate = when (eff.source) {
+            LayerSource.WATCH -> snap.estimate
+            LayerSource.PHONE -> phone?.estimate
+            else -> null
+        }
+        val category = when (eff.source) {
+            LayerSource.PHONE -> phone?.let { categoryOf(it.output, BtClassHint.UNKNOWN, ExposureRepository.state.value.usualHeadphones) }
+            else -> snap.category
+        }
+        val over = estimate != null && estimate.dba > HeadphoneProfile.SAFE_DBA
         ExposureRepository.update {
             it.copy(
-                headphoneCategory = hp.category,
-                headphoneListening = hp.playing,
-                headphoneEstimate = hp.estimate,
+                headphoneCategory = category,
+                headphoneListening = eff.playing,
+                headphoneEstimate = estimate,
+                headphonePossibleSpeaker = eff.possibleSpeaker,
+                headphoneCanRememberSpeaker = eff.source == LayerSource.WATCH && snap.canRememberSpeaker,
+                headphoneSource = eff.source,
+                listeningSecondsToday = listeningSeconds,
                 headphoneWeeklyPa2h = used,
                 headphoneWeeklyFraction = used / weeklyBudgetPa2h,
+                // Back under the recommended level (or nothing playing): the in-view alert has nothing left to say.
+                headphoneAlert = if (over || it.lowerVolume !is LowerUi.Idle) it.headphoneAlert else null,
+                lowerVolume = if (over || it.lowerVolume !is LowerUi.Idle) it.lowerVolume else LowerUi.Idle,
             )
         }
     }
@@ -835,7 +1117,10 @@ class DosimeterService : LifecycleService() {
     private fun buildNotification(): Notification {
         val s = ExposureRepository.state.value
         val res = strings()
-        val content = res.getString(
+        // Headphones mode says so, and that the room is still being measured.
+        val content = if (s.listening.active) res.getString(
+            R.string.notification_content_headphones, s.dba.roundToInt(), s.dosePercent.roundToInt(),
+        ) else res.getString(
             R.string.notification_content, s.dba.roundToInt(), s.dosePercent.roundToInt(),
         )
         val pending = PendingIntent.getActivity(
@@ -865,6 +1150,10 @@ class DosimeterService : LifecycleService() {
     private fun maybeNotify(risk: RiskState, now: Long) {
         if (risk == lastRisk && now - lastNotifyAt < NOTIFY_EVERY_MS) return
         lastRisk = risk
+        refreshNotification(now)
+    }
+
+    private fun refreshNotification(now: Long) {
         lastNotifyAt = now
         getSystemService(NotificationManager::class.java)
             .notify(Notifications.DOSIMETER_ID, buildNotification())

@@ -66,6 +66,85 @@ object HeadphoneProfile {
     /** Used only when the platform cannot convert a volume index to dB. */
     const val FALLBACK_RANGE_DB = 60.0
     const val UNCERTAINTY_DB = 10.0
+
+    /**
+     * The recommended listening level: 80 dBA for 40 h a week is exactly the WHO-ITU H.870 weekly
+     * reference of 1.6 Pa²h (4e-10 Pa² · 10^8 · 40 h). Above it a headphone alert fires and "Lower to
+     * safe volume" aims at it. Not a measurement: the level itself is an estimate (see above).
+     */
+    const val SAFE_DBA = 80.0
+
+    /** Escalation steps of the "above the recommended level" alert (estimated dBA, inclusive). */
+    const val TIER2_DBA = 90.0
+    const val TIER3_DBA = 100.0
+}
+
+/**
+ * Where the estimate sits against the recommended level: 0 = at or below [HeadphoneProfile.SAFE_DBA],
+ * 1 = above it, 2 = from [HeadphoneProfile.TIER2_DBA], 3 = from [HeadphoneProfile.TIER3_DBA].
+ * A higher tier is a reason to alert again whatever the cooldown says.
+ */
+fun headphoneTierOf(dba: Double): Int = when {
+    dba.isNaN() || dba <= HeadphoneProfile.SAFE_DBA -> 0
+    dba >= HeadphoneProfile.TIER3_DBA -> 3
+    dba >= HeadphoneProfile.TIER2_DBA -> 2
+    else -> 1
+}
+
+/** One audio output as the platform reports it, before any decision (the Android layer fills it in). */
+data class RouteCandidate(
+    val kind: OutputKind,
+    val btHint: BtClassHint,
+    /** `AudioDeviceInfo.getType()`; only used to ask the platform for this output's volume curve. */
+    val androidType: Int,
+    /** Which physical output this is, for "Not headphones" ([OutputIgnoreList]); null when unknown. */
+    val id: OutputId? = null,
+)
+
+/**
+ * The headphone route in force, decided from the connected outputs.
+ *
+ * @property possibleSpeaker a Bluetooth output whose class could not be read (no BLUETOOTH_CONNECT, or
+ * the device does not say): counted as headphones on purpose (warning too much beats warning too
+ * little), but the UI says "possible speaker" so the wearer can tell why
+ */
+data class HeadphoneRoute(
+    val category: HeadphoneCategory,
+    val kind: OutputKind,
+    val androidType: Int,
+    val possibleSpeaker: Boolean,
+    /** The output itself, so "Not headphones" can leave exactly this one out. */
+    val id: OutputId? = null,
+)
+
+/** A Bluetooth output whose class we could not read might be a speaker or a car kit. */
+fun possibleSpeaker(kind: OutputKind, btHint: BtClassHint): Boolean =
+    btHint == BtClassHint.UNKNOWN &&
+        (kind == OutputKind.BLUETOOTH_A2DP || kind == OutputKind.BLE_BROADCAST)
+
+/**
+ * The route media would take: wired and USB first (the platform prefers them), then a BLE headset,
+ * then A2DP. Outputs that are not headphones (speaker, car kit, hearing aid) never win; null when
+ * there is none. [usual] is the wearer's "my headphones are usually…" setting. An output the wearer said is not
+ * headphones ([ignored], see [OutputIgnoreList]) never wins either.
+ */
+fun chooseRoute(
+    candidates: List<RouteCandidate>,
+    usual: HeadphoneCategory?,
+    ignored: (RouteCandidate) -> Boolean = { false },
+): HeadphoneRoute? {
+    fun rank(k: OutputKind) = when (k) {
+        OutputKind.WIRED_HEADPHONES, OutputKind.USB_HEADSET -> 0
+        OutputKind.BLE_HEADSET -> 1
+        OutputKind.BLUETOOTH_A2DP -> 2
+        OutputKind.BLE_BROADCAST -> 3
+        OutputKind.OTHER -> 9
+    }
+    return candidates
+        .filterNot(ignored)
+        .mapNotNull { c -> categoryOf(c.kind, c.btHint, usual)?.let { c to it } }
+        .minByOrNull { rank(it.first.kind) }
+        ?.let { (c, cat) -> HeadphoneRoute(cat, c.kind, c.androidType, possibleSpeaker(c.kind, c.btHint), c.id) }
 }
 
 enum class Confidence(val code: Int) {

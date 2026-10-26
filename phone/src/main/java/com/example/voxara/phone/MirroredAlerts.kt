@@ -57,7 +57,7 @@ object MirroredAlerts {
         )
         val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(alert.atMs))
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_voxara)
+            .setSmallIcon(R.drawable.ic_voxara_status)
             .setContentTitle(res.getString(alert.kind.titleRes()))
             .setContentText(res.getString(R.string.mirror_body, time))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)

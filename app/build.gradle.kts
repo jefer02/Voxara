@@ -139,6 +139,7 @@ dependencies {
     implementation(libs.concurrent.futures)
     implementation(libs.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)
