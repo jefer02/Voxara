@@ -1,6 +1,12 @@
 package com.example.voxara.phone.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import com.example.voxara.phone.ui.theme.VoxSpace
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -29,6 +35,7 @@ import com.example.voxara.phone.ui.components.ExpandableRow
 import com.example.voxara.phone.ui.components.GroupHeader
 import com.example.voxara.phone.ui.components.GroupNote
 import com.example.voxara.phone.ui.components.GroupRow
+import com.example.voxara.phone.ui.components.HeroCard
 import com.example.voxara.phone.ui.components.IconTile
 import com.example.voxara.phone.ui.components.LinkButton
 import com.example.voxara.phone.ui.components.PillButton
@@ -46,33 +53,23 @@ import com.example.voxara.ui.design.VoxIcons
 @Composable
 fun WatchScreen(s: PhoneUiState, actions: PhoneActions) {
     VoxScreen(stringResource(R.string.watch_title), refreshing = s.syncing, onRefresh = actions.onRefresh) {
-        item { DeviceCard(s, actions, Modifier.contentWidth()) }
-        item {
-            val text = linkHealthText(s.linkHealth, s.nowMs)
-            if (text != null) {
-                Banner(
-                    VoxIcons.Refresh, text, stringResource(R.string.link_health_body),
-                    tint = Vox.colors.caution, modifier = Modifier.contentWidth(),
-                    action = stringResource(R.string.action_sync_now), onAction = actions.onRefresh,
-                )
-            }
-        }
-        if (s.pendingSpans > 0) item { GroupNote(stringResource(R.string.link_pending_listening, s.pendingSpans), Modifier.contentWidth()) }
-        item { BatteryGuide(s, actions, Modifier.contentWidth()) }
-        item { GroupNote(stringResource(R.string.link_explain), Modifier.contentWidth()) }
+        // the connection is the hero: connected, reconnecting or disconnected since when, in words with its icon
+        item(key = "device") { DeviceCard(s, actions, Modifier.contentWidth()) }
+        if (s.pendingSpans > 0) item(key = "pending") { GroupNote(stringResource(R.string.link_pending_listening, s.pendingSpans), Modifier.contentWidth()) }
+        item(key = "battery") { BatteryGuide(s, actions, Modifier.contentWidth()) }
 
         val watch = s.watch
         if (watch != null) {
-            item { GroupHeader(stringResource(R.string.watch_checklist), Modifier.contentWidth()) }
-            item { Checklist(s, actions, Modifier.contentWidth()) }
+            item(key = "checklist-header") { GroupHeader(stringResource(R.string.watch_checklist), Modifier.contentWidth()) }
+            item(key = "checklist") { Checklist(s, actions, Modifier.contentWidth()) }
             val others = when (val l = s.link) {
                 is LinkState.Linked -> l.others
                 is LinkState.Problem -> l.others
                 else -> emptyList()
             }
             if (others.isNotEmpty()) {
-                item { GroupHeader(stringResource(R.string.link_other_watches), Modifier.contentWidth()) }
-                item {
+                item(key = "others-header") { GroupHeader(stringResource(R.string.link_other_watches), Modifier.contentWidth()) }
+                item(key = "others") {
                     Group(Modifier.contentWidth()) {
                         others.forEachIndexed { i, w ->
                             if (i > 0) GroupDivider()
@@ -83,7 +80,7 @@ fun WatchScreen(s: PhoneUiState, actions: PhoneActions) {
             }
         }
 
-        item {
+        item(key = "help") {
             Group(Modifier.contentWidth()) {
                 ExpandableRow(stringResource(R.string.troubleshoot_title), icon = VoxIcons.Info) {
                     listOf(R.string.ts_1, R.string.ts_2, R.string.ts_3, R.string.ts_4, R.string.ts_5).forEach {
@@ -92,6 +89,7 @@ fun WatchScreen(s: PhoneUiState, actions: PhoneActions) {
                 }
             }
         }
+        item(key = "explain") { GroupNote(stringResource(R.string.link_explain), Modifier.contentWidth()) }
     }
 }
 
@@ -128,66 +126,58 @@ private fun DeviceCard(s: PhoneUiState, actions: PhoneActions, modifier: Modifie
     }
 }
 
+/**
+ * THE WATCH HERO — the watch and the link as it really is, said plainly and large: connected; problem; reconnecting; or
+ * disconnected since when (each with its icon and its word, never colour alone), what that means while it lasts, then
+ * when it last reported, its version and mode, and the two things to do.
+ */
 @Composable
 private fun LinkedCard(s: PhoneUiState, watch: WatchNode, problem: SyncProblem?, actions: PhoneActions, modifier: Modifier) {
     val c = Vox.colors
-    VoxCard(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(VoxIcons.Watch, c.brand, size = 44.dp)
-            Spacer(Modifier.width(12.dp))
-            androidx.compose.foundation.layout.Column {
-                Text(watch.name, style = MaterialTheme.typography.titleLarge, color = c.text)
-                val zone = if (problem == null) RiskZone.OK else RiskZone.LOUD
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(VoxIcons.zone(zone), null, tint = c.zoneInk(zone), modifier = Modifier.size(16.dp))
-                    Text(
-                        stringResource(if (problem == null) R.string.watch_connected else R.string.link_problem),
-                        style = MaterialTheme.typography.labelLarge, color = c.zoneInk(zone),
-                    )
-                }
+    val health = linkHealthText(s.linkHealth, s.nowMs)
+    val ok = problem == null && health == null
+    val zone = if (ok) RiskZone.OK else RiskZone.LOUD
+    val state = when {
+        problem != null -> stringResource(R.string.link_problem)
+        health != null -> health
+        else -> stringResource(R.string.watch_connected)
+    }
+    HeroCard(modifier) {
+        IconTile(VoxIcons.Watch, c.brand, size = 56.dp)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(VoxSpace.xxs)) {
+            Text(watch.name, style = MaterialTheme.typography.titleLarge, color = c.text, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(if (ok) VoxIcons.Check else VoxIcons.zone(zone), null, tint = c.zoneInk(zone), modifier = Modifier.size(18.dp))
+                Text(state, style = MaterialTheme.typography.titleSmall, color = c.zoneInk(zone), textAlign = TextAlign.Center)
             }
         }
-        Text(
+        val why = when (problem) {
+            SyncProblem.UNREACHABLE -> R.string.link_problem_unreachable
+            SyncProblem.INCOMPATIBLE -> R.string.link_problem_incompatible
+            SyncProblem.NO_WEAR_API -> R.string.link_problem_no_api
+            null -> if (health != null) R.string.link_health_body else null
+        }
+        if (why != null) Text(stringResource(why), style = MaterialTheme.typography.bodyMedium, color = c.text2, textAlign = TextAlign.Center)
+        val details = listOfNotNull(
             s.lastSyncMs?.let { stringResource(R.string.last_synced, dateTimeText(it, s.nowMs)) } ?: stringResource(R.string.fresh_never),
-            style = MaterialTheme.typography.bodyMedium, color = c.text2,
-        )
-        Text(
             s.status?.appVersion?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.watch_version, it) }
                 ?: stringResource(R.string.watch_version_unknown),
-            style = MaterialTheme.typography.bodyMedium, color = c.text2,
+            // the mode the watch is in (as of its last status), with its headphones layer and why it is on
+            watchModeName(s)?.let { stringResource(R.string.watch_mode, it) },
         )
-        // The mode the watch is in (as of its last status); Auto shows what it resolved to.
-        // With its headphones layer: "Auto · Street + Headphones", and why the layer is on.
-        watchModeName(s)?.let { name ->
-            Text(stringResource(R.string.watch_mode, name), style = MaterialTheme.typography.bodyMedium, color = c.text2)
-        }
+        Text(details.joinToString("\n"), style = MaterialTheme.typography.bodySmall, color = c.text2, textAlign = TextAlign.Center)
         s.status?.takeIf { it.headphonesMode }?.let { st ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(VoxIcons.Headphones, null, tint = c.secondary, modifier = Modifier.size(16.dp))
                 val on = stringResource(R.string.hp_state_on)
                 val source = headphonesSourceText(st.headphonesSource)
-                Text(
-                    if (source != null) stringResource(R.string.hp_state_detail, on, source) else on,
-                    style = MaterialTheme.typography.labelLarge, color = c.secondary,
-                )
+                Text(if (source != null) stringResource(R.string.hp_state_detail, on, source) else on, style = MaterialTheme.typography.labelLarge, color = c.secondary)
             }
         }
-        if (problem != null) {
-            Text(
-                stringResource(
-                    when (problem) {
-                        SyncProblem.UNREACHABLE -> R.string.link_problem_unreachable
-                        SyncProblem.INCOMPATIBLE -> R.string.link_problem_incompatible
-                        SyncProblem.NO_WEAR_API -> R.string.link_problem_no_api
-                    }
-                ),
-                style = MaterialTheme.typography.bodyMedium, color = c.text,
-            )
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(VoxSpace.xs)) {
+            PillButton(stringResource(R.string.action_sync_now), actions.onRefresh, icon = VoxIcons.Refresh, enabled = !s.syncing, modifier = Modifier.fillMaxWidth())
+            PillButton(stringResource(R.string.action_open_on_watch), actions.onOpenOnWatch, icon = VoxIcons.Watch, tonal = true, modifier = Modifier.fillMaxWidth())
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PillButton(stringResource(R.string.action_sync_now), actions.onRefresh, icon = VoxIcons.Refresh, enabled = !s.syncing)
-        }
-        PillButton(stringResource(R.string.action_open_on_watch), actions.onOpenOnWatch, icon = VoxIcons.Watch, tonal = true)
     }
 }
 
