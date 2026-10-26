@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
+import android.os.SystemClock
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -21,6 +23,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.runtime.derivedStateOf
+import com.example.voxara.phone.ui.theme.VoxMotion
+import com.example.voxara.phone.ui.theme.VoxRadius
+import com.example.voxara.phone.ui.theme.VoxSpace
+import com.example.voxara.ui.design.rememberDigitCellWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -68,29 +84,71 @@ import com.example.voxara.ui.design.wordRes
 import kotlin.math.roundToInt
 
 /*
- * THE ORBIT PIECES OF THE PHONE: the 250° ring of the watch (same 110° gap at the bottom), the zone as a word with its
- * icon, the meter to the 100 % line, and the share tile. Colour carries the zone together with an icon and a word, never alone.
+ * THE ORBIT PIECES OF THE PHONE: the watch's dose ring (one arc from 12 o'clock, clockwise), the zone as a word with its
+ * icon, the meter to the 100 % line, the share tile, the counting figure and the shared-element and entrance motion.
+ * Colour carries the zone together with an icon and a word, never alone.
  */
-
-/** The ring starts at 145° (bottom left) and sweeps 250°, leaving the 110° gap at the bottom, as on the watch. */
-const val RING_START = 145f
-const val RING_SWEEP = 250f
 
 // ------------------------------------------------------------------------------------ shared element
 
-/** The scopes a destination is shown in, so the ring on Home can become the ring in Today. Null in previews and tests. */
+/** The scopes a destination is shown in, so Home's cards can become their screens. Null in previews and tests. */
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransition = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalDestinationScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
-/** Marks this as the same element across two destinations ([key]); a plain modifier when there is no transition. */
+/**
+ * Marks this as the same element across two destinations ([key]): a container transform that moves on the expressive slow
+ * spring and clips to [shape] while it flies. A plain modifier when there is no transition or motion is reduced.
+ */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun Modifier.sharedAcrossScreens(key: String): Modifier {
+fun Modifier.sharedAcrossScreens(key: String, shape: Shape = RoundedCornerShape(VoxRadius.hero)): Modifier {
     val shared = LocalSharedTransition.current ?: return this
     val destination = LocalDestinationScope.current ?: return this
-    return with(shared) { this@sharedAcrossScreens.sharedBounds(rememberSharedContentState(key), destination) }
+    if (LocalReduceMotion.current) return this
+    return with(shared) {
+        this@sharedAcrossScreens.sharedBounds(
+            rememberSharedContentState(key), destination,
+            boundsTransform = { _, _ -> VoxMotion.heroSlow() },
+            clipInOverlayDuringTransition = OverlayClip(shape),
+        )
+    }
 }
+
+/** Shared-element keys: the Home card and the screen it grows into. */
+object SharedKeys {
+    const val DOSE = "dose-card"
+    const val HEADPHONES = "headphones-card"
+}
+
+/** When each screen first showed its content in this process ([entrance]). */
+private object FirstLoad {
+    private val started = HashMap<String, Long>()
+    fun startOf(screen: String): Long = synchronized(started) { started.getOrPut(screen) { SystemClock.uptimeMillis() } }
+}
+
+/**
+ * The first-load entrance: the block fades in and rises 12 dp, [index] steps after the first ([VoxMotion.STAGGER_MS]).
+ * Only for blocks that compose within the first moment [screen] shows its content, once per process: coming back to a
+ * screen, or scrolling to a block later, shows it as it is. Nothing with reduced motion. Read in the draw phase.
+ */
+@Composable
+fun Modifier.entrance(screen: String, index: Int): Modifier {
+    val reduce = LocalReduceMotion.current
+    val play = remember { !reduce && SystemClock.uptimeMillis() - FirstLoad.startOf(screen) < ENTRANCE_WINDOW_MS }
+    if (!play) return this
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(VoxMotion.ENTRANCE_MS, delayMillis = index * VoxMotion.STAGGER_MS, easing = EntranceEasing))
+    }
+    return this.graphicsLayer {
+        alpha = progress.value
+        translationY = (1f - progress.value) * 12.dp.toPx()
+    }
+}
+
+private const val ENTRANCE_WINDOW_MS = 400L
+private val EntranceEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 // ------------------------------------------------------------------------------------ motion helpers
 
@@ -145,15 +203,16 @@ fun Meter(percent: Double, modifier: Modifier = Modifier, height: Dp = 8.dp) {
     }
 }
 
-// ------------------------------------------------------------------------------------ the ring
+// ------------------------------------------------------------------------------------ the dose ring
 
 /**
- * THE RING — today's share of the allowance on the watch's 250° arc: a track, a soft glow and the arc in the zone's
- * colour, over a halo of the same colour (depth as light, not shadow). The arc draws in when the screen opens and
- * eases to a new value; [content] sits in the middle. [percent] above 100 fills the arc and the colour says so.
+ * THE DOSE RING — the watch's Dose ring at phone size, with the same meaning: one arc that starts at 12 o'clock and fills
+ * clockwise over a faint full track; full = 100 % of today's limit, and it stays full above it (the colour, the word and the
+ * figure say how far). The fill moves on the expressive slow spring when it first shows and when the value changes; the
+ * sweep is read in the draw phase, so the fill never recomposes. [content] sits in the middle.
  */
 @Composable
-fun OrbitRing(percent: Double, modifier: Modifier = Modifier, strokeWidth: Dp = 16.dp, content: @Composable BoxScope.() -> Unit) {
+fun DoseRing(percent: Double, modifier: Modifier = Modifier, strokeWidth: Dp = 14.dp, content: @Composable BoxScope.() -> Unit) {
     val c = Vox.colors
     val reduce = LocalReduceMotion.current
     val zone = RiskZone.ofPercent(percent)
@@ -161,31 +220,23 @@ fun OrbitRing(percent: Double, modifier: Modifier = Modifier, strokeWidth: Dp = 
     val target = (percent / 100.0).coerceIn(0.0, 1.0).toFloat()
     val shown = remember { Animatable(if (reduce) target else 0f) }
     LaunchedEffect(target, reduce) {
-        if (reduce) shown.snapTo(target)
-        else shown.animateTo(target, spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessVeryLow))
+        if (reduce) shown.snapTo(target) else shown.animateTo(target, VoxMotion.heroSlow())
     }
-    Box(modifier.aspectRatio(1f), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
+    Box(
+        modifier.aspectRatio(1f).drawBehind {
             val w = strokeWidth.toPx()
-            val inset = w * 1.2f
-            val d = minOf(size.width, size.height) - 2 * inset
+            val d = size.minDimension - w
             val topLeft = Offset((size.width - d) / 2, (size.height - d) / 2)
-            // the halo: a soft wash of the zone's colour behind the ring
-            drawCircle(
-                Brush.radialGradient(
-                    listOf(tone.fill.copy(alpha = if (c.dark) 0.20f else 0.13f), Color.Transparent),
-                    center = center, radius = size.minDimension * 0.58f,
-                ),
-            )
-            drawArc(c.track, RING_START, RING_SWEEP, false, topLeft, Size(d, d), style = Stroke(w, cap = StrokeCap.Round))
-            val sweep = RING_SWEEP * shown.value
-            if (sweep > 0.5f) {
-                drawArc(tone.fill.copy(alpha = 0.16f), RING_START, sweep, false, topLeft, Size(d, d), style = Stroke(w * 1.7f, cap = StrokeCap.Round))
-                drawArc(tone.fill, RING_START, sweep, false, topLeft, Size(d, d), style = Stroke(w, cap = StrokeCap.Round))
-            }
-        }
-        content()
-    }
+            val arc = Size(d, d)
+            drawArc(c.track, 0f, 360f, false, topLeft, arc, style = Stroke(w))
+            // the spring may overshoot a little: the arc never draws past full or before empty
+            val sweep = 360f * shown.value.coerceIn(0f, 1f)
+            // a clean stroke over the faint track: no glow, no halo
+            if (sweep > 0.5f) drawArc(tone.fill, -90f, sweep, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+        },
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
 }
 
 /**
@@ -202,6 +253,7 @@ fun FitFigure(
     sizes: List<Int> = listOf(92, 80, 68, 58, 48),
     spoken: String? = null,
     appear: Boolean = false,
+    count: Boolean = false,
 ) {
     com.example.voxara.ui.design.CappedFontScale(1.3f) {
         val measurer = rememberTextMeasurer()
@@ -217,13 +269,52 @@ fun FitFigure(
             } ?: sizes.last()
         }
         val reduce = LocalReduceMotion.current
-        // With [appear] the figure rolls up from 0 to its value when it first shows.
-        var shown by remember { mutableIntStateOf(if (appear && !reduce) 0 else value) }
-        LaunchedEffect(value) { shown = value }
         val said = spoken ?: (value.toString() + if (suffix.isNotEmpty()) " $suffix" else "")
-        RollingDigits(shown, figureStyle(size), color, modifier, suffix = suffix, still = reduce, spoken = said, cellScale = DISPLAY_CELL, fitCells = true)
+        if (count) {
+            CountingDigits(value, figureStyle(size), color, modifier, suffix, still = reduce, spoken = said)
+        } else {
+            // With [appear] the figure rolls up from 0 to its value when it first shows.
+            var shown by remember { mutableIntStateOf(if (appear && !reduce) 0 else value) }
+            LaunchedEffect(value) { shown = value }
+            RollingDigits(shown, figureStyle(size), color, modifier, suffix = suffix, still = reduce, spoken = said, cellScale = DISPLAY_CELL, fitCells = true)
+        }
     }
 }
+
+/**
+ * A figure that COUNTS to [value] (from 0 when it first shows, from the last value after that) in fixed digit cells sized
+ * to the final figure, right-aligned, so nothing shifts while it runs. Only this composable recomposes while it counts, and
+ * only when the shown integer changes. TalkBack hears the final value. Still with reduced motion.
+ */
+@Composable
+private fun CountingDigits(value: Int, style: TextStyle, color: Color, modifier: Modifier, suffix: String, still: Boolean, spoken: String) {
+    val anim = remember { Animatable(if (still) value.toFloat() else 0f) }
+    LaunchedEffect(value, still) {
+        if (still) anim.snapTo(value.toFloat())
+        else anim.animateTo(value.toFloat(), tween(VoxMotion.COUNT_MS, easing = CountEasing))
+    }
+    val shown by remember { derivedStateOf { anim.value.roundToInt() } }
+    val cell = rememberDigitCellWidth(style, DISPLAY_CELL, value.toString())
+    val companion = companionStyle(style)
+    val text = shown.toString()
+    val cells = maxOf(text.length, value.toString().length)
+    Row(modifier.clearAndSetSemantics { contentDescription = spoken }, verticalAlignment = Alignment.Bottom) {
+        repeat(cells - text.length) { Spacer(Modifier.width(cell)) }
+        text.forEach { ch ->
+            Box(Modifier.width(cell), contentAlignment = Alignment.Center) {
+                BasicText(ch.toString(), style = style.copy(color = color, textAlign = TextAlign.Center), maxLines = 1, softWrap = false)
+            }
+        }
+        if (suffix.isNotEmpty()) {
+            BasicText(
+                suffix, style = companion.copy(color = color), maxLines = 1, softWrap = false,
+                modifier = Modifier.padding(start = 3.dp, bottom = style.fontSize.value.dp * 0.11f),
+            )
+        }
+    }
+}
+
+private val CountEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 
 /** Display-size digit cells sit a little tighter than the widest digit, so "83" reads as one number, not two. */
 const val DISPLAY_CELL = 0.92f
@@ -244,34 +335,36 @@ fun ShareTile(
     spoken: String,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    count: Boolean = false,
+    sharedKey: String? = null,
 ) {
     val c = Vox.colors
     val source = remember { MutableInteractionSource() }
+    val shape = MaterialTheme.shapes.medium
+    val m = if (sharedKey != null) modifier.sharedAcrossScreens(sharedKey, shape) else modifier
     val body = @Composable {
         Column(
-            Modifier.padding(16.dp).semantics(mergeDescendants = true) { contentDescription = spoken },
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.padding(VoxSpace.m).semantics(mergeDescendants = true) { contentDescription = spoken },
+            verticalArrangement = Arrangement.spacedBy(VoxSpace.xs),
         ) {
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(VoxSpace.xs)) {
                 Icon(icon, null, tint = iconTint, modifier = Modifier.padding(top = 2.dp).size(18.dp))
                 Text(label, style = MaterialTheme.typography.labelLarge, color = c.text2)
             }
-            FitFigure(percent.roundToInt(), maxWidth = 200.dp, color = c.text, sizes = listOf(36, 30, 26), spoken = "")
+            FitFigure(percent.roundToInt(), maxWidth = 200.dp, color = c.text, sizes = listOf(36, 30, 26), spoken = "", count = count)
             Text(caption, style = MaterialTheme.typography.bodySmall, color = c.text2)
             Meter(percent)
         }
     }
     if (onClick != null) {
         Surface(
-            onClick = onClick, modifier = modifier.pressFeedback(source), shape = RoundedCornerShape20, color = c.surface2,
+            onClick = onClick, modifier = m.pressFeedback(source), shape = shape, color = c.surface,
             contentColor = c.text, interactionSource = source,
         ) { body() }
     } else {
-        Surface(modifier = modifier, shape = RoundedCornerShape20, color = c.surface2, contentColor = c.text) { body() }
+        Surface(modifier = m, shape = shape, color = c.surface, contentColor = c.text) { body() }
     }
 }
-
-private val RoundedCornerShape20 = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
 
 /** A text style for annotation text inside charts. */
 internal val AnnotationStyle: TextStyle get() = wordsStyle(12, FontWeight.SemiBold, 1.2f)
