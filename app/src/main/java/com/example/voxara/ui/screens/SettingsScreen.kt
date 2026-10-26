@@ -18,7 +18,6 @@ import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.Scenario
 import com.example.voxara.debug.DebugTools
-import com.example.voxara.debug.DetectionLog
 import com.example.voxara.text.labelRes
 import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv

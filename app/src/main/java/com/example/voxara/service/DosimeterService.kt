@@ -76,9 +76,6 @@ import com.example.voxara.data.ExposureDb
 import com.example.voxara.data.ExposureState
 import com.example.voxara.data.ExposureRepository
 import com.example.voxara.data.LocaleStore
-import com.example.voxara.debug.DetectionLog
-import com.example.voxara.debug.DetectionTrace
-import com.example.voxara.core.scene.SceneModel
 import com.example.voxara.sync.CompanionLink
 import com.example.voxara.haptics.HapticConductor
 import com.example.voxara.haptics.Pattern
@@ -657,11 +654,9 @@ class DosimeterService : LifecycleService() {
      * otherwise just the staleness check. The feature vectors are dropped right here.
      */
     private fun detectSituation(burst: AudioBurstSampler.Burst, now: Long, hp: HeadphoneWatcher.Snapshot) {
-        val t0 = System.nanoTime()
         val vote = if (burst.sceneFeatures.isNotEmpty() && autoModes.wantsVote(now)) {
             autoModes.voteOf(now, burst.sceneFeatures, burst.leqDba)
         } else null
-        val inferenceNs = System.nanoTime() - t0
         val decision = if (vote != null) {
             autoModes.offer(
                 vote,
@@ -671,41 +666,6 @@ class DosimeterService : LifecycleService() {
             autoModes.tick(now)
         }
         applyDetection(decision, now)
-        if (vote != null && DetectionLog.available) logDetection(burst, vote, decision, inferenceNs, hp.playing)
-    }
-
-    /** Debug builds: one numbers-only row per classification (DetectionLog, src/debug). */
-    private fun logDetection(
-        burst: AudioBurstSampler.Burst,
-        vote: AutoModeDetector.Vote,
-        decision: AutoModeDetector.Decision,
-        inferenceNs: Long,
-        headphones: Boolean,
-    ) {
-        val classes = SceneModel.classes
-        val top = vote.classProbabilities?.let { p ->
-            p.indices.sortedByDescending { p[it] }.take(3).map { classes[it] to p[it] }
-        } ?: emptyList()
-        DetectionLog.record(
-            this,
-            DetectionTrace(
-                atMs = vote.atMs,
-                dba = burst.leqDba,
-                featureMs = burst.sceneFeatureNanos / 1e6,
-                vectors = burst.sceneFeatures.size,
-                inferenceMs = inferenceNs / 1e6,
-                topClasses = top,
-                vote = decision.vote,
-                musicLike = vote.musicLike,
-                tonalityDb = vote.tonalityDb,
-                vetoes = decision.vetoes.map { it.name },
-                detected = decision.detected,
-                mode = ExposureRepository.state.value.mode,
-                confidence = decision.confidence,
-                headphonesPlaying = headphones,
-                sceneModelEnabled = BuildConfig.SCENE_MODEL_ENABLED,
-            ),
-        )
     }
 
     /**
