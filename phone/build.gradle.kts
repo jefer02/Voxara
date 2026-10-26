@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.baselineprofile)
 }
 
 /**
@@ -94,6 +95,10 @@ dependencies {
     implementation(libs.ui.graphics)
     implementation(libs.ui.tooling.preview)
     implementation(libs.glance.appwidget)
+    implementation(libs.haze)
+    // installs the Baseline Profile (src/main/generated/baselineProfiles, made by :baselineprofile) on devices without Play
+    implementation(libs.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
     // Play services brings Fragment 1.1 transitively; 1.3+ is required with the Activity Result APIs.
     implementation(libs.fragment)
     debugImplementation(libs.ui.tooling)
