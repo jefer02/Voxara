@@ -10,7 +10,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.InteractionSource
@@ -48,24 +47,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonColors
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -79,14 +88,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -94,14 +106,19 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.phone.R
 import com.example.voxara.phone.model.Freshness
 import com.example.voxara.phone.ui.freshnessText
+import com.example.voxara.phone.ui.theme.LocalGlass
 import com.example.voxara.phone.ui.theme.LocalReduceMotion
+import com.example.voxara.phone.ui.theme.VoxMotion
+import com.example.voxara.phone.ui.theme.VoxSpace
+import com.example.voxara.phone.ui.theme.VoxType
+import com.example.voxara.ui.design.CappedFontScale
+import dev.chrisbanes.haze.HazeState
 import com.example.voxara.phone.ui.theme.Vox
 import com.example.voxara.phone.ui.theme.VoxNum
 import com.example.voxara.ui.design.VoxIcons
@@ -114,13 +131,24 @@ import com.example.voxara.ui.design.wordRes
 val ContentMaxWidth = 720.dp
 val ScreenGutter = 16.dp
 val TouchTarget = 48.dp
+/** A row of a grouped section: above the 48 dp target, with room for two lines. */
+val RowMinHeight = 52.dp
 
 // ------------------------------------------------------------------------------------ screen
 
+/** The test tag of every screen's list (the Baseline Profile journeys scroll it). */
+const val ListTag = "list"
+
+/** The collapsed bar's height (under the status bar). */
+val BarHeight = 56.dp
+
 /**
- * A screen: a large title that collapses as the list scrolls (Material 3), pull to refresh with the wave indicator,
- * and content centred to a readable width on large screens. With [largeTitle] off there is no bar at all and the
- * screen draws its own header (Home: the link line and the sync button).
+ * A screen (docs/design/PHONE_PREMIUM.md): the list runs edge to edge under a glass bar. With [largeTitle] the screen opens
+ * with its title large, as the list's first item; it scrolls up under the bar, and as it goes the bar's material and its
+ * small title fade in (read in the draw phase: scrolling never recomposes). [header] is a line under the large title
+ * (Home: the watch's status). Without [largeTitle] the bar shows its material and small title from the start. Pull to
+ * refresh with the wave indicator; content centred to a readable width on large screens; the last item ends above the
+ * bottom bar and the gesture area.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,61 +160,141 @@ fun VoxScreen(
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     largeTitle: Boolean = true,
+    header: (@Composable () -> Unit)? = null,
+    listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
-    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val c = Vox.colors
-    Scaffold(
-        modifier = if (largeTitle) Modifier.nestedScroll(scroll.nestedScrollConnection) else Modifier,
-        containerColor = c.background,
-        bottomBar = bottomBar,
-        topBar = {
-            if (largeTitle) {
-                LargeTopAppBar(
-                    title = { Text(title, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
-                    navigationIcon = {
-                        if (onBack != null) {
-                            IconButton(onClick = onBack, modifier = Modifier.size(TouchTarget)) {
-                                Icon(VoxIcons.Back, contentDescription = stringResource(R.string.action_back))
-                            }
-                        }
-                    },
-                    actions = actions,
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = c.background,
-                        scrolledContainerColor = c.background,
-                        titleContentColor = c.text,
-                        navigationIconContentColor = c.text,
-                        actionIconContentColor = c.text,
-                    ),
-                    scrollBehavior = scroll,
-                )
-            }
-        },
-    ) { padding ->
-        val list = @Composable {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = padding.calculateTopPadding() + 4.dp,
-                    bottom = padding.calculateBottomPadding() + 32.dp,
-                    start = ScreenGutter, end = ScreenGutter,
-                ),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                content = content,
-            )
-        }
-        if (onRefresh != null) {
-            val state = rememberPullToRefreshState()
-            PullToRefreshBox(
-                isRefreshing = refreshing, onRefresh = onRefresh, state = state, modifier = Modifier.fillMaxSize(),
-                indicator = { WaveRefreshIndicator(state, refreshing, Modifier.align(Alignment.TopCenter)) },
-            ) { list() }
-        } else {
-            list()
+    val glass = LocalGlass.current
+    val haze = remember(glass) { if (glass) HazeState() else null }
+    val barInset = LocalBottomBarInset.current
+    val density = LocalDensity.current
+    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + BarHeight
+    // How far the large title has gone under the bar, 0..1; read only in draw lambdas.
+    val titleTravelPx = with(density) { 44.dp.toPx() }
+    val collapsed: () -> Float = {
+        when {
+            !largeTitle -> 1f
+            listState.firstVisibleItemIndex > 0 -> 1f
+            else -> (listState.firstVisibleItemScrollOffset / titleTravelPx).coerceIn(0f, 1f)
         }
     }
+    Scaffold(
+        containerColor = c.background,
+        contentWindowInsets = WindowInsets(0),
+        bottomBar = {
+            // a screen's own bar (Tono's question field) sits on top of the app's bottom bar
+            Box(
+                if (barInset > 0.dp) Modifier.padding(bottom = barInset).consumeWindowInsets(WindowInsets.navigationBars) else Modifier,
+            ) { bottomBar() }
+        },
+    ) { padding ->
+        val bottom = maxOf(
+            padding.calculateBottomPadding(),
+            if (barInset > 0.dp) barInset else WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+        )
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))) {
+            val list = @Composable {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().glassSource(haze).testTag(ListTag),
+                    state = listState,
+                    contentPadding = PaddingValues(top = top + VoxSpace.xxs, bottom = bottom + VoxSpace.xl, start = ScreenGutter, end = ScreenGutter),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(VoxSpace.m),
+                ) {
+                    if (largeTitle) item(key = "vox-large-title", contentType = "title") { LargeTitle(title, header) }
+                    content()
+                }
+            }
+            if (onRefresh != null) {
+                val state = rememberPullToRefreshState()
+                PullToRefreshBox(
+                    isRefreshing = refreshing, onRefresh = onRefresh, state = state, modifier = Modifier.fillMaxSize(),
+                    indicator = { WaveRefreshIndicator(state, refreshing, Modifier.align(Alignment.TopCenter).padding(top = top)) },
+                ) { list() }
+            } else {
+                list()
+            }
+            GlassTopBar(title, onBack, actions, haze, collapsed, smallTitleIsHeading = !largeTitle)
+        }
+    }
+}
+
+/** The title at the top of the list, large, then the optional line under it. */
+@Composable
+private fun LargeTitle(title: String, header: (@Composable () -> Unit)?) {
+    Column(Modifier.contentWidth().padding(horizontal = VoxSpace.xxs), verticalArrangement = Arrangement.spacedBy(VoxSpace.xxs)) {
+        Text(title, style = VoxType.largeTitle, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
+        header?.invoke()
+    }
+}
+
+/**
+ * The bar: back, the small title and the actions over glass. Its material, hairline and small title appear with
+ * [collapsed] (read in graphicsLayer, so scrolling only redraws the bar). With a large title on the page, the small one is
+ * decoration (TalkBack reads the large one); otherwise it is the screen's heading.
+ */
+@Composable
+private fun GlassTopBar(
+    title: String,
+    onBack: (() -> Unit)?,
+    actions: @Composable RowScope.() -> Unit,
+    haze: HazeState?,
+    collapsed: () -> Float,
+    smallTitleIsHeading: Boolean,
+) {
+    val c = Vox.colors
+    Column(Modifier.fillMaxWidth()) {
+    Box(Modifier.fillMaxWidth()) {
+        Box(Modifier.matchParentSize().graphicsLayer { alpha = collapsed() }.glassBar(haze))
+        Row(
+            Modifier.fillMaxWidth().statusBarsPadding().height(BarHeight).padding(horizontal = VoxSpace.xxs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                IconButton(onClick = onBack, modifier = Modifier.size(TouchTarget)) {
+                    Icon(VoxIcons.Back, contentDescription = stringResource(R.string.action_back), tint = c.text)
+                }
+            } else {
+                Spacer(Modifier.width(TouchTarget))
+            }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                CappedFontScale(1.3f) {
+                    Text(
+                        title, style = VoxType.barTitle, color = c.text, maxLines = 1, softWrap = false,
+                        modifier = Modifier
+                            .graphicsLayer { alpha = ((collapsed() - 0.5f) * 2f).coerceIn(0f, 1f) }
+                            .then(if (smallTitleIsHeading) Modifier.semantics { heading() } else Modifier.clearAndSetSemantics { }),
+                    )
+                }
+            }
+            Row(Modifier.widthIn(min = TouchTarget), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                CompositionLocalProvider(LocalContentColor provides c.text) { actions() }
+            }
+        }
+    }
+    // the scroll edge: once the list runs under the bar, it dissolves over 48 dp instead of meeting a hard line
+    EdgeFade(top = true, Modifier.graphicsLayer { alpha = collapsed() })
+    }
+}
+
+/** How far content dissolves before it meets a bar (under the top bar once scrolled, above the floating tab bar). */
+val EdgeFadeHeight = 48.dp
+
+/**
+ * A soft fade of the background over [EdgeFadeHeight]: solid at the bar's side, clear towards the content. Drawing only (it
+ * takes no touches), so the list under it still scrolls and its rows still respond.
+ */
+@Composable
+fun EdgeFade(top: Boolean, modifier: Modifier = Modifier, height: Dp = EdgeFadeHeight) {
+    val bg = Vox.colors.background
+    val solid = bg.copy(alpha = 0.92f)
+    val clear = bg.copy(alpha = 0f)
+    Box(
+        modifier.fillMaxWidth().height(height).background(
+            Brush.verticalGradient(if (top) listOf(solid, bg.copy(alpha = 0.55f), clear) else listOf(clear, bg.copy(alpha = 0.55f), solid)),
+        ),
+    )
 }
 
 /**
@@ -220,75 +328,119 @@ fun Modifier.contentWidth(): Modifier = this.widthIn(max = ContentMaxWidth).fill
 // ------------------------------------------------------------------------------------ cards
 
 /**
- * Press feedback: the target gives a little (97 %) while it is pressed and springs back; nothing moves when motion is
- * reduced. Pass the same [source] to the clickable.
+ * Press feedback: the target gives a little (97 %) while it is pressed and springs back (standard motion); nothing moves
+ * when motion is reduced. The scale is read in the draw phase. Pass the same [source] to the clickable.
  */
 @Composable
 fun Modifier.pressFeedback(source: InteractionSource, amount: Float = 0.97f): Modifier {
     val pressed by source.collectIsPressedAsState()
     val reduce = LocalReduceMotion.current
-    val scale by animateFloatAsState(
-        if (pressed && !reduce) amount else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium), label = "press",
+    val scale = animateFloatAsState(
+        if (pressed && !reduce) amount else 1f, animationSpec = VoxMotion.standardFast(), label = "press",
     )
-    return this.graphicsLayer { scaleX = scale; scaleY = scale }
+    return this.graphicsLayer { scaleX = scale.value; scaleY = scale.value }
 }
 
-/** A card: flat (no shadow, depth is colour), 20 dp radius, a hairline border; a tap gives press feedback. */
+/** A card: flat (no shadow, no border: depth is the step from the background to the surface), 22 dp radius; a tap gives press feedback. */
 @Composable
 fun VoxCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    padding: Dp = 16.dp,
+    padding: Dp = VoxSpace.m,
     shape: Shape = MaterialTheme.shapes.large,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Vox.colors
     val body = @Composable {
-        Column(Modifier.padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+        Column(Modifier.padding(padding), verticalArrangement = Arrangement.spacedBy(VoxSpace.xs), content = content)
     }
-    val border = BorderStroke(1.dp, c.outline)
     if (onClick != null) {
         val source = remember { MutableInteractionSource() }
         Surface(
             onClick = onClick, modifier = modifier.pressFeedback(source), shape = shape, color = c.surface, contentColor = c.text,
-            border = border, interactionSource = source,
+            interactionSource = source,
         ) { body() }
     } else {
-        Surface(modifier = modifier, shape = shape, color = c.surface, contentColor = c.text, border = border) { body() }
+        Surface(modifier = modifier, shape = shape, color = c.surface, contentColor = c.text) { body() }
     }
 }
 
-/** The title of a group of rows: sentence case, bold, quiet. */
+/**
+ * THE HERO CARD: the one big container a screen leads with (Home: the dose). 28 dp radius, generous padding, press
+ * feedback; [sharedKey] makes it the same element as its counterpart on the screen it opens (container transform).
+ */
+@Composable
+fun HeroCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
+    sharedKey: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = Vox.colors
+    val source = remember { MutableInteractionSource() }
+    val shape = MaterialTheme.shapes.extraLarge
+    Column(
+        modifier
+            .then(if (sharedKey != null) Modifier.sharedAcrossScreens(sharedKey) else Modifier)
+            .then(if (onClick != null) Modifier.pressFeedback(source, 0.98f) else Modifier)
+            .clip(shape)
+            .background(c.surface)
+            .then(
+                if (onClick != null) Modifier.clickable(interactionSource = source, indication = ripple(), role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
+                else Modifier,
+            )
+            .padding(VoxSpace.l),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(VoxSpace.m),
+        content = content,
+    )
+}
+
+/** The title of a grouped section: sentence case, bold, quiet, aligned with the rows' text. */
 @Composable
 fun GroupHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = MaterialTheme.typography.titleSmall,
+        style = VoxType.sectionHeader,
         color = Vox.colors.text2,
-        modifier = modifier.padding(start = 4.dp, top = 14.dp).semantics { heading() },
+        modifier = modifier.padding(start = VoxSpace.m, end = VoxSpace.m, top = VoxSpace.xs).semantics { heading() },
     )
 }
 
-/** A rounded group of rows separated by hairlines. */
+/** An inset grouped section: rows on one rounded surface, separated by inset hairlines. No border, no shadow. */
 @Composable
 fun Group(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val c = Vox.colors
-    Surface(
-        modifier = modifier, shape = MaterialTheme.shapes.medium, color = c.surface, contentColor = c.text,
-        border = BorderStroke(1.dp, c.outline),
-    ) {
+    Surface(modifier = modifier, shape = MaterialTheme.shapes.medium, color = c.surface, contentColor = c.text) {
         Column(content = content)
     }
 }
 
+/** The hairline between two rows of a group; [inset] lines it up with the rows' text (past an icon tile: [RowTextInset]). */
 @Composable
-fun GroupDivider() = HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 1.dp, color = Vox.colors.outline)
+fun GroupDivider(inset: Dp = VoxSpace.m) = HorizontalDivider(Modifier.padding(start = inset), thickness = 1.dp, color = Vox.colors.outline)
+
+/**
+ * A chart in its own grouped section: its title and an optional line under it, then the chart, all 16 dp in. Used by Home,
+ * Today and Trends so every chart sits on the same surface.
+ */
+@Composable
+fun ChartCard(title: String, note: String?, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Group(modifier) {
+        Column(Modifier.fillMaxWidth().padding(VoxSpace.m), verticalArrangement = Arrangement.spacedBy(VoxSpace.xs)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
+            if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2)
+            Spacer(Modifier.height(VoxSpace.xxs))
+            content()
+        }
+    }
+}
 
 /** A footnote under a group. */
 @Composable
 fun GroupNote(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2, modifier = modifier.padding(horizontal = 16.dp))
+    Text(text, style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2, modifier = modifier.padding(horizontal = VoxSpace.m))
 }
 
 @Composable
@@ -316,10 +468,16 @@ private fun RowLabels(title: String, subtitle: String?, pending: Boolean, modifi
 @Composable
 private fun RowIcon(icon: ImageVector?, tint: Color?) {
     if (icon != null) {
-        IconTile(icon, tint ?: Vox.colors.brand)
-        Spacer(Modifier.width(12.dp))
+        IconTile(icon, tint ?: Vox.colors.brand, size = RowIconSize)
+        Spacer(Modifier.width(VoxSpace.s))
     }
 }
+
+/** A row's icon tile. */
+val RowIconSize = 32.dp
+
+/** Where a row's text starts when it has an icon tile (16 + 32 + 12): dividers line up with it. */
+val RowTextInset = 60.dp
 
 @Composable
 fun GroupRow(
@@ -333,12 +491,12 @@ fun GroupRow(
 ) {
     val row = @Composable {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().heightIn(min = RowMinHeight).padding(horizontal = VoxSpace.m, vertical = VoxSpace.s),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RowIcon(icon, iconTint)
             RowLabels(title, subtitle, pending, Modifier.weight(1f))
-            if (trailing != null) { Spacer(Modifier.width(12.dp)); trailing() }
+            if (trailing != null) { Spacer(Modifier.width(VoxSpace.s)); trailing() }
             else if (onClick != null) Icon(VoxIcons.Forward, contentDescription = null, tint = Vox.colors.text3, modifier = Modifier.size(18.dp))
         }
     }
@@ -346,6 +504,20 @@ fun GroupRow(
         val source = remember { MutableInteractionSource() }
         Surface(onClick = onClick, color = Color.Transparent, contentColor = Vox.colors.text, interactionSource = source) { row() }
     } else row()
+}
+
+/** A fact as a row: its label (and an optional line under it) and its value at the end, in the bold number style. */
+@Composable
+fun ValueRow(label: String, value: String, subtitle: String? = null) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = RowMinHeight).padding(horizontal = VoxSpace.m, vertical = VoxSpace.s)
+            .semantics(mergeDescendants = true) { },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowLabels(label, subtitle, false, Modifier.weight(1f))
+        Spacer(Modifier.width(VoxSpace.s))
+        Text(value, style = VoxNum.medium, color = Vox.colors.text, textAlign = TextAlign.End)
+    }
 }
 
 /**
@@ -363,16 +535,16 @@ fun ExpandableRow(
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     val reduce = LocalReduceMotion.current
-    // The forward chevron turns down when closed and up when open.
-    val turn by animateFloatAsState(if (open) -90f else 90f, if (reduce) snap() else tween(200), label = "chevron")
+    // The chevron turns (standard motion); the row opens with an expressive spring (a card expanding is a hero moment).
+    val turn by animateFloatAsState(if (open) -90f else 90f, VoxMotion.spec(reduce, VoxMotion.standard()), label = "chevron")
     val stateText = stringResource(if (open) R.string.state_expanded else R.string.state_collapsed)
-    Column(modifier.animateContentSize(if (reduce) snap() else spring(stiffness = Spring.StiffnessMediumLow))) {
+    Column(modifier.animateContentSize(VoxMotion.spec(reduce, VoxMotion.hero()))) {
         Surface(
             onClick = { open = !open }, color = Color.Transparent, contentColor = Vox.colors.text,
             modifier = Modifier.semantics { stateDescription = stateText },
         ) {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().heightIn(min = RowMinHeight).padding(horizontal = VoxSpace.m, vertical = VoxSpace.s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RowIcon(icon, iconTint)
@@ -400,16 +572,16 @@ fun SwitchRow(
     enabled: Boolean = true,
     pending: Boolean = false,
 ) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberVoxHaptics()
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .heightIn(min = RowMinHeight)
             .toggleable(value = checked, enabled = enabled, role = Role.Switch) {
-                haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+                haptics.toggle(it)
                 onChange(it)
             }
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = VoxSpace.m, vertical = VoxSpace.s)
             .alpha(if (enabled) 1f else 0.5f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -432,7 +604,7 @@ fun StepperRow(
     subtitle: String? = null,
     pending: Boolean = false,
 ) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberVoxHaptics()
     // Label above, control below: nothing gets squeezed at large font scales.
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
         RowLabels(title, subtitle, pending, Modifier.padding(end = 8.dp))
@@ -442,7 +614,7 @@ fun StepperRow(
                 containerColor = Vox.colors.surface2, contentColor = Vox.colors.brand,
             )
             FilledTonalIconButton(
-                onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onMinus() },
+                onClick = { haptics.segment(); onMinus() },
                 enabled = canMinus, modifier = Modifier.size(TouchTarget), colors = buttons,
             ) { Icon(VoxIcons.Minus, contentDescription = stringResource(R.string.action_decrease, title)) }
             Text(
@@ -451,7 +623,7 @@ fun StepperRow(
                 maxLines = 1,
             )
             FilledTonalIconButton(
-                onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onPlus() },
+                onClick = { haptics.segment(); onPlus() },
                 enabled = canPlus, modifier = Modifier.size(TouchTarget), colors = buttons,
             ) { Icon(VoxIcons.Plus, contentDescription = stringResource(R.string.action_increase, title)) }
         }
@@ -481,7 +653,7 @@ fun <T> ChoiceRow(
  */
 @Composable
 fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberVoxHaptics()
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val labelStyle = if (options.size >= 4) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
@@ -494,7 +666,7 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
                 options.forEach { (value, label) ->
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = TouchTarget)
-                            .selectable(selected = value == selected, role = Role.RadioButton) { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onSelect(value) },
+                            .selectable(selected = value == selected, role = Role.RadioButton) { haptics.segment(); onSelect(value) },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
@@ -507,31 +679,37 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
                 }
             }
         } else {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                options.forEachIndexed { i, (value, label) ->
-                    SegmentedButton(
-                        selected = value == selected,
-                        onClick = { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onSelect(value) },
-                        shape = SegmentedButtonDefaults.itemShape(i, options.size),
-                        colors = segmentColors(),
-                        icon = {},
-                        modifier = Modifier.heightIn(min = TouchTarget).fillMaxHeight(),
-                        label = { Text(label, maxLines = 2, textAlign = TextAlign.Center, style = labelStyle) },
-                    )
+            // a track with one accent indicator that springs (standard motion) to the chosen segment; the indicator's
+            // position is read in the draw phase, so it moves without recomposing the labels
+            val c = Vox.colors
+            val reduce = LocalReduceMotion.current
+            val index = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+            val position = animateFloatAsState(index.toFloat(), VoxMotion.spec(reduce, VoxMotion.standard()), label = "segment")
+            Row(
+                Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(CircleShape).background(c.surface2).padding(3.dp)
+                    .drawBehind {
+                        val w = size.width / options.size
+                        drawRoundRect(c.accent.fill, Offset(position.value * w, 0f), Size(w, size.height), CornerRadius(size.height / 2f))
+                    }
+                    .selectableGroup(),
+            ) {
+                options.forEach { (value, label) ->
+                    val on = value == selected
+                    Box(
+                        Modifier.weight(1f).fillMaxHeight().heightIn(min = TouchTarget - 6.dp).clip(CircleShape)
+                            .selectable(selected = on, role = Role.RadioButton) {
+                                if (!on) haptics.segment()
+                                onSelect(value)
+                            }
+                            .padding(horizontal = VoxSpace.xs, vertical = VoxSpace.xxs),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(label, maxLines = 2, textAlign = TextAlign.Center, style = labelStyle, color = if (on) c.accent.onFill else c.text)
+                    }
                 }
             }
         }
     }
-}
-
-/** The active segment in the accent fill with its own text colour; the others quiet. */
-@Composable
-private fun segmentColors(): SegmentedButtonColors {
-    val c = Vox.colors
-    return SegmentedButtonDefaults.colors(
-        activeContainerColor = c.accent.fill, activeContentColor = c.accent.onFill, activeBorderColor = c.accent.fill,
-        inactiveContainerColor = c.surface2, inactiveContentColor = c.text, inactiveBorderColor = c.outline,
-    )
 }
 
 // ------------------------------------------------------------------------------------ buttons
