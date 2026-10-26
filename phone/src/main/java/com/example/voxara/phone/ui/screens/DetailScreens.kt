@@ -40,13 +40,21 @@ import com.example.voxara.phone.ui.components.GroupDivider
 import com.example.voxara.phone.ui.components.GroupHeader
 import com.example.voxara.phone.ui.components.HourColumns
 import com.example.voxara.phone.ui.components.IconTile
-import com.example.voxara.phone.ui.components.OrbitRing
 import com.example.voxara.phone.ui.components.SkeletonCard
 import com.example.voxara.phone.ui.components.VoxScreen
 import com.example.voxara.phone.ui.components.ZoneStrip
 import com.example.voxara.phone.ui.components.ZoneWord
 import com.example.voxara.phone.ui.components.contentWidth
-import com.example.voxara.phone.ui.components.sharedAcrossScreens
+import com.example.voxara.phone.ui.components.ChartCard
+import com.example.voxara.phone.ui.components.DoseRing
+import com.example.voxara.phone.ui.components.HeroCard
+import com.example.voxara.phone.ui.components.SharedKeys
+import com.example.voxara.phone.ui.components.ValueRow
+import com.example.voxara.phone.ui.components.RowIconSize
+import com.example.voxara.phone.ui.components.RowMinHeight
+import com.example.voxara.phone.ui.components.RowTextInset
+import com.example.voxara.phone.ui.theme.VoxSpace
+import androidx.compose.foundation.layout.heightIn
 import com.example.voxara.phone.ui.components.zoneWordText
 import com.example.voxara.phone.ui.dateText
 import com.example.voxara.phone.ui.isLevel
@@ -97,6 +105,7 @@ fun TodayScreen(s: PhoneUiState, onBack: () -> Unit, onRefresh: () -> Unit) {
                     CumulativeLine(
                         cumulative, nowMinute / 1440f,
                         stringResource(R.string.chart_cumulative_cd, total.roundToInt(), clock(nowMinute)),
+                        nowMinute = nowMinute,
                     )
                 }
             }
@@ -146,49 +155,40 @@ fun TodayScreen(s: PhoneUiState, onBack: () -> Unit, onRefresh: () -> Unit) {
         if (todays.isEmpty()) {
             item { Text(stringResource(R.string.today_no_alerts), style = MaterialTheme.typography.bodyMedium, color = Vox.colors.text2, modifier = Modifier.contentWidth().padding(horizontal = 16.dp)) }
         } else {
-            item { Group(Modifier.contentWidth()) { todays.forEachIndexed { i, a -> if (i > 0) GroupDivider(); AlertRow(a) } } }
+            item { Group(Modifier.contentWidth()) { todays.forEachIndexed { i, a -> if (i > 0) GroupDivider(RowTextInset); AlertRow(a) } } }
         }
     }
 }
 
-/** The ring of Home, smaller: the same element (it grows out of Home's ring), the figure, the zone as its own label under it. */
+/**
+ * Home's dose card, smaller: the same element (Home's card grows into it, [SharedKeys.DOSE]) and the same ring (one arc
+ * from 12 o'clock, clockwise, full = 100 %), the figure, the zone as its own label and what the figure is a share of.
+ */
 @Composable
 private fun TodayRing(total: Double, zone: RiskZone) {
     val c = Vox.colors
     val cd = stringResource(R.string.home_ring_cd, total.roundToInt(), zoneWordText(zone))
-    Column(Modifier.contentWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        OrbitRing(
-            total,
-            Modifier.width(220.dp).sharedAcrossScreens("ring").semantics(mergeDescendants = true) { contentDescription = cd },
-            strokeWidth = 14.dp,
-        ) {
-            FitFigure(total.roundToInt(), maxWidth = 150.dp, color = c.text, sizes = listOf(64, 54, 46, 40), spoken = "")
+    HeroCard(Modifier.contentWidth(), sharedKey = SharedKeys.DOSE) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DoseRing(total, Modifier.width(200.dp).semantics(mergeDescendants = true) { contentDescription = cd }, strokeWidth = 12.dp) {
+                FitFigure(total.roundToInt(), maxWidth = 140.dp, color = c.text, sizes = listOf(60, 52, 46, 40), spoken = "")
+            }
+            ZoneWord(zone, sizeSp = 17)
+            Text(stringResource(R.string.home_of_allowance), style = MaterialTheme.typography.bodyMedium, color = c.text2, textAlign = TextAlign.Center)
         }
-        ZoneWord(zone, sizeSp = 17)
-        Text(stringResource(R.string.home_of_allowance), style = MaterialTheme.typography.bodyMedium, color = c.text2, textAlign = TextAlign.Center)
     }
 }
 
-/** A titled block on the page itself (no card): heading, an optional line under it, then the chart. */
+/** A chart of Today in its own grouped section ([ChartCard]). */
 @Composable
 private fun Section(title: String, note: String?, content: @Composable () -> Unit) {
-    Column(Modifier.contentWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
-        if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2)
-        content()
-    }
+    ChartCard(title, note, Modifier.contentWidth()) { content() }
 }
 
 private fun clock(minuteOfDay: Int): String = "%02d:%02d".format(minuteOfDay / 60 % 24, minuteOfDay % 60)
 
 @Composable
-private fun MetricRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.titleSmall, color = Vox.colors.text, modifier = Modifier.weight(1f))
-        Spacer(Modifier.width(12.dp))
-        Text(value, style = VoxNum.medium, color = Vox.colors.text, modifier = Modifier.widthIn(min = 56.dp), textAlign = TextAlign.End)
-    }
-}
+private fun MetricRow(label: String, value: String) = ValueRow(label, value)
 
 // ------------------------------------------------------------------------------------ alerts
 
@@ -212,13 +212,14 @@ fun AlertRow(a: AlertRecord) {
     // large text: the value joins the lines under the title instead of squeezing a column beside them
     val stacked = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).clearAndSetSemantics { contentDescription = cd },
+        Modifier.fillMaxWidth().heightIn(min = RowMinHeight).padding(horizontal = VoxSpace.m, vertical = VoxSpace.s)
+            .clearAndSetSemantics { contentDescription = cd },
         verticalAlignment = if (stacked) Alignment.Top else Alignment.CenterVertically,
     ) {
-        IconTile(VoxIcons.zone(zone), c.zoneInk(zone))
-        Spacer(Modifier.width(12.dp))
+        IconTile(VoxIcons.zone(zone), c.zoneInk(zone), size = RowIconSize)
+        Spacer(Modifier.width(VoxSpace.s))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = c.text)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = c.text)
             Text("$tier · $time · $state", style = MaterialTheme.typography.bodySmall, color = c.text2)
             if (stacked) {
                 Text(if (a.level > 0) "$value · " + stringResource(R.string.alert_level, a.level) else value, style = VoxNum.medium, color = c.text)
@@ -247,9 +248,9 @@ fun AlertsScreen(s: PhoneUiState, onBack: () -> Unit, onRefresh: () -> Unit) {
             return@VoxScreen
         }
         val byDay = s.history.alerts.groupBy { dayKey(it.atMs) }
-        for ((_, alerts) in byDay) {
-            item { GroupHeader(dateText(alerts.first().atMs), Modifier.contentWidth()) }
-            item { Group(Modifier.contentWidth()) { alerts.forEachIndexed { i, a -> if (i > 0) GroupDivider(); AlertRow(a) } } }
+        for ((day, alerts) in byDay) {
+            item(key = "h-$day") { GroupHeader(dateText(alerts.first().atMs), Modifier.contentWidth()) }
+            item(key = "g-$day") { Group(Modifier.contentWidth()) { alerts.forEachIndexed { i, a -> if (i > 0) GroupDivider(RowTextInset); AlertRow(a) } } }
         }
     }
 }

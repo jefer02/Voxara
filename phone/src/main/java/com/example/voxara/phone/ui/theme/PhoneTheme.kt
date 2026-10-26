@@ -1,8 +1,12 @@
 package com.example.voxara.phone.ui.theme
 
 import androidx.compose.animation.animateColorAsState
+import android.app.ActivityManager
+import android.os.Build
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +21,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -112,6 +118,12 @@ val LocalVox = staticCompositionLocalOf { VoxColors.of(dark = false, accent = Ac
 val LocalReduceMotion = staticCompositionLocalOf { false }
 
 /**
+ * Translucent blurred bars (docs/design/PHONE_PREMIUM.md §Materials): on from Android 12 (RenderEffect) on devices that are
+ * not low-RAM; otherwise the bars are solid surfaces. Never needed to read anything: the bars carry the same content either way.
+ */
+val LocalGlass = staticCompositionLocalOf { false }
+
+/**
  * The zone that sets the level-reactive accent of headers and heroes: today's dose zone (the phone
  * never shows a live level). OK until the app provides it.
  */
@@ -167,14 +179,80 @@ fun wordsStyle(sizeSp: Int, weight: FontWeight = FontWeight.Medium, lineHeight: 
     fontFamily = JakartaFamily, fontWeight = weight, fontSize = sizeSp.sp, lineHeight = (sizeSp * lineHeight).sp,
 )
 
-/** Cards 22 dp, hero 26 dp, pills fully round. */
+/** Radii (docs/design/PHONE_PREMIUM.md): rows 12, grouped sections and cards 22, the hero 28, pills fully round. */
+object VoxRadius {
+    val row = 12.dp
+    val section = 22.dp
+    val hero = 28.dp
+}
+
 val VoxShapes = Shapes(
     extraSmall = RoundedCornerShape(10.dp),
     small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(22.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(26.dp),
+    medium = RoundedCornerShape(VoxRadius.section),
+    large = RoundedCornerShape(VoxRadius.section),
+    extraLarge = RoundedCornerShape(VoxRadius.hero),
 )
+
+/**
+ * The 8-pt grid. Every gap and padding is one of these; 4 and 12 are the half steps used inside rows only.
+ */
+object VoxSpace {
+    val xxs = 4.dp
+    val xs = 8.dp
+    val s = 12.dp
+    val m = 16.dp
+    val l = 24.dp
+    val xl = 32.dp
+    val xxl = 48.dp
+}
+
+/** Type roles on top of the Material scale ([VoxTypography]): the collapsing title and the bar's small title. */
+object VoxType {
+    /** The large title a screen opens with; it scrolls under the bar. */
+    val largeTitle = style(32, 38, FontWeight.ExtraBold, -0.025)
+    /** The title in the collapsed bar. */
+    val barTitle = style(17, 22, FontWeight.Bold, -0.01)
+    /** A grouped section's header: sentence case, never uppercase. */
+    val sectionHeader = style(15, 20, FontWeight.Bold)
+}
+
+/**
+ * MOTION. Two families, as Material 3 Expressive defines them: EXPRESSIVE springs for the hero moments only (the ring
+ * filling, a card growing into its screen, a number counting) and STANDARD springs for everything utilitarian. The values
+ * are the Material tokens (ExpressiveMotionTokens / StandardMotionTokens of material3 1.4): `MotionScheme.expressive()` is
+ * not public in the stable material3 this app builds on, so the specs live here and read the same. With reduced motion
+ * every spec is a snap ([spec]).
+ */
+object VoxMotion {
+    /** Expressive, slow spatial: the ring filling, a card growing into its screen. */
+    fun <T> heroSlow(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.8f, stiffness = 200f)
+    /** Expressive, default spatial. */
+    fun <T> hero(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.8f, stiffness = 380f)
+    /** Standard, default spatial: press feedback, a chevron turning, a pill moving. */
+    fun <T> standard(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.9f, stiffness = 700f)
+    /** Standard, fast spatial. */
+    fun <T> standardFast(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.9f, stiffness = 1400f)
+    /** Effects (alpha, colour): no bounce. */
+    fun <T> effects(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 1600f)
+
+    /** A number counting to its value. */
+    const val COUNT_MS = 900
+    /** The first-load entrance of one block, and the step between two blocks. */
+    const val ENTRANCE_MS = 420
+    const val STAGGER_MS = 45
+
+    /** [motion], or a snap when motion is reduced. */
+    fun <T> spec(reduce: Boolean, motion: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> = if (reduce) snap() else motion
+}
+
+/** Blur is worth its cost from Android 12 on devices that are not low-RAM; previews and tests draw solid bars. */
+@Composable
+fun glassSupported(): Boolean {
+    if (LocalInspectionMode.current || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+    val context = LocalContext.current
+    return remember(context) { context.getSystemService(ActivityManager::class.java)?.isLowRamDevice != true }
+}
 
 /** How long the colours take to settle after the theme or the accent changes. */
 const val THEME_CROSSFADE_MS = 360
@@ -201,6 +279,7 @@ fun VoxaraPhoneTheme(
     accent: Accent = Accent.DEFAULT,
     reduceMotion: Boolean = false,
     levelZone: RiskZone = RiskZone.OK,
+    glass: Boolean = glassSupported(),
     content: @Composable () -> Unit,
 ) {
     val target = remember(darkTheme, accent) { VoxColors.of(darkTheme, accent) }
@@ -239,6 +318,7 @@ fun VoxaraPhoneTheme(
         LocalVox provides vox,
         LocalReduceMotion provides reduceMotion,
         LocalLevelZone provides levelZone,
+        LocalGlass provides glass,
     ) {
         MaterialTheme(colorScheme = scheme, typography = VoxTypography, shapes = VoxShapes, content = content)
     }

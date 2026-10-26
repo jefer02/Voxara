@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,7 +31,13 @@ import com.example.voxara.phone.R
 import com.example.voxara.phone.model.DayFigure
 import com.example.voxara.phone.model.HearingFigures
 import com.example.voxara.phone.ui.PhoneUiState
+import com.example.voxara.phone.ui.components.ChartCard
 import com.example.voxara.phone.ui.components.EmptyState
+import com.example.voxara.phone.ui.components.Group
+import com.example.voxara.phone.ui.components.GroupDivider
+import com.example.voxara.phone.ui.components.GroupRow
+import com.example.voxara.phone.ui.components.HeroCard
+import com.example.voxara.phone.ui.components.RowTextInset
 import com.example.voxara.phone.ui.components.FitFigure
 import com.example.voxara.phone.ui.components.FreshnessLine
 import com.example.voxara.phone.ui.components.DayColumns
@@ -48,6 +52,8 @@ import com.example.voxara.phone.ui.components.ZoneWord
 import com.example.voxara.phone.ui.components.contentWidth
 import com.example.voxara.phone.ui.components.dayText
 import com.example.voxara.phone.ui.theme.Vox
+import com.example.voxara.phone.ui.theme.VoxSpace
+import androidx.compose.ui.text.style.TextAlign
 import com.example.voxara.phone.ui.theme.wordsStyle
 import com.example.voxara.ui.design.VoxIcons
 import com.example.voxara.ui.design.wordRes
@@ -70,7 +76,7 @@ fun TrendsScreen(s: PhoneUiState, onRefresh: () -> Unit, onAskTono: () -> Unit =
     BoxWithConstraints {
     val wide = maxWidth >= 840.dp
     VoxScreen(stringResource(R.string.trends_title), refreshing = s.syncing, onRefresh = onRefresh) {
-        item {
+        item(key = "range") {
             SegmentedChoice(
                 listOf(
                     TrendRange.DAY to stringResource(R.string.range_day),
@@ -81,24 +87,18 @@ fun TrendsScreen(s: PhoneUiState, onRefresh: () -> Unit, onAskTono: () -> Unit =
             )
         }
         if (!s.loaded) {
-            items(2) { SkeletonCard(Modifier.contentWidth(), lines = 4) }
+            items(2, key = { "skeleton-$it" }) { SkeletonCard(Modifier.contentWidth(), lines = 4) }
             return@VoxScreen
         }
-        item { FreshnessLine(s.lastSyncMs, s.nowMs, Modifier.contentWidth()) }
         if (s.history.isEmpty) {
-            item { EmptyState(VoxIcons.Chart, stringResource(R.string.trends_title), stringResource(R.string.trends_empty), Modifier.contentWidth()) }
+            item(key = "empty") { EmptyState(VoxIcons.Chart, stringResource(R.string.trends_title), stringResource(R.string.trends_empty), Modifier.contentWidth()) }
             return@VoxScreen
         }
 
         val f = s.figures
-        val askTono = @Composable {
+        val askTono = @Composable { m: Modifier ->
             if (s.settings.tonoEnabled) {
-                AssistChip(
-                    onClick = onAskTono,
-                    label = { Text(stringResource(R.string.trends_ask_tono), style = MaterialTheme.typography.labelLarge) },
-                    leadingIcon = { Icon(VoxIcons.Ask, null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                )
+                Group(m) { GroupRow(stringResource(R.string.trends_ask_tono), icon = VoxIcons.Ask, onClick = onAskTono) }
             }
         }
         val chart = @Composable {
@@ -112,25 +112,23 @@ fun TrendsScreen(s: PhoneUiState, onRefresh: () -> Unit, onAskTono: () -> Unit =
             // two panes: what it says on the left, the charts on the right
             item {
                 Row(Modifier.widthIn(max = 1100.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(VoxSpace.m)) {
                         Hero(range, f, s)
-                        askTono()
-                        if (range == TrendRange.WEEK) HeadphoneShare(f)
-                        ScoreLine(s)
+                        askTono(Modifier.fillMaxWidth())
+                        Supporting(range, f, s)
                     }
-                    Column(Modifier.weight(1.3f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(Modifier.weight(1.3f), verticalArrangement = Arrangement.spacedBy(VoxSpace.m)) {
                         chart()
                         RollingSection(f, if (range == TrendRange.MONTH) 30 else 7)
                     }
                 }
             }
         } else {
-            item { Hero(range, f, s) }
-            item { Column(Modifier.contentWidth()) { askTono() } }
-            item { Column(Modifier.contentWidth()) { chart() } }
-            item { RollingSection(f, if (range == TrendRange.MONTH) 30 else 7) }
-            if (range == TrendRange.WEEK) item { HeadphoneShare(f) }
-            item { ScoreLine(s) }
+            item(key = "hero") { Hero(range, f, s) }
+            item(key = "chart") { chart() }
+            item(key = "rolling") { RollingSection(f, if (range == TrendRange.MONTH) 30 else 7) }
+            item(key = "supporting") { Supporting(range, f, s) }
+            item(key = "tono") { askTono(Modifier.contentWidth()) }
         }
     }
     }
@@ -169,23 +167,27 @@ private fun Hero(range: TrendRange, f: HearingFigures, s: PhoneUiState) {
         if (zone != null) append(", ").append(stringResource(zone.wordRes()))
         append(". ").append(sentence)
     }
-    Column(Modifier.contentWidth().semantics(mergeDescendants = true) { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        BoxWithConstraints {
-            val room = this.maxWidth
-            FitFigure(value, maxWidth = room * 0.6f, color = c.text, suffix = suffix, sizes = listOf(72, 64, 56, 48), spoken = "")
+    // the range's one hero: the figure counting to its value, the zone as its own label, what it is a share of
+    HeroCard(Modifier.contentWidth().semantics(mergeDescendants = true) { contentDescription = spoken }) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(VoxSpace.xs)) {
+            BoxWithConstraints(contentAlignment = Alignment.Center) {
+                val room = this.maxWidth
+                FitFigure(value, maxWidth = room * 0.7f, color = c.text, suffix = suffix, sizes = listOf(72, 64, 56, 48), spoken = "", count = true)
+            }
+            Text(caption, style = MaterialTheme.typography.bodyMedium, color = c.text2, textAlign = TextAlign.Center)
+            if (zone != null) ZoneWord(zone, sizeSp = 16)
+            if (range == TrendRange.WEEK) {
+                Text(
+                    stringResource(
+                        R.string.trends_week_breakdown, f.surroundingsWeekPercent.roundToInt(), f.headphonesWeekPercent.roundToInt(),
+                    ),
+                    style = MaterialTheme.typography.bodySmall, color = c.text2, textAlign = TextAlign.Center,
+                )
+            }
+            if (sentence.isNotBlank()) {
+                Text(sentence, style = wordsStyle(16, FontWeight.Bold, 1.3f), color = c.text, textAlign = TextAlign.Center, modifier = Modifier.padding(top = VoxSpace.xxs))
+            }
         }
-        // the zone is its own label, the caption stays with the figure
-        if (zone != null) ZoneWord(zone, sizeSp = 16)
-        Text(caption, style = MaterialTheme.typography.bodyMedium, color = c.text2)
-        if (range == TrendRange.WEEK) {
-            Text(
-                stringResource(
-                    R.string.trends_week_breakdown, f.surroundingsWeekPercent.roundToInt(), f.headphonesWeekPercent.roundToInt(),
-                ),
-                style = MaterialTheme.typography.bodyMedium, color = c.text2,
-            )
-        }
-        if (sentence.isNotBlank()) Text(sentence, style = wordsStyle(17, FontWeight.ExtraBold, 1.25f), color = c.text)
     }
 }
 
@@ -205,13 +207,10 @@ private fun changeSentence(f: HearingFigures): String {
 
 // ------------------------------------------------------------------------------------ charts
 
+/** A chart of Trends in its own grouped section ([ChartCard]). */
 @Composable
 private fun Block(title: String, note: String?, content: @Composable () -> Unit) {
-    Column(Modifier.contentWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
-        if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2)
-        content()
-    }
+    ChartCard(title, note, Modifier.contentWidth()) { content() }
 }
 
 @Composable
@@ -263,28 +262,29 @@ private fun zoneWords(): (RiskZone) -> String {
 @Composable
 private fun RollingSection(f: HearingFigures, count: Int) {
     val values = f.rolling.takeLast(count)
+    // one label per value (the day it ends on), so the line can be scrubbed; none when the two do not line up
+    val days = f.lastDays(values.size)
+    val today = stringResource(R.string.stat_today)
+    val labels = if (days.size == values.size) days.mapIndexed { i, d -> if (i == days.lastIndex) today else dayText(d.dayEpoch, "EEE d") } else null
     Block(stringResource(R.string.trends_budget), stringResource(R.string.trends_budget_note)) {
-        RollingLine(values, stringResource(R.string.chart_line_cd, (values.lastOrNull() ?: 0.0).roundToInt()))
+        RollingLine(values, stringResource(R.string.chart_line_cd, (values.lastOrNull() ?: 0.0).roundToInt()), dayLabels = labels)
     }
 }
 
+/**
+ * The supporting lines as one grouped section: how much came from headphones (Week) and the Hearing Care Score (it was the
+ * Home hero before, and it is not a hearing test), each a row with its icon, then when the figures are from.
+ */
 @Composable
-private fun HeadphoneShare(f: HearingFigures) {
+private fun Supporting(range: TrendRange, f: HearingFigures, s: PhoneUiState) {
     val c = Vox.colors
-    Row(Modifier.contentWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Icon(VoxIcons.Headphones, null, tint = c.secondary, modifier = Modifier.padding(top = 2.dp).size(20.dp))
-        Text(
-            stringResource(R.string.trends_headphone_share, (f.headphoneShare * 100).roundToInt()),
-            style = MaterialTheme.typography.bodyMedium, color = c.text2,
-        )
+    Group(Modifier.contentWidth()) {
+        if (range == TrendRange.WEEK) {
+            GroupRow(stringResource(R.string.trends_headphone_share, (f.headphoneShare * 100).roundToInt()), icon = VoxIcons.Headphones, iconTint = c.secondary)
+            GroupDivider(RowTextInset)
+        }
+        GroupRow(stringResource(R.string.trends_score_line, s.score), icon = VoxIcons.Shield)
+        GroupDivider(RowTextInset)
+        FreshnessLine(s.lastSyncMs, s.nowMs, Modifier.padding(horizontal = VoxSpace.m, vertical = VoxSpace.s))
     }
-}
-
-/** The Hearing Care Score, a supporting line: it was the Home hero before, and it is not a hearing test. */
-@Composable
-private fun ScoreLine(s: PhoneUiState) {
-    Text(
-        stringResource(R.string.trends_score_line, s.score),
-        style = MaterialTheme.typography.bodySmall, color = Vox.colors.text2, modifier = Modifier.contentWidth().padding(top = 4.dp),
-    )
 }

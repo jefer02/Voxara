@@ -134,7 +134,6 @@
     <string name="tono_title">Tono</string>
     <string name="tono_placeholder">Pregunta por tu día o tu semana</string>
     <string name="tono_send">Enviar</string>
-    <string name="tono_weekly_title">Tu semana</string>
     <string name="tono_weekly_button">Resumen semanal</string>
     <string name="tono_today_button">¿Cómo va mi día?</string>
     <string name="tono_source_ai">Redactado por IA en la nube</string>
@@ -149,7 +148,6 @@
     <string name="tono_off_body">Activa Tono para recibir resúmenes en lenguaje sencillo. Las alertas nunca dependen de Tono.</string>
     <string name="tono_turn_on">Activar Tono</string>
     <string name="tono_thinking">Tono está pensando…</string>
-    <string name="tono_not_medical">No es un dispositivo médico. Las preguntas sobre síntomas reciben una respuesta fija y nunca se envían.</string>
     <string name="tono_empty">Haz una pregunta o toca una sugerencia.</string>
 
     <string name="watch_title">Reloj</string>
@@ -326,8 +324,8 @@
     <string name="hp_alert_channel">Alertas de volumen de audífonos</string>
     <string name="hp_alert_title">Volumen por encima de lo recomendado</string>
     <string name="hp_alert_text">Estimado en unos %1$d dBA, por encima de los 80 dBA recomendados. Bajarlo protege tus oídos.</string>
-    <string name="hp_lower_action">Bajar a volumen seguro</string>
-    <string name="hp_dismiss_action">Descartar</string>
+    <string name="hp_lower_action">Bajar volumen</string>
+    <string name="hp_dismiss_action">Entendido</string>
     <string name="hp_lower_working">Bajando…</string>
     <string name="hp_lower_lowered_db">Volumen bajado. Ahora unos %1$d dBA (estimado).</string>
     <string name="hp_lower_lowered">Volumen bajado.</string>
@@ -361,9 +359,7 @@
     <string name="action_open_tono">Preguntar a Tono</string>
     <string name="home_ask_tono">Preguntar a Tono</string>
     <string name="home_ask_tono_ai">Preguntar a Tono · con ayuda de IA</string>
-    <string name="uncalibrated_compact">Estimación sin calibrar: las lecturas pueden variar ±3–5 dB.</string>
     <string name="tile_week">Últimos 7 días</string>
-    <string name="tile_week_caption">del límite semanal, entorno</string>
     <string name="tile_week_cd">Últimos 7 días, entorno: %1$d por ciento del límite semanal, %2$s</string>
     <string name="tile_headphones">Audífonos</string>
     <string name="tile_headphones_caption">del límite semanal, últimos 7 días, estimado</string>
@@ -413,4 +409,16 @@
         <item quantity="other">%1$d puntos menos que los 7 días anteriores (%2$d %%).</item>
     </plurals>
     <string name="how_sharing_body">Tu reloj Voxara puede incluir la escucha con audífonos de este teléfono en tu límite semanal. Es opcional y está desactivado hasta que lo actives.\n\nLo que se envía a tu reloj cada vez que algo cambia (audífonos conectados o retirados, reproducir o pausar, el volumen): la hora, cuánto tiempo, el volumen multimedia y el tipo de salida (cable, Bluetooth…). El reloj lo convierte en un nivel estimado. Mientras esté activado, una notificación pequeña indica que Voxara vigila los audífonos.\n\nNunca se envía ni se guarda: audio, títulos de canciones o videos, nombres de apps, nombres de audífonos ni direcciones Bluetooth. Nada va a internet; solo viaja a tu propio reloj.</string>
+    <!-- Inicio, pase premium (docs/design/PHONE_PREMIUM.md) -->
+    <string name="home_surroundings">Entorno</string>
+    <string name="home_week_caption">del límite semanal</string>
+    <string name="home_hp_caption">del límite semanal · estimado</string>
+    <string name="uncalibrated_short">Sin calibrar · ±3–5 dB</string>
+    <string name="hp_not_headphones_action">No son audífonos</string>
+    <string name="hp_not_headphones_done">Se ignorará hasta que se desconecte</string>
+    <string name="hp_not_headphones_nothing">No hay nada conectado</string>
+    <string name="action_not_now">Ahora no</string>
+    <string name="tono_notice_ai">Con ayuda de IA · no es consejo médico · las preguntas sobre síntomas nunca se envían</string>
+    <string name="tono_notice_offline">Respuestas integradas · no es consejo médico · las preguntas sobre síntomas nunca se envían</string>
+    <string name="sec_alerts">Alertas</string>
 </resources>

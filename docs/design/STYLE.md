@@ -61,7 +61,7 @@ switch glow, number glow, halo). Fill and ink differ per theme so every pair pas
 | Turquoise | `#00E5BF` | `#00E5BF` | `#009E87` | `#00695C` | `#05080D` |
 | Blue | `#3B82F6` | `#60A5FA` | `#3B82F6` | `#1D4ED8` | `#05080D` |
 | Emerald | `#34D399` ² | `#34D399` | `#059669` | `#065F46` | `#05080D` |
-| Caution tier | `#FFB800` | `#FFB800` | `#B7791F` | `#92400E` | `#05080D` |
+| Caution tier | `#FFB800` | `#FFB800` | `#D56E00` ³ | `#944D00` | `#05080D` |
 | Danger tier | `#FF2A6D` | `#FF6B93` | `#FF2A6D` | `#9F1239` | `#05080D` |
 
 Rules, enforced by `shared/src/test/…/core/design/AccentPaletteTest.kt` for **every accent × theme**:
@@ -71,6 +71,11 @@ Rules, enforced by `shared/src/test/…/core/design/AccentPaletteTest.kt` for **
 - watch: Purple ink ≥ 4.5:1 and fill ≥ 3:1 on black and on the dark card.
 
 ² Emerald's dark fill was `#10B981`; against the dark crimson it was only 3.9 apart under deuteranopia (below the dataviz floor of 6), so it moved to the lighter `#34D399` (`ChartColorsTest`).
+
+³ The light caution tier was `#B7791F` / `#92400E`, which read as a muddy brown on white. It is now a fully saturated
+orange at hue 31°, `#D56E00` (3.47:1 on the card, 3.03:1 on card-subtle), with the text shade `#944D00` of the same hue
+(≥ 4.7:1 on every light surface and its soft tint). Redder oranges came within 6 of the crimson for tritanopia readers
+(`ChartColorsTest`); 31° is the most vivid hue that keeps 7.4 apart from every accent and the crimson.
 
 Turquoise and Emerald are too light to be a graphic on white, so their light fills are deeper
 shades of the same hue. Purple text on a white card uses `#6D28D9`, not `#8B5CF6`.

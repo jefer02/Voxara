@@ -146,7 +146,6 @@
     <string name="tono_title">Tono</string>
     <string name="tono_placeholder">Ask about your day or week</string>
     <string name="tono_send">Send</string>
-    <string name="tono_weekly_title">Your week</string>
     <string name="tono_weekly_button">Weekly summary</string>
     <string name="tono_today_button">How is my day?</string>
     <string name="tono_source_ai">Written by cloud AI</string>
@@ -161,7 +160,6 @@
     <string name="tono_off_body">Turn Tono on for plain-language summaries. Alerts never depend on Tono.</string>
     <string name="tono_turn_on">Turn Tono on</string>
     <string name="tono_thinking">Tono is thinking…</string>
-    <string name="tono_not_medical">Not a medical device. Questions about symptoms get a fixed answer and are never sent.</string>
     <string name="tono_empty">Ask a question or tap a suggestion.</string>
 
     <!-- watch -->
@@ -343,8 +341,8 @@
     <string name="hp_alert_channel">Headphone volume alerts</string>
     <string name="hp_alert_title">Volume above the recommended level</string>
     <string name="hp_alert_text">Estimated about %1$d dBA, above the recommended 80 dBA. Turning it down protects your ears.</string>
-    <string name="hp_lower_action">Lower to safe volume</string>
-    <string name="hp_dismiss_action">Dismiss</string>
+    <string name="hp_lower_action">Lower volume</string>
+    <string name="hp_dismiss_action">Got it</string>
     <string name="hp_lower_working">Lowering…</string>
     <string name="hp_lower_lowered_db">Volume lowered. About %1$d dBA now (estimated).</string>
     <string name="hp_lower_lowered">Volume lowered.</string>
@@ -378,9 +376,7 @@
     <string name="action_open_tono">Ask Tono</string>
     <string name="home_ask_tono">Ask Tono</string>
     <string name="home_ask_tono_ai">Ask Tono · AI-assisted</string>
-    <string name="uncalibrated_compact">Uncalibrated estimate: readings can be off by ±3–5 dB.</string>
     <string name="tile_week">Last 7 days</string>
-    <string name="tile_week_caption">of the weekly limit, surroundings</string>
     <string name="tile_week_cd">Last 7 days, surroundings: %1$d percent of the weekly limit, %2$s</string>
     <string name="tile_headphones">Headphones</string>
     <string name="tile_headphones_caption">of the weekly limit, last 7 days, estimated</string>
@@ -427,4 +423,16 @@
         <item quantity="other">%1$d points less than the 7 days before (%2$d%%).</item>
     </plurals>
     <string name="how_sharing_body">Your Voxara watch can include headphone listening from this phone in its weekly limit. This is optional and off until you turn it on.\n\nWhat is sent to your watch whenever something changes (headphones connected or removed, play or pause, the volume moved): the time, how long, the media volume, and the type of output (wired, Bluetooth…). The watch turns this into an estimated level. While this is on, a small notification shows that Voxara is watching for headphones.\n\nNever sent or stored: audio, song or video titles, app names, headphone names or Bluetooth addresses. Nothing goes to the internet; it travels only to your own watch.</string>
+    <!-- Home, premium pass (docs/design/PHONE_PREMIUM.md) -->
+    <string name="home_surroundings">Surroundings</string>
+    <string name="home_week_caption">of the weekly limit</string>
+    <string name="home_hp_caption">of the weekly limit · estimated</string>
+    <string name="uncalibrated_short">Uncalibrated · ±3–5 dB</string>
+    <string name="hp_not_headphones_action">Not headphones</string>
+    <string name="hp_not_headphones_done">Left out until it disconnects</string>
+    <string name="hp_not_headphones_nothing">Nothing is connected</string>
+    <string name="action_not_now">Not now</string>
+    <string name="tono_notice_ai">AI-assisted · not medical advice · symptom questions are never sent</string>
+    <string name="tono_notice_offline">Built-in answers · not medical advice · symptom questions are never sent</string>
+    <string name="sec_alerts">Alerts</string>
 </resources>

@@ -16,7 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -60,6 +66,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -72,7 +79,9 @@ import kotlin.math.roundToInt
  *  - one series needs no legend; the zones are icon + word, never colour alone;
  *  - the future is quiet (a hairline, no marks) and the past without data is a short grey stub;
  *  - every chart has a spoken twin (the description the caller passes) and most have the table next to them;
- *  - they draw in once when the screen opens and stand still when motion is reduced.
+ *  - they draw in once when the screen opens and stand still when motion is reduced;
+ *  - press and drag scrubs them: the mark under the finger stays lit, the others dim, a bubble says its value, and every
+ *    new mark ticks once ([scrub]). The value is the same one the spoken twin and the tables carry.
  * Text drawn on a canvas is held at 1.3 times the font scale; the same facts are always also real text beside the chart.
  */
 
@@ -127,6 +136,66 @@ fun ZoneLegend(zones: Collection<RiskZone>, modifier: Modifier = Modifier) {
     }
 }
 
+// ------------------------------------------------------------------------------------ scrubbing
+
+/**
+ * PRESS AND DRAG over a chart: [state] holds the index under the finger while it touches (null otherwise), and each new
+ * index ticks once. A drag that starts vertically is left to the list, which scrolls; a horizontal one belongs to the chart.
+ * Charts read [state] in their draw lambda, so scrubbing redraws the chart and nothing else. [key] restarts the gesture when
+ * the geometry [indexAt] depends on changes.
+ */
+fun Modifier.scrub(count: Int, state: MutableState<Int?>, haptics: VoxHaptics, key: Any? = null, indexAt: (x: Float, width: Float) -> Int): Modifier =
+    if (count <= 0) this else pointerInput(count, key) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            var last = indexAt(down.position.x, size.width.toFloat()).coerceIn(0, count - 1)
+            state.value = last
+            haptics.tick()
+            var travel = Offset.Zero
+            var mine = false
+            while (true) {
+                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed) break
+                travel += change.positionChange()
+                if (!mine) {
+                    // a vertical start is a scroll: give the list the gesture
+                    if (abs(travel.y) > viewConfiguration.touchSlop && abs(travel.y) > abs(travel.x)) break
+                    if (abs(travel.x) > viewConfiguration.touchSlop) mine = true
+                }
+                if (change.isConsumed && !mine) break
+                if (mine) change.consume()
+                val i = indexAt(change.position.x, size.width.toFloat()).coerceIn(0, count - 1)
+                if (i != last) {
+                    last = i
+                    state.value = i
+                    haptics.tick()
+                }
+            }
+            state.value = null
+        }
+    }
+
+private val BubbleStyle get() = wordsStyle(13, FontWeight.Bold, 1.2f)
+
+/**
+ * The value bubble of a scrubbed mark: [text] in an inverted pill at the top of the chart, centred on [x] and kept inside
+ * it, and a hairline from the bubble down to [baseline] so the eye finds the mark.
+ */
+private fun DrawScope.valueBubble(ink: ChartInk, text: String, x: Float, baseline: Float, pill: Color, onPill: Color, line: Color) {
+    val t = ink.text(text, BubbleStyle)
+    val padH = 10.dp.toPx()
+    val padV = 5.dp.toPx()
+    val w = t.size.width + 2 * padH
+    val h = t.size.height + 2 * padV
+    val left = (x - w / 2f).coerceIn(0f, max(0f, size.width - w))
+    drawLine(line, Offset(x, h), Offset(x, baseline), 1.dp.toPx())
+    drawRoundRect(pill, Offset(left, 0f), Size(w, h), CornerRadius(h / 2f))
+    drawText(t, onPill, Offset(left + padH, padV))
+}
+
+/** The alpha of a mark while another one is scrubbed. */
+private const val DIMMED = 0.32f
+
 // ------------------------------------------------------------------------------------ hours
 
 /**
@@ -150,8 +219,20 @@ fun HourColumns(
     val loudest = hourly.withIndex().maxByOrNull { it.value }?.takeIf { it.value > 0f }?.index
     val axis = listOf(0 to "0", 6 to "6", 12 to "12", 18 to "18")
     val guideLabel = stringResource(R.string.chart_guide_85)
-    Canvas(modifier.fillMaxWidth().height(plotHeight + axisHeight).clearAndSetSemantics { contentDescription = description }) {
+    val none = stringResource(R.string.zone_not_measured)
+    // what the bubble says for each hour: its level, or that it was not measured
+    val bubbles = List(24) { h ->
+        val v = hourly.getOrElse(h) { 0f }
+        "%02d:00".format(h) + " · " + if (v > 0f && (nowHour == null || h <= nowHour)) stringResource(R.string.value_dba, v.roundToInt()) else none
+    }
+    val scrubbed = remember { mutableStateOf<Int?>(null) }
+    val haptics = rememberVoxHaptics()
+    Canvas(
+        modifier.fillMaxWidth().height(plotHeight + axisHeight).clearAndSetSemantics { contentDescription = description }
+            .scrub(24, scrubbed, haptics) { x, w -> (x / (w / 24f)).toInt() },
+    ) {
         val n = 24
+        val sel = scrubbed.value
         val slot = size.width / n
         val bw = min(14.dp.toPx(), slot * 0.62f)
         val base = plotHeight.toPx()
@@ -173,11 +254,12 @@ fun HourColumns(
                 v <= 0f -> drawRoundRect(c.track, Offset(x, base - 3.dp.toPx()), Size(bw, 3.dp.toPx()), CornerRadius(1.5.dp.toPx()))
                 else -> {
                     val full = max(base - y(v), 4.dp.toPx())
-                    capped(c.zoneFill(RiskZone.of(v.toDouble())), x, base, bw, full * stagger(grow, h, n), 4.dp.toPx())
+                    val fill = c.zoneFill(RiskZone.of(v.toDouble()))
+                    capped(if (sel != null && sel != h) fill.copy(alpha = DIMMED) else fill, x, base, bw, full * stagger(grow, h, n), 4.dp.toPx())
                 }
             }
         }
-        if (loudest != null) {
+        if (loudest != null && sel == null) {
             val v = hourly[loudest]
             drawCircle(c.surface, 5.dp.toPx(), Offset(loudest * slot + slot / 2, y(v) - 9.dp.toPx()))
             drawCircle(c.text, 3.dp.toPx(), Offset(loudest * slot + slot / 2, y(v) - 9.dp.toPx()))
@@ -194,6 +276,7 @@ fun HourColumns(
         }
         val end = ink.text("24")
         drawText(end, c.text2, Offset(size.width - end.size.width, labelY))
+        if (sel != null) valueBubble(ink, bubbles[sel], sel * slot + slot / 2, base, c.text, c.background, c.text3)
     }
 }
 
@@ -223,8 +306,19 @@ fun DayColumns(
     val topMargin = textHeight + 6.dp
     val limitLabel = stringResource(R.string.chart_limit_100)
     val maxV = max(120.0, days.maxOfOrNull { it.percent } ?: 0.0)
-    Canvas(modifier.fillMaxWidth().height(plotHeight + axisHeight).clearAndSetSemantics { contentDescription = description }) {
+    val none = stringResource(R.string.zone_not_measured)
+    val bubbles = days.mapIndexed { i, d ->
+        labels.getOrElse(i) { "" } + " · " + if (d.measured) stringResource(R.string.value_percent, d.percent.roundToInt()) else none
+    }
+    val gutterPx = ink.text(limitLabel).size.width + with(density) { 8.dp.toPx() }
+    val scrubbed = remember { mutableStateOf<Int?>(null) }
+    val haptics = rememberVoxHaptics()
+    Canvas(
+        modifier.fillMaxWidth().height(plotHeight + axisHeight).clearAndSetSemantics { contentDescription = description }
+            .scrub(days.size, scrubbed, haptics, key = gutterPx) { x, w -> ((x - gutterPx) / ((w - gutterPx) / max(1, days.size))).toInt() },
+    ) {
         val n = max(1, days.size)
+        val sel = scrubbed.value
         val limit = ink.text(limitLabel)
         val gutter = limit.size.width + 8.dp.toPx()
         val plotW = size.width - gutter
@@ -242,9 +336,12 @@ fun DayColumns(
             val cx = gutter + i * slot + slot / 2
             if (d.measured) {
                 val h = max(base - y(d.percent), 4.dp.toPx()) * stagger(grow, i, n)
-                capped(c.zoneFill(RiskZone.ofPercent(d.percent)), x, base, bw, h, 4.dp.toPx())
-                val v = ink.text("${d.percent.roundToInt()}", valueStyle)
-                drawText(v, c.text, Offset(cx - v.size.width / 2f, base - h - v.size.height - 3.dp.toPx()))
+                val fill = c.zoneFill(RiskZone.ofPercent(d.percent))
+                capped(if (sel != null && sel != i) fill.copy(alpha = DIMMED) else fill, x, base, bw, h, 4.dp.toPx())
+                if (sel == null) {
+                    val v = ink.text("${d.percent.roundToInt()}", valueStyle)
+                    drawText(v, c.text, Offset(cx - v.size.width / 2f, base - h - v.size.height - 3.dp.toPx()))
+                }
             } else {
                 drawRoundRect(c.track, Offset(x, base - 3.dp.toPx()), Size(bw, 3.dp.toPx()), CornerRadius(1.5.dp.toPx()))
             }
@@ -252,6 +349,7 @@ fun DayColumns(
             val l = ink.text(labels.getOrElse(i) { "" }, if (today) wordsStyle(12, FontWeight.ExtraBold, 1.2f) else labelStyle)
             drawText(l, if (today) c.text else c.text2, Offset(cx - l.size.width / 2f, base + 8.dp.toPx()))
         }
+        if (sel != null && sel in days.indices) valueBubble(ink, bubbles[sel], gutter + sel * slot + slot / 2, base, c.text, c.background, c.text3)
     }
 }
 
@@ -268,6 +366,7 @@ private fun LineChart(
     xAxis: List<Pair<Float, String>> = emptyList(),
     domainEnd: Float = 1f,
     minMax: Double = 120.0,
+    bubbles: List<String>? = null,
 ) {
     val c = Vox.colors
     val ink = rememberChartInk()
@@ -276,7 +375,21 @@ private fun LineChart(
     val axisHeight = if (xAxis.isEmpty()) 8.dp else with(density) { ink.text("0").size.height.toDp() } + 10.dp
     val limitLabel = stringResource(R.string.chart_limit_100)
     val maxV = max(minMax, values.maxOrNull() ?: 0.0)
-    Canvas(modifier.fillMaxWidth().height(plotHeight + axisHeight).clearAndSetSemantics { contentDescription = description }) {
+    val gutterPx = ink.text(limitLabel).size.width + with(density) { 8.dp.toPx() }
+    val scrubbed = remember { mutableStateOf<Int?>(null) }
+    val haptics = rememberVoxHaptics()
+    val n = values.size
+    val scrubbing = bubbles != null && bubbles.size == n && n >= 2
+    Canvas(
+        modifier.fillMaxWidth().height(plotHeight + axisHeight).clearAndSetSemantics { contentDescription = description }
+            .then(
+                if (!scrubbing) Modifier
+                else Modifier.scrub(n, scrubbed, haptics, key = gutterPx to domainEnd) { x, w ->
+                    (((x - gutterPx) / ((w - gutterPx) * domainEnd)) * (n - 1)).roundToInt()
+                },
+            ),
+    ) {
+        val sel = scrubbed.value
         val limit = ink.text(limitLabel)
         val gutter = limit.size.width + 8.dp.toPx()
         val plotW = size.width - gutter
@@ -303,11 +416,17 @@ private fun LineChart(
             }
             drawPath(area, lineColor.copy(alpha = 0.10f))
             drawPath(shown, lineColor, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            if (grow >= 1f) {
+            if (grow >= 1f && sel == null) {
                 val end = Offset(x(values.size - 1), y(values.last()))
                 drawCircle(c.surface, 6.dp.toPx(), end)
                 drawCircle(c.zoneFill(RiskZone.ofPercent(values.last())), 4.dp.toPx(), end)
             }
+        }
+        if (sel != null && bubbles != null && sel in values.indices) {
+            val at = Offset(x(sel), y(values[sel]))
+            valueBubble(ink, bubbles[sel], at.x, base, c.text, c.background, c.text3)
+            drawCircle(c.surface, 6.dp.toPx(), at)
+            drawCircle(c.zoneFill(RiskZone.ofPercent(values[sel])), 4.dp.toPx(), at)
         }
         xAxis.forEach { (frac, text) ->
             val t = ink.text(text)
@@ -317,10 +436,14 @@ private fun LineChart(
     }
 }
 
-/** THE ROLLING WEEK — the share of the weekly allowance used, as of the end of each day (oldest first); the end dot is today. */
+/**
+ * THE ROLLING WEEK — the share of the weekly allowance used, as of the end of each day (oldest first); the end dot is today.
+ * [dayLabels] (one per value) make it scrubbable.
+ */
 @Composable
-fun RollingLine(values: List<Double>, description: String, modifier: Modifier = Modifier, plotHeight: Dp = 110.dp) {
-    LineChart(values, Vox.colors.accent.fill, description, modifier, plotHeight)
+fun RollingLine(values: List<Double>, description: String, modifier: Modifier = Modifier, plotHeight: Dp = 110.dp, dayLabels: List<String>? = null) {
+    val bubbles = dayLabels?.takeIf { it.size == values.size }?.mapIndexed { i, d -> d + " · " + stringResource(R.string.value_percent, values[i].roundToInt()) }
+    LineChart(values, Vox.colors.accent.fill, description, modifier, plotHeight, bubbles = bubbles)
 }
 
 /**
@@ -334,13 +457,21 @@ fun CumulativeLine(
     description: String,
     modifier: Modifier = Modifier,
     plotHeight: Dp = 96.dp,
+    nowMinute: Int = (nowFraction * 1440).roundToInt(),
+    minuteStep: Int = 6,
 ) {
     val total = cumulative.lastOrNull() ?: 0.0
+    // each point is a step of [minuteStep] minutes after midnight, the last one now
+    val bubbles = cumulative.mapIndexed { i, v ->
+        val minute = if (i == cumulative.lastIndex) nowMinute else min(i * minuteStep, nowMinute)
+        "%02d:%02d".format(minute / 60 % 24, minute % 60) + " · " + stringResource(R.string.value_percent, v.roundToInt())
+    }
     LineChart(
         cumulative, Vox.colors.zoneFill(RiskZone.ofPercent(total)), description, modifier, plotHeight,
         xAxis = listOf(0f to "0", 0.25f to "6", 0.5f to "12", 0.75f to "18", 1f to "24"),
         domainEnd = nowFraction.coerceIn(0.02f, 1f),
         minMax = max(110.0, total * 1.15),
+        bubbles = bubbles,
     )
 }
 

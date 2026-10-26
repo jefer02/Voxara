@@ -1,5 +1,6 @@
 package com.example.voxara.phone.ui
 
+import com.example.voxara.core.headphones.NotHeadphonesOutcome
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
@@ -309,6 +310,16 @@ class PhoneViewModel(app: Application) : AndroidViewModel(app) {
             PhoneListeningRuntime.dismissAlert()
         },
         onLowerHeadphones = { viewModelScope.launch { PhoneListeningService.lower(ctx) } },
+        onNotHeadphones = {
+            viewModelScope.launch {
+                val r = PhoneListeningService.notHeadphones(ctx, speaker = false)
+                PhoneAlerts.cancelNotification(ctx)
+                PhoneListeningRuntime.dismissAlert()
+                _events.tryEmit(
+                    PhoneEvent.Message(if (r == NotHeadphonesOutcome.NOTHING) R.string.hp_not_headphones_nothing else R.string.hp_not_headphones_done)
+                )
+            }
+        },
         onOpenBatterySettings = { _events.tryEmit(PhoneEvent.OpenBatterySettings) },
         onDismissBatteryHint = { PhonePrefs.setBatteryHintDismissedAt(ctx, System.currentTimeMillis()); refreshLocal() },
     )

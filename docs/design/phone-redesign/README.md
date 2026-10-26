@@ -5,9 +5,8 @@ The phone app was redesigned to be the watch's other half ("Orbit, enlarged"), w
 | What | Where |
 |---|---|
 | The surface brief (mode Operate, the one question, scenes, constraints) | `SURFACE_BRIEF.md` |
-| Before: critique 26/40, audit 13/20, 280 renders (local only, ignored by git) | `baseline-critique.md`, `baseline-audit.md`, `before/` |
-| The two concepts at checkpoint B and their comparison | `concepts/` (`README.md`, the PNGs; the concept code was deleted after the build) |
-| After: critique 35/40, audit 18/20, 305 renders | `after-critique.md`, `after-audit.md`, `after/` |
+| Before: critique 26/40, audit 13/20, 280 renders (local only, ignored by git) | `before/` |
+| After: critique 35/40, audit 18/20, 305 renders (local only, ignored by git) | `after/` |
 | Style and design documents | `docs/design/STYLE.md` (§2, §3, §4, §5e, §6, §8), `DESIGN.md` (Voxara Phone) |
 
 Regenerate the renders (opt-in, they are slow): `VOXARA_SHOTS_DIR=<dir> ./gradlew :phone:testDebugUnitTest --tests '*PhoneRenderMatrixTest*'` with `JAVA_HOME` set to Android Studio's `jbr`.
