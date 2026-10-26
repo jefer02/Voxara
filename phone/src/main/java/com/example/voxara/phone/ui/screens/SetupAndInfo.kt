@@ -45,6 +45,14 @@ import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.components.ContentMaxWidth
 import com.example.voxara.phone.ui.components.IconTile
 import com.example.voxara.phone.ui.components.Group
+import com.example.voxara.phone.ui.components.GroupDivider
+import com.example.voxara.phone.ui.components.GroupRow
+import com.example.voxara.phone.ui.components.ExpandableRow
+import com.example.voxara.phone.ui.components.RowIconSize
+import com.example.voxara.phone.ui.components.RowTextInset
+import com.example.voxara.phone.ui.theme.VoxSpace
+import com.example.voxara.phone.ui.theme.VoxType
+import androidx.compose.ui.platform.testTag
 import com.example.voxara.phone.ui.components.LinkButton
 import com.example.voxara.phone.ui.components.PillButton
 import com.example.voxara.phone.ui.components.SwitchRow
@@ -72,17 +80,27 @@ fun HowItWorksScreen(onBack: () -> Unit) {
         Triple(VoxIcons.Lock, R.string.how_privacy_title, R.string.how_privacy_body),
         Triple(VoxIcons.Shield, R.string.how_medical_title, R.string.how_medical_body),
     )
+    // one grouped list of short titles; each opens in place to its explanation. The medical note is never folded away.
+    val (medicalIcon, medicalTitle, medicalBody) = sections.last()
     VoxScreen(stringResource(R.string.how_title), onBack = onBack) {
-        sections.forEach { (icon, title, body) ->
-            item {
-                VoxCard(Modifier.contentWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconTile(icon, Vox.colors.brand)
-                        Spacer(Modifier.width(12.dp))
-                        Text(stringResource(title), style = MaterialTheme.typography.titleMedium, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
+        item(key = "topics") {
+            Group(Modifier.contentWidth()) {
+                sections.dropLast(1).forEachIndexed { i, (icon, title, body) ->
+                    if (i > 0) GroupDivider(RowTextInset)
+                    ExpandableRow(stringResource(title), icon = icon) {
+                        Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = Vox.colors.text2)
                     }
-                    Text(stringResource(body), style = MaterialTheme.typography.bodyLarge, color = Vox.colors.text2)
                 }
+            }
+        }
+        item(key = "medical") {
+            VoxCard(Modifier.contentWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(medicalIcon, Vox.colors.text2, size = RowIconSize)
+                    Spacer(Modifier.width(VoxSpace.s))
+                    Text(stringResource(medicalTitle), style = MaterialTheme.typography.titleSmall, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
+                }
+                Text(stringResource(medicalBody), style = MaterialTheme.typography.bodyMedium, color = Vox.colors.text2)
             }
         }
     }
@@ -132,7 +150,7 @@ fun SetupScreen(s: PhoneUiState, actions: PhoneActions, initialStep: Int = 0) {
             Column(Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 PillButton(
                     stringResource(if (step == STEPS - 1) R.string.action_done else R.string.action_continue),
-                    next, modifier = Modifier.fillMaxWidth(),
+                    next, modifier = Modifier.fillMaxWidth().testTag("setup_continue"),
                 )
                 if (step in 1 until STEPS - 1) {
                     LinkButton(stringResource(R.string.action_back), { step-- }, Modifier.align(Alignment.CenterHorizontally))
@@ -145,7 +163,7 @@ fun SetupScreen(s: PhoneUiState, actions: PhoneActions, initialStep: Int = 0) {
 @Composable
 private fun StepTitle(icon: ImageVector, title: String) {
     IconTile(icon, Vox.colors.brand, size = 56.dp)
-    Text(title, style = MaterialTheme.typography.headlineLarge, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
+    Text(title, style = VoxType.largeTitle, color = Vox.colors.text, modifier = Modifier.semantics { heading() })
 }
 
 @Composable
@@ -158,28 +176,21 @@ private fun StepContent(step: Int, s: PhoneUiState, actions: PhoneActions) {
         0 -> {
             StepTitle(VoxIcons.Waves, stringResource(R.string.setup_welcome_title))
             Body(stringResource(R.string.setup_welcome_body))
-            listOf(
-                VoxIcons.Chart to R.string.setup_point_1,
-                VoxIcons.Vibrate to R.string.setup_point_2,
-                VoxIcons.Ask to R.string.setup_point_3,
-            ).forEach { (icon, text) ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconTile(icon, c.brand)
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(text), style = MaterialTheme.typography.bodyLarge, color = c.text)
+            Group {
+                listOf(
+                    VoxIcons.Chart to R.string.setup_point_1,
+                    VoxIcons.Vibrate to R.string.setup_point_2,
+                    VoxIcons.Ask to R.string.setup_point_3,
+                ).forEachIndexed { i, (icon, text) ->
+                    if (i > 0) GroupDivider(RowTextInset)
+                    GroupRow(stringResource(text), icon = icon)
                 }
             }
         }
         1 -> {
             StepTitle(VoxIcons.Lock, stringResource(R.string.setup_privacy_title))
             Body(stringResource(R.string.setup_privacy_body))
-            VoxCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconTile(VoxIcons.Shield, c.caution)
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.setup_medical), style = MaterialTheme.typography.bodyLarge, color = c.text)
-                }
-            }
+            Group { GroupRow(stringResource(R.string.setup_medical), icon = VoxIcons.Shield, iconTint = c.text2) }
         }
         2 -> {
             StepTitle(VoxIcons.Watch, stringResource(R.string.setup_link_title))
