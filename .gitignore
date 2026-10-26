@@ -70,5 +70,3 @@ desktop.ini
 *.webm
 !**/src/**/res/**
 !docs/design/icons/store/*.png
-
-# Images already in the repo before this rule (e.g. docs/design/phone-redesign/concepts/) stay tracked until removed with git rm --cached.
