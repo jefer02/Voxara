@@ -75,8 +75,8 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
 
         // ------------------------------------------------------------------ mode
-        item { GroupHeader(stringResource(R.string.sec_watch), Modifier.contentWidth()) }
-        item {
+        item(key = "s1") { GroupHeader(stringResource(R.string.sec_watch), Modifier.contentWidth()) }
+        item(key = "s2") {
             Group(Modifier.contentWidth()) {
                 SituationChoice.entries.forEachIndexed { i, choice ->
                     if (i > 0) GroupDivider()
@@ -93,10 +93,10 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 }
             }
         }
-        item { GroupNote(stringResource(DsR.string.situation_rule), Modifier.contentWidth()) }
+        item(key = "s3") { GroupNote(stringResource(DsR.string.situation_rule), Modifier.contentWidth()) }
 
         // ------------------------------------------------------------------ headphones mode
-        item {
+        item(key = "s4") {
             Group(Modifier.contentWidth()) {
                 // Fully automatic: nothing to switch. What the watch is doing now (its last status), as information.
                 val live = s.status
@@ -113,10 +113,11 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 }
             }
         }
-        item { GroupNote(stringResource(R.string.hp_mode_auto_note) + "\n\n" + stringResource(R.string.hp_mode_rule), Modifier.contentWidth()) }
+        item(key = "s5") { GroupNote(stringResource(R.string.hp_mode_auto_note) + "\n\n" + stringResource(R.string.hp_mode_rule), Modifier.contentWidth()) }
 
         // ------------------------------------------------------------------ alerts
-        item {
+        item(key = "s6") { GroupHeader(stringResource(R.string.sec_alerts), Modifier.contentWidth()) }
+        item(key = "s7") {
             Group(Modifier.contentWidth()) {
                 StepperRow(
                     stringResource(R.string.set_threshold), stringResource(R.string.value_dba, set.alertThresholdDba),
@@ -163,8 +164,8 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 )
             }
         }
-        item { GroupNote(stringResource(R.string.set_quiet_note), Modifier.contentWidth()) }
-        item {
+        item(key = "s8") { GroupNote(stringResource(R.string.set_quiet_note), Modifier.contentWidth()) }
+        item(key = "s9") {
             Group(Modifier.contentWidth()) {
                 ChoiceRow(
                     stringResource(R.string.set_haptics),
@@ -189,11 +190,10 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
 
         // ------------------------------------------------------------------ headphones
-        item { GroupHeader(stringResource(R.string.sec_headphones), Modifier.contentWidth()) }
-        item {
+        item(key = "s10") { GroupHeader(stringResource(R.string.sec_headphones), Modifier.contentWidth()) }
+        item(key = "s11") {
             Group(Modifier.contentWidth()) {
-                SwitchRow(stringResource(R.string.hp_sampling), s.phoneSampling, actions.onPhoneSampling, icon = VoxIcons.Phone,
-                    subtitle = stringResource(R.string.setup_off_default))
+                SwitchRow(stringResource(R.string.hp_sampling), s.phoneSampling, actions.onPhoneSampling, icon = VoxIcons.Phone)
                 GroupDivider()
                 ChoiceRow(
                     title = stringResource(R.string.hp_type),
@@ -222,8 +222,8 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
 
         // ------------------------------------------------------------------ Tono and privacy
-        item { GroupHeader(stringResource(R.string.sec_tono), Modifier.contentWidth()) }
-        item {
+        item(key = "s12") { GroupHeader(stringResource(R.string.sec_tono), Modifier.contentWidth()) }
+        item(key = "s13") {
             Group(Modifier.contentWidth()) {
                 SwitchRow(stringResource(R.string.set_tono), set.tonoEnabled, { change(SettingField.TONO_ENABLED, it) },
                     icon = VoxIcons.Ask, subtitle = stringResource(R.string.set_tono_note), pending = SettingField.TONO_ENABLED in p)
@@ -236,11 +236,11 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 )
             }
         }
-        item { GroupNote(stringResource(R.string.privacy_numbers) + "\n\n" + stringResource(R.string.privacy_backup), Modifier.contentWidth()) }
+        item(key = "s14") { GroupNote(stringResource(R.string.privacy_numbers) + "\n\n" + stringResource(R.string.privacy_backup), Modifier.contentWidth()) }
 
         // ------------------------------------------------------------------ appearance (phone only)
-        item { GroupHeader(stringResource(R.string.sec_appearance), Modifier.contentWidth()) }
-        item {
+        item(key = "s15") { GroupHeader(stringResource(R.string.sec_appearance), Modifier.contentWidth()) }
+        item(key = "s16") {
             Group(Modifier.contentWidth()) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(stringResource(R.string.set_accent), style = MaterialTheme.typography.titleSmall, color = Vox.colors.text)
@@ -269,10 +269,10 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 )
             }
         }
-        item { GroupNote(stringResource(R.string.set_appearance_note), Modifier.contentWidth()) }
+        item(key = "s17") { GroupNote(stringResource(R.string.set_appearance_note), Modifier.contentWidth()) }
 
         // ------------------------------------------------------------------ language
-        item {
+        item(key = "s18") {
             Group(Modifier.contentWidth()) {
                 ChoiceRow(
                     stringResource(R.string.sec_language),
@@ -288,8 +288,8 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
 
         // ------------------------------------------------------------------ data
-        item { GroupHeader(stringResource(R.string.sec_data), Modifier.contentWidth()) }
-        item {
+        item(key = "s19") { GroupHeader(stringResource(R.string.sec_data), Modifier.contentWidth()) }
+        item(key = "s20") {
             Group(Modifier.contentWidth()) {
                 ChoiceRow(
                     stringResource(R.string.set_retention),
@@ -312,8 +312,8 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
         }
 
         // ------------------------------------------------------------------ about
-        item { GroupHeader(stringResource(R.string.sec_about), Modifier.contentWidth()) }
-        item {
+        item(key = "s21") { GroupHeader(stringResource(R.string.sec_about), Modifier.contentWidth()) }
+        item(key = "s22") {
             Group(Modifier.contentWidth()) {
                 GroupRow(stringResource(R.string.how_it_works), icon = VoxIcons.Info, onClick = { navigate(PhoneRoutes.HOW) })
                 GroupDivider()
@@ -322,7 +322,7 @@ fun SettingsScreen(s: PhoneUiState, actions: PhoneActions, navigate: (String) ->
                 GroupRow(stringResource(R.string.version, s.appVersion), stringResource(R.string.licences), icon = VoxIcons.Shield)
             }
         }
-        item { GroupNote(stringResource(R.string.how_medical_body), Modifier.contentWidth().padding(bottom = 8.dp)) }
+        item(key = "s23") { GroupNote(stringResource(R.string.how_medical_body), Modifier.contentWidth().padding(bottom = 8.dp)) }
     }
 
     if (confirmDelete) {
