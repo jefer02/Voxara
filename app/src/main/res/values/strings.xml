@@ -304,7 +304,7 @@
     <string name="set_advanced">Advanced</string>
     <string name="set_alert_level">Alert level</string>
     <string name="set_fine_trim">Fine trim (dB)</string>
-    <string name="set_licenses">Voxara © 2026 jefer02, Apache License 2.0. Plus Jakarta Sans © The Plus Jakarta Sans Project Authors and JetBrains Mono © The JetBrains Mono Project Authors, SIL Open Font License 1.1.</string>
+    <string name="set_licenses">Voxara © 2026 Jeferson Manuel Morillo Vallejo. All rights reserved. Plus Jakarta Sans © The Plus Jakarta Sans Project Authors and JetBrains Mono © The JetBrains Mono Project Authors, SIL Open Font License 1.1.</string>
     <string name="set_privacy">Privacy</string>
     <string name="set_privacy_body">Kept on this watch only: sound levels per minute (35 days), your settings, calibration and the outputs you marked as speakers (as a code). Never audio, song or app names, device names or location.</string>
     <string name="set_start_monitoring">Start monitoring</string>
