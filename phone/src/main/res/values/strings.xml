@@ -250,7 +250,7 @@
     <string name="sec_about">About</string>
     <string name="how_it_works">How Voxara works</string>
     <string name="version">Version %1$s</string>
-    <string name="licences">Voxara © 2026 jefer02: Apache License 2.0. Plus Jakarta Sans and JetBrains Mono fonts: SIL Open Font License 1.1</string>
+    <string name="licences">Voxara © 2026 Jeferson Manuel Morillo Vallejo. All rights reserved. Plus Jakarta Sans and JetBrains Mono fonts: SIL Open Font License 1.1</string>
     <string name="setup_again">Run setup again</string>
     <string name="sync_failed_toast">Sync didn\'t complete. See Watch for help.</string>
     <string name="sync_done_toast">Synced.</string>
