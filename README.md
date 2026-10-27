@@ -366,6 +366,6 @@ All strings are resources in **English** and **Spanish**.
 
 ## License
 
-Copyright 2026 jefer02.
+Copyright (c) 2026 Jeferson Manuel Morillo Vallejo. **All rights reserved.**
 
-Voxara is licensed under the [Apache License 2.0](LICENSE). Third-party fonts, libraries and data keep their own licences; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). The scene model weights in debug builds come from non-commercial training data and are **not** covered by the Apache licence.
+The source code is published so that it can be read; it is not open source. You may use the official releases from [GitHub Releases](https://github.com/jefer02/Voxara/releases) free of charge for personal and non-commercial use. Copying, modifying, redistributing or selling the code or the app needs written permission. See [`LICENSE`](LICENSE) for the full terms and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for third-party fonts, libraries and data, which keep their own licences.
