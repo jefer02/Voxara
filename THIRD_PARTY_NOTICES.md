@@ -1,6 +1,6 @@
 # Third-party notices
 
-Voxara's own code is licensed under the [Apache License 2.0](LICENSE). It uses the third-party components below, each under its own licence.
+Voxara's own code is © 2026 Jeferson Manuel Morillo Vallejo, all rights reserved (see [LICENSE](LICENSE)). It uses the third-party components below, each under its own licence.
 
 ## Fonts (bundled in the app)
 
@@ -30,4 +30,4 @@ Voxara's own code is licensed under the [Apache License 2.0](LICENSE). It uses t
 
 ## Training data (debug builds only)
 
-The scene model weights in `shared/src/debug` were trained on **TUT Acoustic Scenes 2017** (DCASE 2017 Task 1, Zenodo 400515 + 1040168), © Tampere University of Technology. Its EULA allows only internal, non-commercial and scientific research use. **The weights are not part of the Apache 2.0 licence of this project and are not included in release builds** (see the licence gate in the [README](README.md#5-automatic-situation-detection-auto-mode)).
+The scene model weights in `shared/src/debug` were trained on **TUT Acoustic Scenes 2017** (DCASE 2017 Task 1, Zenodo 400515 + 1040168), © Tampere University of Technology. Its EULA allows only internal, non-commercial and scientific research use. **The weights are not included in release builds and may not be used commercially** (see the licence gate in the [README](README.md#5-automatic-situation-detection-auto-mode)).
