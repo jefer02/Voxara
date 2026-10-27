@@ -40,6 +40,7 @@ A small AI coach, **Tono**, explains your status in plain language. Alerts and n
 - [Design](#design)
 - [Documentation](#documentation)
 - [Privacy](#privacy)
+- [License](#license)
 
 ## Features
 
@@ -362,3 +363,9 @@ All strings are resources in **English** and **Spanish**.
 - Levels per minute (35 days), settings and calibration stay on your devices and sync only between your watch and your phone.
 - Tono's cloud AI asks for your consent first, and then sends only numbers (dose percentages, rounded dBA, minutes, rough time of day). It never sends audio, song or app names, or location. With it off, Tono uses built-in answers and works offline.
 - The phone's headphone detection is opt-in and off by default.
+
+## License
+
+Copyright 2026 jefer02.
+
+Voxara is licensed under the [Apache License 2.0](LICENSE). Third-party fonts, libraries and data keep their own licences; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). The scene model weights in debug builds come from non-commercial training data and are **not** covered by the Apache licence.
