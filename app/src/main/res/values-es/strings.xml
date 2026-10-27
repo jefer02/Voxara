@@ -302,7 +302,7 @@
     <string name="set_advanced">Avanzado</string>
     <string name="set_alert_level">Nivel de alerta</string>
     <string name="set_fine_trim">Ajuste fino (dB)</string>
-    <string name="set_licenses">Voxara © 2026 jefer02, Apache License 2.0. Plus Jakarta Sans © The Plus Jakarta Sans Project Authors y JetBrains Mono © The JetBrains Mono Project Authors, SIL Open Font License 1.1.</string>
+    <string name="set_licenses">Voxara © 2026 Jeferson Manuel Morillo Vallejo. Todos los derechos reservados. Plus Jakarta Sans © The Plus Jakarta Sans Project Authors y JetBrains Mono © The JetBrains Mono Project Authors, SIL Open Font License 1.1.</string>
     <string name="set_privacy">Privacidad</string>
     <string name="set_privacy_body">Guardado solo en este reloj: niveles de sonido por minuto (35 días), tus ajustes, la calibración y las salidas que marcaste como parlante (como un código). Nunca audio, nombres de canciones o apps, nombres de dispositivos ni ubicación.</string>
     <string name="set_start_monitoring">Iniciar monitoreo</string>
