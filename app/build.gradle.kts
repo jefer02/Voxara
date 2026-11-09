@@ -128,9 +128,15 @@ val checkSceneModelLicence by tasks.registering {
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkSceneModelLicence) }
 
-/** Fails a release build that has no release key, instead of producing an unsigned APK. */
+/**
+ * Fails a release build that has no release key, instead of producing an unsigned APK. Android Studio's
+ * Generate Signed APK wizard passes its own key (android.injected.signing.*), so keystore.properties is
+ * then not needed.
+ */
+val wizardSigning = providers.gradleProperty("android.injected.signing.store.file").isPresent
 val checkReleaseSigning by tasks.registering {
-    val missing = signingKeys.filter { keystoreProps.getProperty(it).isNullOrBlank() }
+    val wizard = wizardSigning
+    val missing = if (wizard) emptyList() else signingKeys.filter { keystoreProps.getProperty(it).isNullOrBlank() }
     val store = keystoreProps.getProperty("storeFile")?.trim()?.takeIf { it.isNotEmpty() }?.let { rootProject.file(it) }
     doLast {
         if (missing.isNotEmpty()) throw GradleException(
@@ -138,7 +144,7 @@ val checkReleaseSigning by tasks.registering {
                 "${missing.joinToString()}. It needs storeFile, storePassword, keyAlias and keyPassword " +
                 "(the same key as :phone). It is git-ignored; never commit it."
         )
-        if (store?.exists() != true) throw GradleException("Release signing: storeFile $store does not exist.")
+        if (!wizard && store?.exists() != true) throw GradleException("Release signing: storeFile $store does not exist.")
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
