@@ -117,14 +117,6 @@ enum class SampleState(val burstMs: Long, val periodMs: Long, val label: String)
 
     val dutyCycle: Double get() = burstMs.toDouble() / periodMs.toDouble()
 
-    /** Run the scene classifier on every burst above AMBIENT, every 5th burst in AMBIENT. */
-    val classifierEveryNthBurst: Int
-        get() = when (this) {
-            IDLE -> 0
-            AMBIENT -> 5
-            else -> 1
-        }
-
     companion object {
         fun of(leq: Double): SampleState = when {
             leq >= 95.0 -> HAZARD

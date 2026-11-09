@@ -11,6 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -33,7 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,7 +56,6 @@ import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.core.situation.SituationMode
-import com.example.voxara.text.sceneOrBandLabelRes
 import com.example.voxara.ui.Routes
 import com.example.voxara.ui.UiEnv
 import com.example.voxara.ui.VoxaraActions
@@ -60,7 +64,6 @@ import com.example.voxara.ui.design.Face
 import com.example.voxara.ui.design.HeroList
 import com.example.voxara.ui.design.LocalDisplay
 import com.example.voxara.ui.design.LocalTextScale
-import com.example.voxara.ui.design.MetricCard
 import com.example.voxara.ui.design.NowRing
 import com.example.voxara.ui.design.PillButton
 import com.example.voxara.ui.design.PillStyle
@@ -142,7 +145,6 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
     val paused = s.monitoringStatus == MonitoringStatus.PAUSED
     val uncalibrated = !s.calibrated && !s.simulated
     val concert = s.mode == SituationMode.CONCERT
-    val scene = stringResource(sceneOrBandLabelRes(s.scene, s.dba))
     val compact = isCompactFont()
 
     val layerOn = s.listening.active
@@ -293,9 +295,14 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
             footDetail(!layerOn && !doseOnHero, detailFoot)
             // Off: one line of information (nothing to switch: it turns on by itself).
             if (!layerOn) row { HeadphonesStatusCard(s.listening, s.headphonePossibleSpeaker) }
-            row { MetricCard(VoxIcons.Waves, stringResource(R.string.scene_label), scene, accent = VColor.AccentInk) }
-            // One tap to the mode picker. Auto's conclusions morph the chip.
-            row { ModeChip(modeValue(s.situationChoice, s.mode, s.listening), concert) { navigate(Routes.MODE) } }
+            // One tap to the mode picker. Auto's conclusions morph the chip; it is the one answer to "where am I".
+            row {
+                ModeChip(
+                    modeValue(s.situationChoice, s.mode, s.autoStatus, s.listening),
+                    modeValue(s.situationChoice, s.mode, s.autoStatus, s.listening, spoken = true),
+                    concert,
+                ) { navigate(Routes.MODE) }
+            }
             if (s.simulated) row { BodyText(stringResource(R.string.bench_source), color = VColor.AccentInk) }
             if (concert) {
                 // A chosen Concert measures continuously; an Auto-detected one does not.
@@ -310,12 +317,12 @@ fun NowScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = {
 }
 
 /**
- * MODE CHIP — "Mode: Auto · Street". When Auto concludes a different mode the label rolls to the new
- * one with a short pop (200 ms) and the chip fills with the accent while Concert is on. Static with
- * reduced motion.
+ * MODE CHIP — "Auto · Street" (the tune icon says it is the mode; TalkBack hears "Mode: Auto · Street").
+ * When Auto concludes a different mode the label rolls to the new one with a short pop (200 ms) and the
+ * chip fills with the accent while Concert is on. Static with reduced motion.
  */
 @Composable
-private fun ModeChip(label: String, concert: Boolean, onClick: () -> Unit) {
+private fun ModeChip(label: String, spokenLabel: String, concert: Boolean, onClick: () -> Unit) {
     val still = LocalReduceMotion.current
     val container by animateColorAsState(
         if (concert) VColor.accent.fill else VColor.CardSubtle,
@@ -323,7 +330,10 @@ private fun ModeChip(label: String, concert: Boolean, onClick: () -> Unit) {
         label = "modeChip",
     )
     val content = if (concert) VColor.accent.onFill else VColor.Text
-    val text = stringResource(R.string.mode_chip, label)
+    // No "Mode:" in front: at 192 dp it wrapped to a dangling "·" and broke "Detectando…" mid-word.
+    val spoken = stringResource(R.string.mode_chip, spokenLabel)
+    // On a small face or at large text the icon gives its width to the words, as on the other buttons.
+    val roomy = LocalConfiguration.current.screenWidthDp >= 200 && LocalDensity.current.fontScale < 1.15f
     Row(
         Modifier
             .fillMaxWidth()
@@ -331,13 +341,14 @@ private fun ModeChip(label: String, concert: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(VRadius.pill))
             .background(container)
             .pressable(onClick = onClick)
+            .clearAndSetSemantics { contentDescription = spoken }
             .padding(horizontal = VSpace.l, vertical = VSpace.s),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(VSpace.s, Alignment.CenterHorizontally),
     ) {
-        Icon(VoxIcons.Tune, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
+        if (roomy) Icon(VoxIcons.Tune, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
         AnimatedContent(
-            targetState = text,
+            targetState = label,
             transitionSpec = {
                 if (still) fadeIn(snap()) togetherWith fadeOut(snap())
                 else (fadeIn(tween(VMotion.DIGIT_MS)) + scaleIn(tween(VMotion.DIGIT_MS), initialScale = 0.85f)) togetherWith
@@ -345,7 +356,15 @@ private fun ModeChip(label: String, concert: Boolean, onClick: () -> Unit) {
             },
             label = "modeLabel",
         ) { t ->
-            Text(t, style = VType.TitleSmall, color = content)
+            // When it needs two lines it reads "Auto" over "Detecting…": a line never ends on the "·".
+            val measurer = rememberTextMeasurer()
+            BoxWithConstraints {
+                val oneLine = measurer.measure(t, VType.TitleSmall, constraints = Constraints(maxWidth = constraints.maxWidth)).lineCount == 1
+                Text(
+                    if (oneLine) t else t.replace(" · ", "\n"),
+                    style = VType.TitleSmall, color = content, textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

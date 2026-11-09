@@ -9,6 +9,8 @@ import com.example.voxara.core.ledger.ExposureKind
 import com.example.voxara.core.ledger.MinuteRecord
 import com.example.voxara.core.ledger.mergeByMinute
 import com.example.voxara.core.monitoring.MonitoringStatus
+import com.example.voxara.core.ai.MiniJson
+import com.example.voxara.core.situation.AutoStatus
 import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.link.LinkHealth
 import com.example.voxara.link.LinkMonitor
@@ -70,6 +72,49 @@ class SyncCompatibilityTest {
         assertFalse(s.tonoEnabled)
         assertTrue(s.headphonesMode)
         assertNull(s.lastDba)
+    }
+
+    @Test
+    fun `an OLD watch never says how sure Auto is, so a new phone keeps its older label and trusts the mode`() {
+        val old = """{"v":1,"at":$now,"app_version":"0.9","monitoring":"RUNNING","mic":true,"notifications":true,
+            "calibrated":false,"dose_pct":10.0,"weekly_pct":20.0,"situation_mode":"STREET","hp_mode":false}""".trimIndent()
+        val s = WatchStatus.fromJson(old)!!
+        assertEquals(SituationMode.STREET, s.situationMode)
+        assertNull("absent: the phone shows \"Auto · Street\" as before", s.autoStatus)
+        assertEquals(SituationMode.STREET, s.knownMode)
+    }
+
+    @Test
+    fun `a NEW watch's auto status reaches a new phone, and only a detection counts as known`() {
+        val base = WatchStatus.fromJson("""{"v":1,"at":$now,"situation_mode":"STREET"}""")!!
+        for (status in AutoStatus.entries) {
+            val back = WatchStatus.fromJson(base.copy(autoStatus = status).toJson())!!
+            assertEquals(status, back.autoStatus)
+            assertEquals(if (status == AutoStatus.DETECTED) SituationMode.STREET else null, back.knownMode)
+        }
+        // A fixed choice sends none: its mode is known.
+        assertNull(WatchStatus.fromJson(base.toJson())!!.autoStatus)
+        assertEquals(SituationMode.STREET, base.knownMode)
+        // A status a later watch invents reads as "not said", never as a detection.
+        val future = WatchStatus.fromJson("""{"v":2,"at":$now,"situation_mode":"STREET","auto_status":"PONDERING"}""")!!
+        assertNull(future.autoStatus)
+    }
+
+    @Test
+    fun `a NEW watch's status is read by an OLD phone exactly as before - the auto status is one more key`() {
+        val new = WatchStatus.fromJson("""{"v":1,"at":$now,"app_version":"1.1","monitoring":"RUNNING","dose_pct":12.0,
+            "situation_mode":"TRANSPORT","hp_mode":true,"hp_source":"WATCH"}""".trimIndent())!!.copy(autoStatus = AutoStatus.UNSURE)
+        val wire = MiniJson.parse(new.toJson()) as Map<*, *>
+        // Additive and optional: the only new key, a plain string; every key an older phone reads is unchanged.
+        val withoutStatus = MiniJson.parse(new.copy(autoStatus = null).toJson()) as Map<*, *>
+        val olderKeys = withoutStatus.keys - "auto_status"
+        assertEquals(setOf("auto_status"), wire.keys - olderKeys)
+        assertEquals("UNSURE", wire["auto_status"])
+        for (k in olderKeys) assertEquals(k.toString(), withoutStatus[k], wire[k])
+        // An older phone's parser ignores keys it does not know (see the NEWER-watch test): it reads what it always did.
+        val oldPhoneSees = WatchStatus.fromJson(MiniJson.write(LinkedHashMap(wire.mapKeys { it.key as String }).apply { remove("auto_status") }))!!
+        assertEquals(new.copy(autoStatus = null), oldPhoneSees)
+        assertEquals(oldPhoneSees, WatchStatus.fromJson(new.toJson())!!.copy(autoStatus = null))
     }
 
     @Test

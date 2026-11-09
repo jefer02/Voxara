@@ -46,24 +46,6 @@
     <string name="risk_critical">Dangerous</string>
     <string name="risk_recover">Recovering</string>
 
-    <!-- Classified scenes -->
-    <string name="scene_traffic">Traffic</string>
-    <string name="scene_transit">Transit</string>
-    <string name="scene_live_music">Live music</string>
-    <string name="scene_machinery">Machinery</string>
-    <string name="scene_conversation">Conversation</string>
-    <string name="scene_quiet_indoor">Quiet indoor</string>
-    <string name="scene_unknown">Unknown</string>
-
-    <!-- Level-only environment bands, used when the classifier is not confident -->
-    <string name="env_quiet_room">Quiet room</string>
-    <string name="env_office">Office</string>
-    <string name="env_conversation">Conversation</string>
-    <string name="env_city_traffic">City traffic</string>
-    <string name="env_live_music">Live music</string>
-    <string name="env_nightclub">Nightclub</string>
-    <string name="env_power_tool">Power tool</string>
-
     <!-- Bench scenarios -->
     <string name="scenario_office">Office</string>
     <string name="scenario_cafe">Café</string>
@@ -95,7 +77,7 @@
     <string name="advice_hazard_transit">%1$s left. Move down the platform.</string>
     <string name="advice_hazard_traffic">%1$s left. Cross to the quieter side.</string>
     <string name="advice_hazard_generic">%1$s left at this level. Find somewhere quieter.</string>
-    <string name="advice_accruing_traffic">Loud commute. Switch to the quieter platform end.</string>
+    <string name="advice_accruing_traffic">Loud street. Take a quieter side street.</string>
     <string name="advice_accruing_transit">Loud carriage. Move a car forward.</string>
     <string name="advice_accruing_music">%1$d%% used. Take a break between sets.</string>
     <string name="advice_accruing_machinery">Dose is running. Fit protection before the next hour.</string>
@@ -327,7 +309,7 @@
     <!-- Situation modes (names and blurbs live in shared-ui) -->
     <string name="mode_title">Mode</string>
     <string name="mode_chip">Mode: %1$s</string>
-    <string name="mode_auto_value">Auto · %1$s</string>
+    <!-- Mode screen, under Auto: what it detected, or that Street applies until it is sure. The chip label is in shared-ui (situationLabel). -->
     <string name="mode_auto_detected">Detected from the sound around you: %1$s.</string>
     <string name="mode_auto_listening">For now %1$s, until Voxara is sure.</string>
     <string name="mode_auto_unavailable">Automatic detection isn\'t available in this version, so Auto uses Street. It still switches to Concert for loud live music.</string>
@@ -342,7 +324,6 @@
     <string name="allowance_caption">of today\'s limit</string>
     <string name="home_today_caption">%1$d%% of today\'s limit</string>
     <string name="week_breakdown">Around you %1$d%% · Headphones %2$d%%</string>
-    <string name="scene_label">Around you</string>
     <string name="estimated_word">estimated</string>
     <string name="hp_week_share_caption">of your weekly listening limit</string>
     <string name="week_caption">of this week\'s limit</string>
@@ -366,7 +347,6 @@
     <string name="hp_mode_announce_on">Headphones mode on; the sound around you is still measured</string>
     <string name="hp_mode_announce_off">Headphones mode off</string>
     <string name="hp_mode_outside_line">Around you %1$d dBA · %2$d%% of today\'s limit</string>
-    <string name="mode_plus_headphones">%1$s + Headphones</string>
     <string name="cd_home_headphones">Headphones mode. Estimated listening about %1$d dBA. Around you %2$d dBA, %3$s. %4$d percent of today’s limit.</string>
     <string name="cd_home_headphones_idle">Headphones mode. Nothing playing. %1$d percent of this week’s listening limit. Around you %2$d dBA, %3$s. %4$d percent of today’s limit.</string>
     <string name="notification_content_headphones">Headphones mode · around you %1$d dBA · %2$d%% of today\'s limit</string>

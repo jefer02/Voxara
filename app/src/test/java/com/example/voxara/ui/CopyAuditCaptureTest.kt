@@ -123,7 +123,7 @@ class CopyAuditCaptureTest {
         SnapshotInputs(
             dosePercent = s.dosePercent, weeklyFraction = s.weeklyFraction, headphoneWeeklyFraction = s.headphoneWeeklyFraction,
             dba = s.dba, simulated = false, sensitiveListener = false, days = s.days, headphoneDays = s.headphoneDays,
-            headphoneCategory = s.headphoneCategory?.name, calibrated = s.calibrated, situation = s.mode,
+            headphoneCategory = s.headphoneCategory?.name, calibrated = s.calibrated, situation = s.knownMode,
         ),
         lang,
     )
@@ -193,6 +193,22 @@ class CopyAuditCaptureTest {
 
     @Test fun nowQuiet() = list("01_now_quiet", 6) { HomeScreen(env(quiet), actions, Routes.NOW) {} }
     @Test fun nowLoud() = capture("02_now_loud") { HomeScreen(env(loud), actions, Routes.NOW) {} }
+    /**
+     * The mode chip in each of Auto's states (the one answer to "where am I"), scrolled down to it: detected
+     * ("Auto · Street"), not sure yet in its first minutes ("Auto · Detecting…"), a build without the scene model
+     * ("Auto"), Concert detected by its rule in that build ("Auto · Concert") and still unsure past the settling
+     * window ("Auto").
+     */
+    @Test fun nowAutoStates() {
+        val unsure = loud.copy(detectedMode = null)
+        list("03a_now_auto_detected", 6) { HomeScreen(env(loud), actions, Routes.NOW) {} }
+        list("03b_now_auto_detecting", 6) { HomeScreen(env(unsure.copy(sceneModel = true, autoSettling = true)), actions, Routes.NOW) {} }
+        list("03c_now_auto_no_model", 6) { HomeScreen(env(unsure.copy(sceneModel = false)), actions, Routes.NOW) {} }
+        list("03d_now_auto_concert", 6) {
+            HomeScreen(env(loud.copy(dba = 101.0, sceneModel = false, mode = SituationMode.CONCERT, detectedMode = SituationMode.CONCERT)), actions, Routes.NOW) {}
+        }
+        list("03e_now_auto_unsure", 6) { HomeScreen(env(unsure.copy(sceneModel = true, autoSettling = false)), actions, Routes.NOW) {} }
+    }
     @Test fun nowCloudReply() = capture("03_now_cloud") { HomeScreen(env(quiet, coach = cloudSeenOnWatch()), actions, Routes.NOW) {} }
     @Test fun doseTodayQuiet() = list("04_dose_today_quiet", 6) { HomeScreen(env(quiet), actions, Routes.TODAY) {} }
     @Test fun doseTodayLoud() = list("05_dose_today_loud", 6) { HomeScreen(env(loud), actions, Routes.TODAY) {} }

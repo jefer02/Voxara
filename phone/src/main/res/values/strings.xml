@@ -308,8 +308,6 @@
     <string name="hp_mode_rule">The sound around you is still measured, and its alerts still work.</string>
     <string name="mode_selected_cd">Selected</string>
     <string name="watch_mode">Mode on the watch: %1$s</string>
-    <string name="watch_mode_auto">Auto · %1$s</string>
-    <string name="mode_plus_headphones">%1$s + Headphones</string>
     <string name="home_mode_cd">Mode on the watch: %1$s</string>
     <string name="hp_state_on">Headphones mode is on</string>
     <string name="hp_state_off">Headphones mode is off</string>

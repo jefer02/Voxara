@@ -33,7 +33,8 @@ data class AggregateSnapshot(
     val listeningMinutesToday: Int,
     val loudHoursByDayPart: Map<DayPart, Int>,
     val headphoneCategory: String?,
-    val ambientCategory: String?,
+    /** The zone of [currentDba] (ok / moderate / loud / dangerous), as on the ring. A level, never a place. */
+    val ambientZone: String?,
     val calibrated: Boolean,
     val hearingCareScore: Int,
     val streakDays: Int,
@@ -54,7 +55,7 @@ data class AggregateSnapshot(
         "listening_min_today" to listeningMinutesToday,
         "loud_hours_by_day_part" to DayPart.entries.associate { it.name.lowercase() to (loudHoursByDayPart[it] ?: 0) },
         "headphone_category" to headphoneCategory,
-        "ambient_category" to ambientCategory,
+        "ambient_zone" to ambientZone,
         "calibrated" to calibrated,
         "hearing_care_score" to hearingCareScore,
         "streak_days" to streakDays,
@@ -80,7 +81,7 @@ data class AggregateSnapshot(
         val WIRE_KEYS = setOf(
             "locale", "daily_dose_pct", "weekly_ambient_pct", "weekly_headphone_pct", "current_dba",
             "avg_dba_today", "loudest_hour_dba_today", "measured_min_today", "listening_min_today",
-            "loud_hours_by_day_part", "headphone_category", "ambient_category", "calibrated",
+            "loud_hours_by_day_part", "headphone_category", "ambient_zone", "calibrated",
             "hearing_care_score", "streak_days", "days_to_weekly_limit", "situation_mode",
         )
     }
@@ -260,6 +261,9 @@ object CoachPrompt {
         data.situation_mode (if present) only sets your tone: quiet = calm and reflective; street = brief and
         practical; transport = brief, mention headphone volume if relevant; concert = very short; work = neutral,
         about the shift. It never changes the numbers, the limits or the safety advice.
+        Never name or guess where the wearer is (a street, a train, a bar, an office) from the level or anything else:
+        only data.situation_mode may say it, and it is absent when nobody knows. data.ambient_zone is the level's zone
+        (ok, moderate, loud, dangerous), not a place.
         All sound levels from the watch are estimates; headphone levels are rough estimates.
         "status" is shown alone on a glance screen: ONE short statement of at most 12 words, no question.
         Reply in ${if (language == "es") "Latin American Spanish (say \"audífonos\" for headphones, \"oídos\" for ears, \"teléfono\" for phone)" else "English"}.
@@ -311,7 +315,7 @@ fun cacheKey(req: CoachRequest, day: Long): String {
     fun b(v: Int?) = v?.let { it / 5 } ?: -1
     return listOf(
         req.task.name, day, s.locale, b(s.dailyDosePercent), b(s.weeklyAmbientPercent),
-        b(s.weeklyHeadphonePercent), b(s.currentDba), s.headphoneCategory, s.ambientCategory, s.situationMode,
+        b(s.weeklyHeadphonePercent), b(s.currentDba), s.headphoneCategory, s.ambientZone, s.situationMode,
         req.alertKind, req.question?.lowercase()?.trim(),
     ).joinToString("|")
 }

@@ -1,13 +1,13 @@
 package com.example.voxara.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.wear.compose.material3.Text
-import com.example.voxara.BuildConfig
 import com.example.voxara.R
 import com.example.voxara.core.headphones.LayerSource
 import com.example.voxara.core.headphones.ListeningLayerState
-import com.example.voxara.core.scene.SceneModel
+import com.example.voxara.core.situation.AutoStatus
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.designsystem.R as DsR
@@ -26,6 +26,7 @@ import com.example.voxara.ui.design.VoxList
 import com.example.voxara.ui.design.row
 import com.example.voxara.ui.design.blurbRes
 import com.example.voxara.ui.design.labelRes
+import com.example.voxara.ui.design.situationLabel
 
 /**
  * MODE — Auto (the default) or one fixed situation mode. Opened from the chip on Now and from
@@ -45,12 +46,12 @@ fun ModeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = 
         // Auto says what it concluded, or that it is still listening (Street meanwhile).
         if (s.situationChoice == SituationChoice.AUTO) {
             row {
-                val detected = s.detectedMode
                 BodyText(
-                    when {
-                        detected != null -> stringResource(R.string.mode_auto_detected, stringResource(detected.labelRes()))
+                    when (s.autoStatus) {
+                        AutoStatus.DETECTED -> stringResource(R.string.mode_auto_detected, stringResource(s.mode.labelRes()))
                         // Licence gate: no scene model in this build — Street, plus the Concert rule.
-                        !BuildConfig.SCENE_MODEL_ENABLED || !SceneModel.available -> stringResource(R.string.mode_auto_unavailable)
+                        AutoStatus.NO_MODEL -> stringResource(R.string.mode_auto_unavailable)
+                        // Past the first minutes and still unsure: listening, without promising a result.
                         else -> stringResource(R.string.mode_auto_listening, stringResource(s.mode.labelRes()))
                     },
                     color = VColor.TextSecondary,
@@ -93,10 +94,12 @@ fun ModeScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Unit = 
     }
 }
 
-/** "Street", or "Auto · Street" when Auto chose it; "+ Headphones" is appended while headphones mode is on ("Transport + Headphones"). */
+/** [situationLabel] (shared with the phone's pill) in the language in force; [spoken] for TalkBack (no ellipsis). */
 @Composable
-fun modeValue(choice: SituationChoice, mode: SituationMode, layer: ListeningLayerState = ListeningLayerState.OFF): String {
-    val situation = stringResource(mode.labelRes())
-    val withLayer = if (layer.active) stringResource(R.string.mode_plus_headphones, situation) else situation
-    return if (choice == SituationChoice.AUTO) stringResource(R.string.mode_auto_value, withLayer) else withLayer
-}
+fun modeValue(
+    choice: SituationChoice,
+    mode: SituationMode,
+    auto: AutoStatus?,
+    layer: ListeningLayerState = ListeningLayerState.OFF,
+    spoken: Boolean = false,
+): String = situationLabel(LocalContext.current.resources, choice, mode, auto, layer.active, spoken)

@@ -36,7 +36,7 @@ class CoachTest {
         locale = "en", dailyDosePercent = 42, weeklyAmbientPercent = 35, weeklyHeadphonePercent = 61,
         currentDba = 72, averageDbaToday = 68, loudestHourDbaToday = 88, measuredMinutesToday = 310,
         listeningMinutesToday = 95, loudHoursByDayPart = mapOf(DayPart.EVENING to 2),
-        headphoneCategory = "earbuds", ambientCategory = "conversation", calibrated = false,
+        headphoneCategory = "earbuds", ambientZone = "moderate", calibrated = false,
         hearingCareScore = 93, streakDays = 4, daysToWeeklyLimit = 3,
     )
 

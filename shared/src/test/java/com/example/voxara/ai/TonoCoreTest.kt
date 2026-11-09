@@ -18,7 +18,7 @@ class TonoCoreTest {
         locale = "en", dailyDosePercent = 42, weeklyAmbientPercent = 30, weeklyHeadphonePercent = 10,
         currentDba = 70, averageDbaToday = 65, loudestHourDbaToday = 78, measuredMinutesToday = 300,
         listeningMinutesToday = 20, loudHoursByDayPart = DayPart.entries.associateWith { 0 },
-        headphoneCategory = null, ambientCategory = "office", calibrated = false, hearingCareScore = 90,
+        headphoneCategory = null, ambientZone = "ok", calibrated = false, hearingCareScore = 90,
         streakDays = 3, daysToWeeklyLimit = null,
     )
 

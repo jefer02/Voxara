@@ -18,5 +18,11 @@
     <string name="situation_transport_blurb">Bus, train or metro: headphones come first.</string>
     <string name="situation_concert_blurb">Live music: alerts vibrate twice and are never capped. Ends after 6 h, or after 20 min below 80 dBA.</string>
     <string name="situation_work_blurb">At work: today\'s dose comes first.</string>
+    <!-- The mode as the chip (watch) and the pill (phone) say it: situationLabel(). "Detecting…" only in Auto's first minutes. -->
+    <string name="situation_auto_value">Auto · %1$s</string>
+    <string name="situation_detecting">Detecting…</string>
+    <!-- For TalkBack: the same word without the ellipsis, which some voices read aloud. -->
+    <string name="situation_detecting_spoken">Detecting</string>
+    <string name="situation_plus_headphones">%1$s + Headphones</string>
     <string name="situation_rule">Modes change what comes first and how Tono talks. They never lower or delay alerts.</string>
 </resources>

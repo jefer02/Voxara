@@ -179,6 +179,9 @@ object CompanionLink {
             situationMode = if (active) live.mode else Situation.resolve(p.situationChoice),
             headphonesMode = layer.active,
             headphonesSource = layer.source,
+            // How sure Auto is, so the phone's pill says what the watch's chip says. Not running: nothing settling.
+            autoStatus = if (active) live.autoStatus
+            else Situation.autoStatus(p.situationChoice, null, live.sceneModel, settling = false),
         )
     }
 

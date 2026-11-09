@@ -10,6 +10,8 @@ import com.example.voxara.core.ledger.energyOf
 import com.example.voxara.core.ledger.nioshDoseOf
 import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.risk.RiskZone
+import com.example.voxara.core.situation.AutoStatus
+import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.phone.export.CsvExport
 import com.example.voxara.sync.WatchStatus
 import org.junit.Assert.assertEquals
@@ -89,6 +91,21 @@ class HistoryModelTest {
         val old = phoneSnapshotInputs(status(now - 30 * 60_000L), h, headline(status(now - 30 * 60_000L), h, null, false, now, utc), false, now)
         assertEquals(0.0, old.dba, 0.0)
         assertNull(SnapshotBuilder.build(old, "en").currentDba)
+    }
+
+    @Test
+    fun `Tono on the phone never names Auto's Street fallback as a place`() {
+        val h = History.EMPTY
+        fun situationFor(st: WatchStatus) = phoneSnapshotInputs(st, h, headline(st, h, null, false, now, utc), false, now).situation
+        val street = status(now - 60_000).copy(situationMode = SituationMode.STREET)
+        for (unsure in listOf(AutoStatus.DETECTING, AutoStatus.UNSURE, AutoStatus.NO_MODEL)) {
+            assertNull(unsure.name, situationFor(street.copy(autoStatus = unsure)))
+        }
+        assertEquals(SituationMode.STREET, situationFor(street.copy(autoStatus = AutoStatus.DETECTED)))
+        assertEquals(SituationMode.STREET, situationFor(street))   // a fixed choice, or an older watch
+        // The level goes to the model as its zone, never a place.
+        val snap = SnapshotBuilder.build(phoneSnapshotInputs(street, h, headline(street, h, null, false, now, utc), false, now), "es")
+        assertEquals("loud", snap.ambientZone)
     }
 
     @Test

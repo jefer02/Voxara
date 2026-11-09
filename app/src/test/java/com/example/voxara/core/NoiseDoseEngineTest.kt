@@ -6,8 +6,8 @@ import com.example.voxara.core.dose.energyAverage
 import com.example.voxara.core.dose.permittedHours
 import com.example.voxara.core.risk.RiskState
 import com.example.voxara.core.risk.RiskStateMachine
-import com.example.voxara.core.scene.Scene
-import com.example.voxara.core.scene.SceneHysteresis
+import com.example.voxara.core.scene.ConfidenceHysteresis
+import com.example.voxara.core.situation.SituationMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -120,17 +120,17 @@ class NoiseDoseEngineTest {
     }
 
     @Test
-    fun `a scene must win three windows before it changes the UI`() {
-        val h = SceneHysteresis()
-        assertEquals(Scene.UNKNOWN, h.offer(Scene.LIVE_MUSIC, 0.9f))
-        assertEquals(Scene.UNKNOWN, h.offer(Scene.LIVE_MUSIC, 0.9f))
-        assertEquals(Scene.LIVE_MUSIC, h.offer(Scene.LIVE_MUSIC, 0.9f))
+    fun `a label must win three windows before it changes`() {
+        val h = ConfidenceHysteresis<SituationMode?>(null, 0.60f, 3)
+        assertEquals(null, h.offer(SituationMode.CONCERT, 0.9f))
+        assertEquals(null, h.offer(SituationMode.CONCERT, 0.9f))
+        assertEquals(SituationMode.CONCERT, h.offer(SituationMode.CONCERT, 0.9f))
     }
 
     @Test
     fun `low confidence never changes the label`() {
-        val h = SceneHysteresis()
-        repeat(10) { h.offer(Scene.MACHINERY, 0.4f) }
-        assertEquals(Scene.UNKNOWN, h.current)
+        val h = ConfidenceHysteresis<SituationMode?>(null, 0.60f, 3)
+        repeat(10) { h.offer(SituationMode.WORK, 0.4f) }
+        assertEquals(null, h.current)
     }
 }

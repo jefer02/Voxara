@@ -1,6 +1,7 @@
 package com.example.voxara.data
 
 import android.content.Context
+import com.example.voxara.BuildConfig
 import com.example.voxara.core.advice.Advice
 import com.example.voxara.audio.DeviceAudioInfo
 import com.example.voxara.audio.PowerPolicy
@@ -28,7 +29,8 @@ import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_SENSITIVE
 import com.example.voxara.core.dose.NoiseDoseEngine
 import com.example.voxara.core.dose.SampleState
 import com.example.voxara.core.risk.RiskState
-import com.example.voxara.core.scene.Scene
+import com.example.voxara.core.scene.SceneModel
+import com.example.voxara.core.situation.AutoStatus
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.core.situation.SituationMode
@@ -63,7 +65,6 @@ data class ExposureState(
     val twaDba: Double? = null,
     val headroomSeconds: Double = Double.POSITIVE_INFINITY,
     val risk: RiskState = RiskState.CALM,
-    val scene: Scene = Scene.UNKNOWN,
     val sampleState: SampleState = SampleState.IDLE,
     /** The situation mode in force (Auto already resolved). Never changes an alert threshold. */
     val mode: SituationMode = SituationMode.DEFAULT,
@@ -74,6 +75,10 @@ data class ExposureState(
      * (Auto is then Street) or the choice is fixed. In memory only, never persisted.
      */
     val detectedMode: SituationMode? = null,
+    /** This build runs the scene model (licence gate): without it Auto can only ever detect Concert. */
+    val sceneModel: Boolean = BuildConfig.SCENE_MODEL_ENABLED && SceneModel.available,
+    /** Auto is inside its first settling window (Situation.AUTO_SETTLE_MS): "Detecting…" is still honest. Set by the dosimeter. */
+    val autoSettling: Boolean = false,
     val monitoring: Boolean = false,
     val micGranted: Boolean = false,
     val simulated: Boolean = false,
@@ -147,6 +152,12 @@ data class ExposureState(
     val tonoEnabled: Boolean = true,
 ) {
     val headroomMinutes: Double get() = headroomSeconds / 60.0
+
+    /** How sure Auto is of [mode]; null when the choice is fixed. Display only: [mode] is what applies. */
+    val autoStatus: AutoStatus? get() = Situation.autoStatus(situationChoice, detectedMode, sceneModel, autoSettling)
+
+    /** The fixed choice or Auto's detection; null while Auto has only its Street fallback. Keys advice and Tono. */
+    val knownMode: SituationMode? get() = Situation.known(situationChoice, detectedMode)
 
     /** The capture path in use, or the one the device would pick. */
     val activeSource: MicSource
