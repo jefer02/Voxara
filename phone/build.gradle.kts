@@ -21,6 +21,14 @@ fun localProp(name: String, default: String = ""): String =
     (localProps.getProperty(name) ?: default).trim()
 fun quoted(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+/** RELEASE SIGNING: the same keystore.properties and key as :app (see app/build.gradle.kts). */
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasReleaseKey = signingKeys.all { !keystoreProps.getProperty(it).isNullOrBlank() }
+
 android {
     namespace = "com.example.voxara.phone"
     compileSdk {
@@ -39,11 +47,21 @@ android {
         buildConfigField("String", "AI_API_KEY", quoted(""))
     }
 
+    signingConfigs {
+        if (hasReleaseKey) create("release") {
+            storeFile = rootProject.file(keystoreProps.getProperty("storeFile").trim())
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias").trim()
+            keyPassword = keystoreProps.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("String", "AI_API_KEY", quoted(localProp("AI_API_KEY")))
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = false
             }
@@ -71,6 +89,21 @@ android {
 
 // Release APK must carry no scene model weights (same check as :app; :phone depends on :shared).
 apply(from = rootProject.file("gradle/scene-weights-check.gradle.kts"))
+
+/** Fails a release build that has no release key, instead of producing an unsigned APK. */
+val checkReleaseSigning by tasks.registering {
+    val missing = signingKeys.filter { keystoreProps.getProperty(it).isNullOrBlank() }
+    val store = keystoreProps.getProperty("storeFile")?.trim()?.takeIf { it.isNotEmpty() }?.let { rootProject.file(it) }
+    doLast {
+        if (missing.isNotEmpty()) throw GradleException(
+            "Release signing: keystore.properties at the project root is missing or lacks " +
+                "${missing.joinToString()}. It needs storeFile, storePassword, keyAlias and keyPassword " +
+                "(the same key as :app). It is git-ignored; never commit it."
+        )
+        if (store?.exists() != true) throw GradleException("Release signing: storeFile $store does not exist.")
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
 
 dependencies {
     implementation(project(":shared"))

@@ -27,6 +27,19 @@ fun quoted(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "
 val sceneModelInRelease = localProp("SCENE_MODEL_ENABLED", "false").toBoolean()
 val allowNoncommercialModel = localProp("ALLOW_NONCOMMERCIAL_MODEL", "false").toBoolean()
 
+/**
+ * RELEASE SIGNING. The watch and the phone sign with the same key (the Data Layer only connects an
+ * app to itself signed the same way), read from the untracked keystore.properties at the project
+ * root: storeFile, storePassword, keyAlias, keyPassword. Debug builds keep the debug key; a release
+ * build without the file fails in checkReleaseSigning below.
+ */
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasReleaseKey = signingKeys.all { !keystoreProps.getProperty(it).isNullOrBlank() }
+
 android {
     namespace = "com.example.voxara"
     compileSdk {
@@ -47,6 +60,15 @@ android {
         buildConfigField("boolean", "SCENE_MODEL_ENABLED", "false")
     }
 
+    signingConfigs {
+        if (hasReleaseKey) create("release") {
+            storeFile = rootProject.file(keystoreProps.getProperty("storeFile").trim())
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias").trim()
+            keyPassword = keystoreProps.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("String", "AI_API_KEY", quoted(localProp("AI_API_KEY")))
@@ -54,6 +76,7 @@ android {
         }
         release {
             buildConfigField("boolean", "SCENE_MODEL_ENABLED", sceneModelInRelease.toString())
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = false
             }
@@ -104,6 +127,21 @@ val checkSceneModelLicence by tasks.registering {
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkSceneModelLicence) }
+
+/** Fails a release build that has no release key, instead of producing an unsigned APK. */
+val checkReleaseSigning by tasks.registering {
+    val missing = signingKeys.filter { keystoreProps.getProperty(it).isNullOrBlank() }
+    val store = keystoreProps.getProperty("storeFile")?.trim()?.takeIf { it.isNotEmpty() }?.let { rootProject.file(it) }
+    doLast {
+        if (missing.isNotEmpty()) throw GradleException(
+            "Release signing: keystore.properties at the project root is missing or lacks " +
+                "${missing.joinToString()}. It needs storeFile, storePassword, keyAlias and keyPassword " +
+                "(the same key as :phone). It is git-ignored; never commit it."
+        )
+        if (store?.exists() != true) throw GradleException("Release signing: storeFile $store does not exist.")
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
 
 // THE RELEASE APK CARRIES NO SCENE WEIGHTS: verifyReleaseHasNoSceneWeights, shared with :phone.
 apply(from = rootProject.file("gradle/scene-weights-check.gradle.kts"))
