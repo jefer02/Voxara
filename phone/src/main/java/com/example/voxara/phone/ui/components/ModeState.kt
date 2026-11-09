@@ -11,30 +11,30 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.voxara.core.headphones.LayerSource
-import com.example.voxara.core.situation.SituationChoice
 import com.example.voxara.phone.R
 import com.example.voxara.phone.ui.PhoneUiState
 import com.example.voxara.phone.ui.theme.Vox
 import com.example.voxara.ui.design.VoxIcons
-import com.example.voxara.ui.design.labelRes
+import com.example.voxara.ui.design.situationLabel
 
 /**
- * The watch's situation with its listening layer, as of its last status: "Street", or
- * "Street + Headphones" while headphones mode is on, with "Auto · " in front when the wearer left the
- * situation on Auto. Null before the watch has reported one (or from an older watch).
+ * The watch's situation with its listening layer, as of its last status, in the watch chip's words (the same
+ * situationLabel): "Street", "Auto · Street" only when Auto detected it, "Auto · Detecting…" in Auto's first
+ * minutes, plain "Auto" when it is unsure or has no scene model, and " + Headphones" while headphones mode is on.
+ * A watch too old to say how sure Auto is keeps the older "Auto · Street". Null before the watch has reported a
+ * mode. [spoken]: for TalkBack (no ellipsis).
  */
 @Composable
-fun watchModeName(s: PhoneUiState): String? {
+fun watchModeName(s: PhoneUiState, spoken: Boolean = false): String? {
     val st = s.status ?: return null
     val mode = st.situationMode ?: return null
-    val name = stringResource(mode.labelRes())
-    val named = if (st.headphonesMode) stringResource(R.string.mode_plus_headphones, name) else name
-    return if (s.settings.situationChoice == SituationChoice.AUTO) stringResource(R.string.watch_mode_auto, named) else named
+    return situationLabel(LocalContext.current.resources, s.settings.situationChoice, mode, st.autoStatus, st.headphonesMode, spoken)
 }
 
 /** Why headphones mode is on, in words; null when it is off. */
@@ -56,7 +56,7 @@ fun WatchModePill(s: PhoneUiState, modifier: Modifier = Modifier) {
     val on = s.status?.headphonesMode == true
     val c = Vox.colors
     val ink = if (on) c.secondary else c.text2
-    val cd = stringResource(R.string.home_mode_cd, name)
+    val cd = stringResource(R.string.home_mode_cd, watchModeName(s, spoken = true) ?: name)
     Row(
         modifier
             .semantics(mergeDescendants = true) { contentDescription = cd }

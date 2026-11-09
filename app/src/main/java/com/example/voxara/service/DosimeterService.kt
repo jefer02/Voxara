@@ -42,7 +42,6 @@ import com.example.voxara.core.headphones.ListeningLayer
 import com.example.voxara.core.headphones.ListeningLayerPolicy
 import com.example.voxara.core.headphones.ListeningLayerState
 import com.example.voxara.core.headphones.LayerSource
-import com.example.voxara.audio.HeuristicSceneClassifier
 import com.example.voxara.complication.DoseComplicationService
 import com.example.voxara.core.advice.AdviceGrammar
 import com.example.voxara.core.alerts.AlertDefaults
@@ -67,8 +66,8 @@ import com.example.voxara.core.monitoring.MonitoringStatus
 import com.example.voxara.core.ledger.localEpochDay
 import com.example.voxara.core.risk.RiskState
 import com.example.voxara.core.risk.RiskStateMachine
-import com.example.voxara.core.scene.SceneHysteresis
 import com.example.voxara.core.situation.AutoModeDetector
+import com.example.voxara.core.situation.AutoSettleWindow
 import com.example.voxara.core.situation.ModeChangeHapticGate
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.core.situation.SituationChoice
@@ -177,14 +176,11 @@ class DosimeterService : LifecycleService() {
     }
 
     private lateinit var sampler: AudioBurstSampler
-    private val classifier = HeuristicSceneClassifier()
-    private val hysteresis = SceneHysteresis()
     private val riskMachine = RiskStateMachine()
     private lateinit var haptics: HapticConductor
 
     private val ready = CompletableDeferred<Unit>()
     private var running = false
-    private var burstIndex = 0
     private var lastPersistAt = 0L
     private var lastNotifyAt = 0L
     private var lastRisk: RiskState? = null
@@ -202,6 +198,8 @@ class DosimeterService : LifecycleService() {
      * Licence gate: without SCENE_MODEL_ENABLED (release default) only the Concert rule runs.
      */
     private val autoModes = AutoModeDetector(AutoModeDetector.Config(sceneModel = BuildConfig.SCENE_MODEL_ENABLED))
+    /** Auto's first few minutes (start, or a switch back to Auto), while the chip may still say "Detecting…". */
+    private val autoSettle = AutoSettleWindow()
     private var currentDayEpoch = 0L
     private val sensitive: Boolean get() = ExposureRepository.state.value.sensitiveListener
     private val weeklyBudgetPa2h: Double
@@ -290,6 +288,8 @@ class DosimeterService : LifecycleService() {
                         situationChoice = p.situationChoice,
                         detectedMode = if (p.situationChoice == SituationChoice.AUTO) it.detectedMode else null,
                         mode = Situation.resolve(p.situationChoice, it.detectedMode),
+                        // Switching to Auto opens its settling window at once, not at the next burst.
+                        autoSettling = it.monitoring && autoSettle.settling(p.situationChoice == SituationChoice.AUTO, System.currentTimeMillis()),
                         concertStartedAtMs = p.concertStartedAtMs,
                     )
                 }
@@ -345,8 +345,14 @@ class DosimeterService : LifecycleService() {
         ready.await()
         startedAtMs = System.currentTimeMillis()
         ExposureRepository.serviceActive = true
+        // A (re)start is a fresh settling window for Auto.
+        autoSettle.settling(false, startedAtMs)
         ExposureRepository.update {
-            it.copy(monitoring = true, monitoringStatus = MonitoringStatus.RUNNING)
+            it.copy(
+                monitoring = true,
+                monitoringStatus = MonitoringStatus.RUNNING,
+                autoSettling = autoSettle.settling(it.situationChoice == SituationChoice.AUTO, startedAtMs),
+            )
         }
 
         // Event-driven: a device appearing, playback starting or stopping and the volume moving all land in
@@ -386,6 +392,7 @@ class DosimeterService : LifecycleService() {
                     val manualConcert = repo.situationChoice == SituationChoice.CONCERT
                     val auto = repo.situationChoice == SituationChoice.AUTO && probe == null
                     if (!auto) forgetDetection()
+                    publishSettling(auto, System.currentTimeMillis())
                     val continuous =
                         probe != null || manualConcert || state == SampleState.HAZARD
                     val burstMs = if (continuous) CONTINUOUS_BURST_MS else state.burstMs
@@ -472,14 +479,6 @@ class DosimeterService : LifecycleService() {
                     // Automatic situation: this burst's features, no extra microphone time.
                     if (auto) detectSituation(burst, now, hp)
 
-                    // Classifier: every burst in ACCRUING and above, every 5th burst in AMBIENT.
-                    burstIndex++
-                    val everyNth = if (manualConcert) 1 else state.classifierEveryNthBurst
-                    if (everyNth > 0 && burstIndex % everyNth == 0) {
-                        val (scene, confidence) = classifier.classify(burst)
-                        hysteresis.offer(scene, confidence)
-                    }
-
                     val dose = engine.dosePercent
                     val headroom = engine.headroomSeconds(leq)
                     val risk = RiskState.of(leq, dose)
@@ -496,7 +495,6 @@ class DosimeterService : LifecycleService() {
                             twaDba = engine.twaDba(),
                             headroomSeconds = headroom,
                             risk = risk,
-                            scene = hysteresis.current,
                             sampleState = state,
                             monitoring = true,
                             micGranted = true,
@@ -504,8 +502,9 @@ class DosimeterService : LifecycleService() {
                             micSource = burst.source,
                             rawDbfsA = burst.dbfsA,
                             rawDbfsZ = burst.dbfsZ,
+                            // Keyed by the mode the wearer is known to be in, like the mode chip and Tono.
                             lastAdvice = AdviceGrammar.advise(
-                                AdviceGrammar.State(leq, dose, headroom / 60.0, hysteresis.current, risk)
+                                AdviceGrammar.State(leq, dose, headroom / 60.0, it.knownMode, risk)
                             ),
                         )
                     }
@@ -565,6 +564,7 @@ class DosimeterService : LifecycleService() {
                 it.copy(
                     monitoring = false,
                     monitoringStatus = if (userStopped) MonitoringStatus.OFF else MonitoringStatus.PAUSED,
+                    autoSettling = autoSettle.settling(false, System.currentTimeMillis()),
                 )
             }
             withContext(NonCancellable) { persist() }
@@ -680,6 +680,12 @@ class DosimeterService : LifecycleService() {
             else it.copy(detectedMode = decision.detected, mode = Situation.resolve(it.situationChoice, decision.detected))
         }
         if (ExposureRepository.state.value.mode != before) playModeChange(now)
+    }
+
+    /** Opens or closes Auto's settling window ("Detecting…" vs plain "Auto"); publishes only a change. */
+    private fun publishSettling(auto: Boolean, now: Long) {
+        val settling = autoSettle.settling(auto, now)
+        if (ExposureRepository.state.value.autoSettling != settling) ExposureRepository.update { it.copy(autoSettling = settling) }
     }
 
     /** A fixed choice (or the calibration probe) needs no detection: forget it, silently. */
@@ -955,7 +961,6 @@ class DosimeterService : LifecycleService() {
         persist()
         store.rollOverIfNeeded(today)
         riskMachine.resetDay()
-        hysteresis.reset()
         val p = store.read()
         ExposureRepository.engine.restore(p.dosePercent, ExposureRepository.engine.weeklyPa2h, p.peakDbc)
         currentDayEpoch = today

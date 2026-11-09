@@ -6,9 +6,6 @@ import com.example.voxara.R
 import com.example.voxara.core.advice.Advice
 import com.example.voxara.core.advice.AdviceKind
 import com.example.voxara.core.risk.RiskState
-import com.example.voxara.core.scene.EnvBand
-import com.example.voxara.core.scene.Scene
-import com.example.voxara.core.scene.environmentBand
 import com.example.voxara.data.AppLanguage
 import com.example.voxara.data.Scenario
 
@@ -19,28 +16,6 @@ import com.example.voxara.data.Scenario
  */
 
 @StringRes
-fun Scene.labelRes(): Int = when (this) {
-    Scene.TRAFFIC -> R.string.scene_traffic
-    Scene.TRANSIT -> R.string.scene_transit
-    Scene.LIVE_MUSIC -> R.string.scene_live_music
-    Scene.MACHINERY -> R.string.scene_machinery
-    Scene.CONVERSATION -> R.string.scene_conversation
-    Scene.QUIET_INDOOR -> R.string.scene_quiet_indoor
-    Scene.UNKNOWN -> R.string.scene_unknown
-}
-
-@StringRes
-fun EnvBand.labelRes(): Int = when (this) {
-    EnvBand.QUIET_ROOM -> R.string.env_quiet_room
-    EnvBand.OFFICE -> R.string.env_office
-    EnvBand.CONVERSATION -> R.string.env_conversation
-    EnvBand.CITY_TRAFFIC -> R.string.env_city_traffic
-    EnvBand.LIVE_MUSIC -> R.string.env_live_music
-    EnvBand.NIGHTCLUB -> R.string.env_nightclub
-    EnvBand.POWER_TOOL -> R.string.env_power_tool
-}
-
-@StringRes
 fun RiskState.labelRes(): Int = when (this) {
     RiskState.CALM -> R.string.risk_calm
     RiskState.ACCRUING -> R.string.risk_accruing
@@ -48,20 +23,6 @@ fun RiskState.labelRes(): Int = when (this) {
     RiskState.CRITICAL -> R.string.risk_critical
     RiskState.RECOVER -> R.string.risk_recover
 }
-
-/** The level-only fallback band for a reading, as a string resource. */
-@StringRes
-fun environmentLabelRes(dba: Double): Int = environmentBand(dba).labelRes()
-
-fun Context.environmentLabel(dba: Double): String = getString(environmentLabelRes(dba))
-
-/**
- * What the user is told they are in: the classifier's scene when it is confident, otherwise the
- * level-only band. An unlabelled reading is better than a wrong label.
- */
-@StringRes
-fun sceneOrBandLabelRes(scene: Scene, dba: Double): Int =
-    if (scene == Scene.UNKNOWN) environmentLabelRes(dba) else scene.labelRes()
 
 @StringRes
 fun AdviceKind.textRes(): Int = when (this) {

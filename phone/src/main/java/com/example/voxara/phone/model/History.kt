@@ -175,7 +175,8 @@ fun phoneSnapshotInputs(status: WatchStatus?, history: History, head: Headline, 
         headphoneDays = history.headphone,
         headphoneCategory = null,
         calibrated = status?.calibrated ?: false,
-        situation = status?.situationMode,
+        // Only a mode the watch knows (fixed or detected): never Auto's Street fallback, so Tono never names a guess.
+        situation = status?.knownMode,
     )
 }
 

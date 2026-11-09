@@ -3,7 +3,7 @@ package com.example.voxara.core.ai
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_ADULT
 import com.example.voxara.core.dose.WHO_WEEKLY_PA2H_SENSITIVE
 import com.example.voxara.core.ledger.DaySummary
-import com.example.voxara.core.scene.environmentBand
+import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.core.situation.Situation
 import com.example.voxara.core.situation.SituationMode
 import kotlin.math.roundToInt
@@ -71,7 +71,8 @@ object SnapshotBuilder {
                 hourly.withIndex().count { (h, v) -> v >= 80f && partOf(h) == part }
             },
             headphoneCategory = i.headphoneCategory?.lowercase(),
-            ambientCategory = i.dba.takeIf { it > 0.0 }?.let { environmentBand(it).name.lowercase() },
+            // The level's zone (as on the ring), never a place guessed from it. Only `situation` may say where.
+            ambientZone = currentZone(i),
             calibrated = i.calibrated,
             hearingCareScore = HearingCareScore.of(weeklyAmbient, weeklyHeadphone, daysOver),
             streakDays = streakDays(completedDays),
@@ -79,6 +80,10 @@ object SnapshotBuilder {
             situationMode = i.situation?.let(Situation::wireValue),
         )
     }
+
+    /** The zone of the level quoted as current: null exactly when [AggregateSnapshot.currentDba] is null. */
+    private fun currentZone(i: SnapshotInputs): String? =
+        i.dba.takeIf { it > 0.0 && !i.simulated }?.let { RiskZone.of(it).name.lowercase() }
 
     fun partOf(hour: Int): DayPart = when (hour) {
         in 6..11 -> DayPart.MORNING

@@ -44,24 +44,6 @@
     <string name="risk_critical">Peligroso</string>
     <string name="risk_recover">Recuperando</string>
 
-    <!-- Escenas clasificadas -->
-    <string name="scene_traffic">Tráfico</string>
-    <string name="scene_transit">Transporte</string>
-    <string name="scene_live_music">Música en vivo</string>
-    <string name="scene_machinery">Maquinaria</string>
-    <string name="scene_conversation">Conversación</string>
-    <string name="scene_quiet_indoor">Interior tranquilo</string>
-    <string name="scene_unknown">Desconocido</string>
-
-    <!-- Bandas por nivel, cuando el clasificador no tiene confianza -->
-    <string name="env_quiet_room">Sala tranquila</string>
-    <string name="env_office">Oficina</string>
-    <string name="env_conversation">Conversación</string>
-    <string name="env_city_traffic">Tráfico urbano</string>
-    <string name="env_live_music">Música en vivo</string>
-    <string name="env_nightclub">Discoteca</string>
-    <string name="env_power_tool">Herramienta eléctrica</string>
-
     <!-- Escenarios de banco de pruebas -->
     <string name="scenario_office">Oficina</string>
     <string name="scenario_cafe">Café</string>
@@ -93,7 +75,7 @@
     <string name="advice_hazard_transit">Quedan %1$s. Camina hasta el otro extremo del andén.</string>
     <string name="advice_hazard_traffic">Quedan %1$s. Cruza al lado más tranquilo.</string>
     <string name="advice_hazard_generic">Quedan %1$s a este nivel. Busca un sitio más tranquilo.</string>
-    <string name="advice_accruing_traffic">Trayecto ruidoso. Cambia al extremo tranquilo del andén.</string>
+    <string name="advice_accruing_traffic">Calle ruidosa. Toma una calle lateral más tranquila.</string>
     <string name="advice_accruing_transit">Vagón ruidoso. Avanza un vagón.</string>
     <string name="advice_accruing_music">Llevas %1$d%%. Descansa entre canciones.</string>
     <string name="advice_accruing_machinery">La dosis corre. Ponte protección antes de la próxima hora.</string>
@@ -325,7 +307,7 @@
     <!-- Modos de situación (nombres y descripciones en shared-ui) -->
     <string name="mode_title">Modo</string>
     <string name="mode_chip">Modo: %1$s</string>
-    <string name="mode_auto_value">Auto · %1$s</string>
+    <!-- Pantalla de modo, con Auto: qué detectó, o que usa Calle hasta estar seguro. La etiqueta del chip está en shared-ui (situationLabel). -->
     <string name="mode_auto_detected">Detectado por el sonido a tu alrededor: %1$s.</string>
     <string name="mode_auto_listening">Por ahora %1$s, hasta que Voxara esté seguro.</string>
     <string name="mode_auto_unavailable">La detección automática no está disponible en esta versión, así que Auto usa Calle. Sí cambia a Concierto con música en vivo muy alta.</string>
@@ -340,7 +322,6 @@
     <string name="allowance_caption">del límite de hoy</string>
     <string name="home_today_caption">%1$d%% del límite de hoy</string>
     <string name="week_breakdown">Entorno %1$d%% · Audífonos %2$d%%</string>
-    <string name="scene_label">Entorno</string>
     <string name="estimated_word">estimado</string>
     <string name="hp_week_share_caption">de tu límite semanal de escucha</string>
     <string name="week_caption">del límite semanal</string>
@@ -364,7 +345,6 @@
     <string name="hp_mode_announce_on">Modo audífonos activado; el sonido a tu alrededor se sigue midiendo</string>
     <string name="hp_mode_announce_off">Modo audífonos inactivo</string>
     <string name="hp_mode_outside_line">Entorno %1$d dBA · %2$d%% del límite de hoy</string>
-    <string name="mode_plus_headphones">%1$s + Audífonos</string>
     <string name="cd_home_headphones">Modo audífonos. Escucha estimada de unos %1$d dBA. Entorno %2$d dBA, %3$s. %4$d por ciento del límite de hoy.</string>
     <string name="cd_home_headphones_idle">Modo audífonos. Nada sonando. %1$d por ciento de tu límite semanal de escucha. Entorno %2$d dBA, %3$s. %4$d por ciento del límite de hoy.</string>
     <string name="notification_content_headphones">Modo audífonos · entorno %1$d dBA · %2$d%% del límite de hoy</string>

@@ -21,6 +21,14 @@ fun localProp(name: String, default: String = ""): String =
     (localProps.getProperty(name) ?: default).trim()
 fun quoted(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+/** RELEASE SIGNING: the same keystore.properties and key as :app (see app/build.gradle.kts). */
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val hasReleaseKey = signingKeys.all { !keystoreProps.getProperty(it).isNullOrBlank() }
+
 android {
     namespace = "com.example.voxara.phone"
     compileSdk {
@@ -31,12 +39,21 @@ android {
         applicationId = "com.example.voxara"
         minSdk = 28
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.9.2-phone"
+        versionCode = 10
+        versionName = "0.10.0"
 
         buildConfigField("String", "AI_BASE_URL", quoted(localProp("AI_BASE_URL", "https://api.deepseek.com")))
         buildConfigField("String", "AI_MODEL", quoted(localProp("AI_MODEL", "deepseek-flash")))
         buildConfigField("String", "AI_API_KEY", quoted(""))
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) create("release") {
+            storeFile = rootProject.file(keystoreProps.getProperty("storeFile").trim())
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias").trim()
+            keyPassword = keystoreProps.getProperty("keyPassword")
+        }
     }
 
     buildTypes {
@@ -44,6 +61,7 @@ android {
             buildConfigField("String", "AI_API_KEY", quoted(localProp("AI_API_KEY")))
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = false
             }
@@ -71,6 +89,27 @@ android {
 
 // Release APK must carry no scene model weights (same check as :app; :phone depends on :shared).
 apply(from = rootProject.file("gradle/scene-weights-check.gradle.kts"))
+
+/**
+ * Fails a release build that has no release key, instead of producing an unsigned APK. Android Studio's
+ * Generate Signed APK wizard passes its own key (android.injected.signing.*), so keystore.properties is
+ * then not needed.
+ */
+val wizardSigning = providers.gradleProperty("android.injected.signing.store.file").isPresent
+val checkReleaseSigning by tasks.registering {
+    val wizard = wizardSigning
+    val missing = if (wizard) emptyList() else signingKeys.filter { keystoreProps.getProperty(it).isNullOrBlank() }
+    val store = keystoreProps.getProperty("storeFile")?.trim()?.takeIf { it.isNotEmpty() }?.let { rootProject.file(it) }
+    doLast {
+        if (missing.isNotEmpty()) throw GradleException(
+            "Release signing: keystore.properties at the project root is missing or lacks " +
+                "${missing.joinToString()}. It needs storeFile, storePassword, keyAlias and keyPassword " +
+                "(the same key as :app). It is git-ignored; never commit it."
+        )
+        if (!wizard && store?.exists() != true) throw GradleException("Release signing: storeFile $store does not exist.")
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
 
 dependencies {
     implementation(project(":shared"))

@@ -3,6 +3,7 @@ package com.example.voxara.sync
 import com.example.voxara.core.ai.MiniJson
 import com.example.voxara.core.alerts.AlertKind
 import com.example.voxara.core.headphones.LayerSource
+import com.example.voxara.core.situation.AutoStatus
 import com.example.voxara.core.situation.SituationMode
 import com.example.voxara.core.monitoring.MonitoringStatus
 
@@ -39,7 +40,16 @@ data class WatchStatus(
     val headphonesMode: Boolean = false,
     /** Why it is on: the watch's own detection, the phone's report or the wearer's switch ([LayerSource.NONE] when off). */
     val headphonesSource: LayerSource = LayerSource.NONE,
+    /**
+     * How sure Auto is of [situationMode], when the watch is on Auto; null when the choice is fixed, and from older
+     * watches (which never said it: the phone then keeps its older label).
+     */
+    val autoStatus: AutoStatus? = null,
 ) {
+    /** [situationMode] when it is known (a fixed choice or a real detection); null when it is only Auto's Street fallback. */
+    val knownMode: SituationMode?
+        get() = situationMode.takeIf { autoStatus == null || autoStatus == AutoStatus.DETECTED }
+
     fun toJson(): String = MiniJson.write(
         linkedMapOf(
             "v" to WearContract.PROTOCOL,
@@ -66,6 +76,7 @@ data class WatchStatus(
             "situation_mode" to situationMode?.name,
             "hp_mode" to headphonesMode,
             "hp_source" to headphonesSource.name,
+            "auto_status" to autoStatus?.name,
         )
     )
 
@@ -101,6 +112,7 @@ data class WatchStatus(
                 situationMode = runCatching { SituationMode.valueOf(m["situation_mode"] as String) }.getOrNull(),
                 headphonesMode = b("hp_mode"),
                 headphonesSource = runCatching { LayerSource.valueOf(m["hp_source"] as String) }.getOrDefault(LayerSource.NONE),
+                autoStatus = runCatching { AutoStatus.valueOf(m["auto_status"] as String) }.getOrNull(),
             )
         }
     }

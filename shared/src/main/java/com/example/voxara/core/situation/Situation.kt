@@ -47,6 +47,20 @@ enum class SituationChoice(val fixed: SituationMode?) {
     }
 }
 
+/**
+ * How sure Auto is of the mode in force. Display only: whatever it says, the mode applied is the one
+ * [Situation.resolve] gives (Street while unsure).
+ *  - [DETECTED]: detection concluded the mode (Concert included).
+ *  - [DETECTING]: the scene model is on, not sure yet, and still inside its first settling window
+ *    ([Situation.AUTO_SETTLE_MS]); Street is a fallback, not a finding.
+ *  - [UNSURE]: the settling window is over and Auto is still not sure. Said as plain "Auto", like [NO_MODEL]:
+ *    "Detecting…" for hours would be a promise it does not keep.
+ *  - [NO_MODEL]: this build has no scene model (licence gate), so only Concert can ever be detected.
+ *
+ * Synced to the phone by name (WatchStatus "auto_status"): add values, never rename them.
+ */
+enum class AutoStatus { DETECTED, DETECTING, UNSURE, NO_MODEL }
+
 /** The card the watch's Home screen puts first. */
 enum class FeaturedCard { NOW, HEADPHONES, TODAY, WEEK }
 
@@ -57,6 +71,13 @@ object Situation {
     /** ...or after this long below [CONCERT_EXIT_BELOW_DBA]. Same values as before modes existed. */
     const val CONCERT_EXIT_QUIET_MS = 20L * 60 * 1000
     const val CONCERT_EXIT_BELOW_DBA = 80.0
+
+    /**
+     * How long Auto may say "Detecting…" after the dosimeter starts or the wearer switches to Auto. AutoModeDetector
+     * needs minVotes (2) plus consecutive (2) votes before a first detection: about a minute at its fast-vote pace
+     * (15 s), a few minutes when the sampling ladder sets a slower pace. Past this window it is just "Auto".
+     */
+    const val AUTO_SETTLE_MS = 3L * 60_000
 
     /**
      * The mode the watch stored before situation modes existed ("mode": URBAN / CONCERT / VOICE).
@@ -75,6 +96,21 @@ object Situation {
      */
     fun resolve(choice: SituationChoice, detected: SituationMode? = null): SituationMode =
         choice.fixed ?: detected ?: SituationMode.DEFAULT
+
+    /**
+     * The mode the wearer actually is in, as far as anyone knows: the fixed choice, or what Auto
+     * detected. Null while Auto has only its Street fallback, so advice and Tono do not claim a street.
+     */
+    fun known(choice: SituationChoice, detected: SituationMode?): SituationMode? = choice.fixed ?: detected
+
+    /** How sure Auto is ([AutoStatus]); null when the choice is fixed. [settling]: inside [AutoSettleWindow]. */
+    fun autoStatus(choice: SituationChoice, detected: SituationMode?, sceneModel: Boolean, settling: Boolean): AutoStatus? = when {
+        choice != SituationChoice.AUTO -> null
+        detected != null -> AutoStatus.DETECTED
+        !sceneModel -> AutoStatus.NO_MODEL
+        settling -> AutoStatus.DETECTING
+        else -> AutoStatus.UNSURE
+    }
 
     /**
      * The alert settings the engine runs with in [mode]. Only Concert differs, and only by lifting
@@ -98,6 +134,25 @@ object Situation {
 
     /** The coarse value Tono sees (one of five words; never a place, never a time). */
     fun wireValue(mode: SituationMode): String = mode.name.lowercase()
+}
+
+/**
+ * THE FIRST SETTLING WINDOW of Auto: [settling] is true for [windowMs] after Auto starts being in force (the
+ * dosimeter started, or the wearer switched to Auto) and false after it. Leaving Auto (a fixed choice, the
+ * calibration probe) and coming back starts a new window. Pure and clock-free: times are passed in.
+ */
+class AutoSettleWindow(private val windowMs: Long = Situation.AUTO_SETTLE_MS) {
+    private var startedAtMs: Long? = null
+
+    /** Call with whether Auto is in force now; true while inside the window. */
+    fun settling(auto: Boolean, nowMs: Long): Boolean {
+        if (!auto) {
+            startedAtMs = null
+            return false
+        }
+        val start = startedAtMs ?: nowMs.also { startedAtMs = it }
+        return nowMs - start < windowMs
+    }
 }
 
 /**

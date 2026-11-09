@@ -18,5 +18,11 @@
     <string name="situation_transport_blurb">Bus, tren o metro: primero los audífonos.</string>
     <string name="situation_concert_blurb">Música en vivo: las alertas vibran dos veces y no tienen tope. Termina a las 6 h o tras 20 min bajo 80 dBA.</string>
     <string name="situation_work_blurb">En el trabajo: primero la dosis de hoy.</string>
+    <!-- El modo como lo dicen el chip (reloj) y la píldora (teléfono): situationLabel(). "Detectando…" solo en los primeros minutos de Auto. -->
+    <string name="situation_auto_value">Auto · %1$s</string>
+    <string name="situation_detecting">Detectando…</string>
+    <!-- Para TalkBack: la misma palabra sin los puntos suspensivos, que algunas voces leen en voz alta. -->
+    <string name="situation_detecting_spoken">Detectando</string>
+    <string name="situation_plus_headphones">%1$s + Audífonos</string>
     <string name="situation_rule">Los modos cambian qué ves primero y cómo habla Tono. Nunca reducen ni retrasan las alertas.</string>
 </resources>

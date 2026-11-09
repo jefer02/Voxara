@@ -14,11 +14,11 @@ import com.example.voxara.core.advice.IntentRouter
 import com.example.voxara.core.advice.VoiceIntent
 import com.example.voxara.core.format.formatHeadroom
 import com.example.voxara.core.format.formatTwa
-import com.example.voxara.core.scene.Scene
+import com.example.voxara.core.risk.RiskZone
 import com.example.voxara.data.ExposureState
 import com.example.voxara.data.LocaleStore
 import com.example.voxara.text.render
-import com.example.voxara.text.environmentLabel
+import com.example.voxara.ui.design.wordRes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -192,13 +192,13 @@ class VoiceTurn(context: Context) {
      * reachable, is only ever allowed to choose the wording.
      */
     private fun answer(state: ExposureState, intent: VoiceIntent, heard: String) {
-        val scene = if (state.scene == Scene.UNKNOWN) Scene.UNKNOWN else state.scene
         val sentence = when (intent) {
             VoiceIntent.LEVEL ->
                 context.getString(
                     R.string.answer_level,
                     state.dba.roundToInt(),
-                    context.environmentLabel(state.dba).lowercase(locale),
+                    // The ring's zone word, never a place guessed from the level ("72 decibels, moderate").
+                    context.getString(RiskZone.of(state.dba).wordRes()).lowercase(locale),
                 )
 
             VoiceIntent.HEADROOM ->
@@ -236,7 +236,7 @@ class VoiceTurn(context: Context) {
                         dba = state.dba,
                         dosePercent = state.dosePercent,
                         headroomMinutes = state.headroomMinutes,
-                        scene = scene,
+                        mode = state.knownMode,
                         risk = state.risk,
                     )
                 )

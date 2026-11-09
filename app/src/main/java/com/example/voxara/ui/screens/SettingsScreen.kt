@@ -6,7 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.Text
@@ -85,10 +88,14 @@ fun SettingsScreen(env: UiEnv, actions: VoxaraActions, navigate: (String) -> Uni
         // ------------------------------------------------------------------ mode
         row { GroupLabel(stringResource(R.string.mode_title)) }
         row {
+            val modeTitle = stringResource(R.string.mode_title)
+            // TalkBack hears the value without "Detecting…"'s ellipsis.
+            val modeSpoken = "$modeTitle, ${modeValue(s.situationChoice, s.mode, s.autoStatus, s.listening, spoken = true)}"
             MetricCard(
                 icon = VoxIcons.Tune,
-                label = stringResource(R.string.mode_title),
-                value = modeValue(s.situationChoice, s.mode, s.listening),
+                label = modeTitle,
+                value = modeValue(s.situationChoice, s.mode, s.autoStatus, s.listening),
+                modifier = Modifier.semantics { contentDescription = modeSpoken },
                 onClick = { navigate(Routes.MODE) },
             )
         }

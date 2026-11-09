@@ -2,12 +2,12 @@ package com.example.voxara.core.advice
 
 import com.example.voxara.core.format.formatHeadroom
 import com.example.voxara.core.risk.RiskState
-import com.example.voxara.core.scene.Scene
+import com.example.voxara.core.situation.SituationMode
 import kotlin.math.roundToInt
 
 /**
  * TIER 1 — always on the watch. A deterministic template table keyed by
- * (scene x risk state x headroom). Zero latency, zero network, no invented numbers:
+ * (situation mode x risk state x headroom). Zero latency, zero network, no invented numbers:
  * every figure in a reply is injected from the dose engine.
  *
  * Rules the generator is held to:
@@ -50,38 +50,39 @@ object AdviceGrammar {
         val dba: Double,
         val dosePercent: Double,
         val headroomMinutes: Double,
-        val scene: Scene,
+        /** The mode the wearer is known to be in (a fixed choice or a detection); null when unsure: level-only advice. */
+        val mode: SituationMode?,
         val risk: RiskState,
     )
 
     /** The one-sentence answer. <= 12 words, always ends in an action. */
     fun advise(s: State): Advice {
         if (s.dosePercent < 25.0 && s.risk == RiskState.CALM) {
-            return when (s.scene) {
-                Scene.QUIET_INDOOR, Scene.CONVERSATION, Scene.UNKNOWN -> Advice(AdviceKind.FINE)
+            return when (s.mode) {
+                SituationMode.QUIET, null -> Advice(AdviceKind.FINE)
                 else -> Advice(AdviceKind.COMFORTABLE)
             }
         }
         val left = formatHeadroom(s.headroomMinutes)
         return when (s.risk) {
-            RiskState.CRITICAL -> when (s.scene) {
-                Scene.LIVE_MUSIC -> Advice(AdviceKind.CRITICAL_MUSIC)
-                Scene.MACHINERY -> Advice(AdviceKind.CRITICAL_MACHINERY)
+            RiskState.CRITICAL -> when (s.mode) {
+                SituationMode.CONCERT -> Advice(AdviceKind.CRITICAL_MUSIC)
+                SituationMode.WORK -> Advice(AdviceKind.CRITICAL_MACHINERY)
                 else -> Advice(AdviceKind.CRITICAL_GENERIC)
             }
-            RiskState.HAZARD -> when (s.scene) {
-                Scene.LIVE_MUSIC -> Advice(AdviceKind.HAZARD_MUSIC, listOf(left))
-                Scene.MACHINERY -> Advice(AdviceKind.HAZARD_MACHINERY, listOf(left))
-                Scene.TRANSIT -> Advice(AdviceKind.HAZARD_TRANSIT, listOf(left))
-                Scene.TRAFFIC -> Advice(AdviceKind.HAZARD_TRAFFIC, listOf(left))
+            RiskState.HAZARD -> when (s.mode) {
+                SituationMode.CONCERT -> Advice(AdviceKind.HAZARD_MUSIC, listOf(left))
+                SituationMode.WORK -> Advice(AdviceKind.HAZARD_MACHINERY, listOf(left))
+                SituationMode.TRANSPORT -> Advice(AdviceKind.HAZARD_TRANSIT, listOf(left))
+                SituationMode.STREET -> Advice(AdviceKind.HAZARD_TRAFFIC, listOf(left))
                 else -> Advice(AdviceKind.HAZARD_GENERIC, listOf(left))
             }
-            RiskState.ACCRUING -> when (s.scene) {
-                Scene.TRAFFIC -> Advice(AdviceKind.ACCRUING_TRAFFIC)
-                Scene.TRANSIT -> Advice(AdviceKind.ACCRUING_TRANSIT)
-                Scene.LIVE_MUSIC ->
+            RiskState.ACCRUING -> when (s.mode) {
+                SituationMode.STREET -> Advice(AdviceKind.ACCRUING_TRAFFIC)
+                SituationMode.TRANSPORT -> Advice(AdviceKind.ACCRUING_TRANSIT)
+                SituationMode.CONCERT ->
                     Advice(AdviceKind.ACCRUING_MUSIC, listOf(s.dosePercent.roundToInt()))
-                Scene.MACHINERY -> Advice(AdviceKind.ACCRUING_MACHINERY)
+                SituationMode.WORK -> Advice(AdviceKind.ACCRUING_MACHINERY)
                 else -> Advice(AdviceKind.ACCRUING_GENERIC, listOf(s.dba.roundToInt()))
             }
             RiskState.RECOVER -> Advice(AdviceKind.RECOVER)

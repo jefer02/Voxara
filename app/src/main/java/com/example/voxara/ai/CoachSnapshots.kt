@@ -24,7 +24,8 @@ object CoachSnapshots {
             headphoneDays = state.headphoneDays,
             headphoneCategory = state.headphoneCategory?.name,
             calibrated = state.calibrated,
-            situation = state.mode,
+            // Auto's Street fallback is not a finding: Tono keeps its neutral voice until a mode is known.
+            situation = state.knownMode,
         ),
         locale,
     )
