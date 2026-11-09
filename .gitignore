@@ -30,6 +30,10 @@ captures/
 *.apk
 *.aab
 output-metadata.json
+# Android Studio's "Generate Signed APK" output (APK, baseline profile .dm files)
+/app/release/
+/phone/release/
+*.dm
 
 # Kotlin and JVM tooling
 .kotlin/
