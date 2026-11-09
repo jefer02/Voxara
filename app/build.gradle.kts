@@ -37,8 +37,8 @@ android {
         applicationId = "com.example.voxara"
         minSdk = 30
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.9"
+        versionCode = 10
+        versionName = "0.10.0"
 
         // OpenAI-compatible endpoint (DeepSeek by default). Both are overridable per machine.
         buildConfigField("String", "AI_BASE_URL", quoted(localProp("AI_BASE_URL", "https://api.deepseek.com")))

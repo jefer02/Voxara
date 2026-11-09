@@ -31,8 +31,8 @@ android {
         applicationId = "com.example.voxara"
         minSdk = 28
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.9.2-phone"
+        versionCode = 10
+        versionName = "0.10.0"
 
         buildConfigField("String", "AI_BASE_URL", quoted(localProp("AI_BASE_URL", "https://api.deepseek.com")))
         buildConfigField("String", "AI_MODEL", quoted(localProp("AI_MODEL", "deepseek-flash")))
